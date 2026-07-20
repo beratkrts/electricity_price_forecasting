@@ -1,0 +1,21 @@
+# Local environment
+.env
+.env.*
+.eptr2-tgt
+.venv/
+venv/
+
+# Project data
+data/
+data_backup/
+
+# Python cache and local tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
