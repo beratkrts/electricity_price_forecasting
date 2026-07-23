@@ -8,6 +8,7 @@ venv/
 # Project data
 data/
 data_backup/
+epias_data/
 
 # Python cache and local tooling
 __pycache__/

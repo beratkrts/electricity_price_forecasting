@@ -1,0 +1,6 @@
+pandas
+python-dotenv
+eptr2
+numpy
+matplotlib
+seaborn

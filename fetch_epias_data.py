@@ -34,9 +34,10 @@ def main():
         "08_actual_consumption": "rt-cons"
     }
 
-    # --- 3. TIME LOOP (January 2024 - Current Time) ---
-    # Monthly frequency from January 2024 to July 2026 (MS = Month Start).
-    monthly_periods = pd.date_range(start="2024-01-01", end="2026-07-01", freq="MS")
+    # --- 3. TIME LOOP (January 2024 - Today) ---
+    today = pd.Timestamp.now(tz="Europe/Istanbul").normalize().tz_localize(None)
+    current_month_start = today.replace(day=1)
+    monthly_periods = pd.date_range(start="2024-01-01", end=current_month_start, freq="MS")
     
     root_folder = "epias_data"
     os.makedirs(root_folder, exist_ok=True)
@@ -45,7 +46,7 @@ def main():
     for i in range(len(monthly_periods)):
         # Dynamically calculate the first and last day of the month.
         start_dt = monthly_periods[i]
-        end_dt = start_dt + pd.offsets.MonthEnd(1)
+        end_dt = min(start_dt + pd.offsets.MonthEnd(1), today)
 
         start_str = start_dt.strftime("%Y-%m-%d")
         end_str = end_dt.strftime("%Y-%m-%d")
