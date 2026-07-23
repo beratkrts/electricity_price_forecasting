@@ -4,3 +4,4 @@ eptr2
 numpy
 matplotlib
 seaborn
+yfinance

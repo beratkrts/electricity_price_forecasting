@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 from eptr2 import EPTR2
+import yfinance as yf
 
 def main():
     # --- 1. AUTHENTICATION (Secure .env Connection) ---
@@ -22,7 +23,7 @@ def main():
     # Initialize the API connection.
     eptr = EPTR2(username=username, password=password, dotenv_path=str(env_path))
 
-    # --- 2. UPDATED SET OF 8 ENDPOINTS ---
+    # --- 2. UPDATED SET OF 8 EPİAŞ ENDPOINTS ---
     endpoints = {
         "01_load_forecast": "load-plan",
         "02_kgup": "kgup",
@@ -43,31 +44,42 @@ def main():
     os.makedirs(root_folder, exist_ok=True)
     print("EPIAS ETL Bot Started: Fetching Data in Monthly Blocks\n")
 
+    # --- 4. FETCH FINANCIAL DATA (USD/TRY & BRENT OIL) VIA YFINANCE ---
+    print(" Fetching macro indicators (USD/TRY & Brent Oil) via yfinance...")
+    start_global = "2024-01-01"
+    end_global = (today + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Tickers: USDTRY=X (USD/TRY), BZ=F (Brent Crude Oil)
+    macro_data = yf.download(["USDTRY=X", "BZ=F"], start=start_global, end=end_global, interval="1d")["Close"]
+    macro_data = macro_data.reset_index()
+    macro_data['Date'] = pd.to_datetime(macro_data['Date']).dt.tz_localize(None)
+    
+    # Missing values (weekends/holidays) forward filled
+    macro_data = macro_data.ffill().bfill()
+    macro_data = macro_data.rename(columns={"USDTRY=X": "usd_try", "BZ=F": "brent_oil_usd", "Date": "date"})
+
+    # --- 5. MAIN MONTHLY DATA FETCHING LOOP ---
     for i in range(len(monthly_periods)):
-        # Dynamically calculate the first and last day of the month.
         start_dt = monthly_periods[i]
         end_dt = min(start_dt + pd.offsets.MonthEnd(1), today)
 
         start_str = start_dt.strftime("%Y-%m-%d")
         end_str = end_dt.strftime("%Y-%m-%d")
         
-        # Create a separate folder for each month.
         folder_name = f"{root_folder}/{start_dt.strftime('%Y-%m')}"
         os.makedirs(folder_name, exist_ok=True)
         
         print(f"\nTarget Period: {start_str} - {end_str} | Folder: {folder_name}")
         
+        # --- A. EPİAŞ ENDPOINTS LOOP ---
         for file_name, call_key in endpoints.items():
             print(f"   -> Calling [{file_name}] ({call_key}) service...")
             try:
-                # Timezone-aware format required by the API (+03:00).
                 start_iso = f"{start_str}T00:00:00+03:00"
                 end_iso = f"{end_str}T23:59:59+03:00"
                 
-                # API call.
                 res = eptr.call(call_key, start_date=start_iso, end_date=end_iso)
                 
-                # Save the response if it is not empty.
                 if res is not None:
                     file_path = f"{folder_name}/{file_name}.json"
                     
@@ -85,10 +97,22 @@ def main():
             except Exception as e:
                 print(f"      [!] ERROR - A problem occurred while fetching {file_name}: {e}")
             
-            # Wait to avoid API rate limits.
-            time.sleep(2) 
+            time.sleep(2)
 
-    print("\nAll operations completed successfully. The data is ready for processing!")
+        # --- B. SAVE MACRO FINANCIAL DATA FOR THIS MONTH ---
+        print("   -> Processing Financial Data (USD/TRY & Brent Oil)...")
+        try:
+            # Slicing financial data for the current month
+            month_macro = macro_data[(macro_data['date'] >= start_dt) & (macro_data['date'] <= end_dt)].copy()
+            month_macro['date'] = month_macro['date'].dt.strftime("%Y-%m-%d")
+            
+            macro_file_path = f"{folder_name}/09_macro_indicators.json"
+            month_macro.to_json(macro_file_path, orient="records", force_ascii=False, indent=4)
+            print("      [+] 09_macro_indicators saved successfully.")
+        except Exception as e:
+            print(f"      [!] ERROR - A problem occurred while saving financial data: {e}")
+
+    print("\nAll operations completed successfully. EPİAŞ & Macro data is ready!")
 
 if __name__ == "__main__":
     main()
