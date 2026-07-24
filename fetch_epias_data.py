@@ -1,11 +1,206 @@
 import os
 import time
+import io
 import json
 from pathlib import Path
 import pandas as pd
+import requests
 from dotenv import load_dotenv
 from eptr2 import EPTR2
 import yfinance as yf
+
+CAS_TICKET_URL = "https://giris.epias.com.tr/cas/v1/tickets"
+LICENSED_REALTIME_GENERATION_URL = (
+    "https://seffaflik.epias.com.tr/electricity-service/v1/"
+    "renewables/data/licensed-realtime-generation"
+)
+
+INSTALLED_CAPACITY_URL = (
+    "https://seffaflik.epias.com.tr/electricity-service/v1/"
+    "renewables/data/new-installed-capacity"
+)
+
+ACTIVE_FULLNESS_URL = (
+    "https://seffaflik.epias.com.tr/electricity-service/v1/"
+    "dams/data/active-fullness"
+)
+
+WATER_ENERGY_PROVISION_URL = (
+    "https://seffaflik.epias.com.tr/electricity-service/v1/"
+    "dams/data/water-energy-provision"
+)
+
+
+
+
+def get_tgt_token(username, password):
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept": "text/plain",
+    }
+    response = requests.post(
+        CAS_TICKET_URL,
+        data={"username": username, "password": password},
+        headers=headers,
+        timeout=30,
+    )
+    response.raise_for_status()
+
+    tgt_token = response.text.strip()
+    if not tgt_token:
+        raise ValueError("EPİAŞ CAS returned an empty TGT token.")
+
+    return tgt_token
+
+
+def find_record_list(value):
+    if isinstance(value, list):
+        if all(isinstance(item, dict) for item in value):
+            return value
+        return None
+
+    if isinstance(value, dict):
+        for preferred_key in ("items", "data", "content", "body"):
+            if preferred_key in value:
+                records = find_record_list(value[preferred_key])
+                if records is not None:
+                    return records
+
+        for nested_value in value.values():
+            records = find_record_list(nested_value)
+            if records is not None:
+                return records
+
+    return None
+
+
+def find_page_info(value):
+    if not isinstance(value, dict):
+        return {}
+
+    page = value.get("page")
+    if isinstance(page, dict):
+        return page
+
+    for nested_value in value.values():
+        page = find_page_info(nested_value)
+        if page:
+            return page
+
+    return {}
+
+
+def fetch_licensed_realtime_generation(tgt_token, start_iso, end_iso, page_size=1000):
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "TGT": tgt_token,
+    }
+
+    all_records = []
+    page_number = 1
+
+    while True:
+        payload = {
+            "startDate": start_iso,
+            "endDate": end_iso,
+            "page": {
+                "number": page_number,
+                "size": page_size,
+            },
+        }
+        response = requests.post(
+            LICENSED_REALTIME_GENERATION_URL,
+            headers=headers,
+            json=payload,
+            timeout=60,
+        )
+        response.raise_for_status()
+
+        response_payload = response.json()
+        records = find_record_list(response_payload) or []
+        all_records.extend(records)
+
+        page_info = find_page_info(response_payload)
+        total_pages = page_info.get("totalPages") or page_info.get("totalPage")
+        if total_pages and page_number >= int(total_pages):
+            break
+
+        total_elements = page_info.get("totalElements") or page_info.get("total")
+        if total_elements and len(all_records) >= int(total_elements):
+            break
+
+        if len(records) < page_size:
+            break
+
+        page_number += 1
+
+    return all_records
+
+
+def fetch_active_fullness(tgt_token, start_iso, end_iso):
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "TGT": tgt_token,
+    }
+    payload = {
+        "startDate": start_iso,
+        "endDate": end_iso,
+    }
+    response = requests.post(
+        ACTIVE_FULLNESS_URL,
+        headers=headers,
+        json=payload,
+        timeout=60,
+    )
+    response.raise_for_status()
+    response_payload = response.json()
+    return find_record_list(response_payload) or []
+
+
+def fetch_water_energy_provision(tgt_token, start_iso, end_iso):
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "TGT": tgt_token,
+    }
+    payload = {
+        "startDate": start_iso,
+        "endDate": end_iso,
+        "exportType": "CSV",
+    }
+    response = requests.post(
+        WATER_ENERGY_PROVISION_URL,
+        headers=headers,
+        json=payload,
+        timeout=60,
+    )
+    response.raise_for_status()
+    response.encoding = "utf-8-sig"
+    df = pd.read_csv(io.StringIO(response.text), sep=";")
+    return df.to_dict(orient="records")
+
+
+def fetch_installed_capacity(tgt_token, period):
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "TGT": tgt_token,
+    }
+    payload = {
+        "period": period,
+    }
+    response = requests.post(
+        INSTALLED_CAPACITY_URL,
+        headers=headers,
+        json=payload,
+        timeout=60,
+    )
+    response.raise_for_status()
+    response_payload = response.json()
+    return find_record_list(response_payload) or response_payload
+
 
 def main():
     # --- 1. AUTHENTICATION (Secure .env Connection) ---
@@ -22,6 +217,13 @@ def main():
 
     # Initialize the API connection.
     eptr = EPTR2(username=username, password=password, dotenv_path=str(env_path))
+
+    try:
+        tgt_token = get_tgt_token(username, password)
+        print("EPİAŞ direct API TGT token received successfully.")
+    except Exception as e:
+        tgt_token = None
+        print(f"[!] WARNING - Could not get EPİAŞ direct API TGT token. Licensed generation data will be skipped: {e}")
 
     # --- 2. UPDATED SET OF 8 EPİAŞ ENDPOINTS ---
     endpoints = {
@@ -40,7 +242,7 @@ def main():
     current_month_start = today.replace(day=1)
     monthly_periods = pd.date_range(start="2024-01-01", end=current_month_start, freq="MS")
     
-    root_folder = "epias_data"
+    root_folder = "data"
     os.makedirs(root_folder, exist_ok=True)
     print("EPIAS ETL Bot Started: Fetching Data in Monthly Blocks\n")
 
@@ -99,7 +301,41 @@ def main():
             
             time.sleep(2)
 
-        # --- B. SAVE MACRO FINANCIAL DATA FOR THIS MONTH ---
+        # --- B. SAVE LICENSED REALTIME GENERATION ---
+        print("   -> Calling [10_licensed_realtime_generation] direct EPİAŞ API service...")
+        try:
+            if tgt_token is None:
+                print("      [-] 10_licensed_realtime_generation skipped because TGT token is missing.")
+            else:
+                licensed_generation = fetch_licensed_realtime_generation(tgt_token, start_iso, end_iso)
+                licensed_file_path = f"{folder_name}/10_licensed_realtime_generation.json"
+
+                with open(licensed_file_path, "w", encoding="utf-8") as f:
+                    json.dump(licensed_generation, f, ensure_ascii=False, indent=4)
+
+                print(f"      [+] 10_licensed_realtime_generation saved successfully. Records: {len(licensed_generation)}")
+        except Exception as e:
+            print(f"      [!] ERROR - A problem occurred while fetching licensed generation data: {e}")
+
+        # --- E. SAVE INSTALLED CAPACITY ---
+        print("   -> Calling [13_installed_capacity] direct EPİAŞ API service...")
+        try:
+            if tgt_token is None:
+                print("      [-] 13_installed_capacity skipped because TGT token is missing.")
+            else:
+                period_str = f"{start_str}T00:00:00+03:00"
+                installed_cap = fetch_installed_capacity(tgt_token, period_str)
+                ic_file_path = f"{folder_name}/13_installed_capacity.json"
+
+                with open(ic_file_path, "w", encoding="utf-8") as f:
+                    json.dump(installed_cap, f, ensure_ascii=False, indent=4)
+
+                cap_len = len(installed_cap) if isinstance(installed_cap, list) else 1
+                print(f"      [+] 13_installed_capacity saved successfully. Records: {cap_len}")
+        except Exception as e:
+            print(f"      [!] ERROR - A problem occurred while fetching installed capacity data: {e}")
+
+        # --- F. SAVE MACRO FINANCIAL DATA FOR THIS MONTH ---
         print("   -> Processing Financial Data (USD/TRY & Brent Oil)...")
         try:
             # Slicing financial data for the current month
@@ -111,6 +347,44 @@ def main():
             print("      [+] 09_macro_indicators saved successfully.")
         except Exception as e:
             print(f"      [!] ERROR - A problem occurred while saving financial data: {e}")
+
+    # --- 6. FETCH SINGLE MASTER SNAPSHOTS (ACTIVE FULLNESS & WATER ENERGY PROVISION) ---
+    print("\n⚡ Fetching Static Master Data Snapshots (Active Fullness & Water Energy Provision) ⚡")
+    today_str = today.strftime("%Y-%m-%d")
+    today_start_iso = f"{today_str}T00:00:00+03:00"
+    today_end_iso = f"{today_str}T23:59:59+03:00"
+
+    # --- A. ACTIVE DAM FULLNESS SNAPSHOT ---
+    print("   -> Calling [active_fullness] master snapshot service...")
+    try:
+        if tgt_token is None:
+            print("      [-] active_fullness skipped because TGT token is missing.")
+        else:
+            active_fullness = fetch_active_fullness(tgt_token, today_start_iso, today_end_iso)
+            af_file_path = f"{root_folder}/master_active_fullness.json"
+
+            with open(af_file_path, "w", encoding="utf-8") as f:
+                json.dump(active_fullness, f, ensure_ascii=False, indent=4)
+
+            print(f"      [+] master_active_fullness saved successfully. Records: {len(active_fullness)} -> {af_file_path}")
+    except Exception as e:
+        print(f"      [!] ERROR - A problem occurred while fetching active fullness snapshot: {e}")
+
+    # --- B. WATER ENERGY PROVISION SNAPSHOT ---
+    print("   -> Calling [water_energy_provision] master snapshot service...")
+    try:
+        if tgt_token is None:
+            print("      [-] water_energy_provision skipped because TGT token is missing.")
+        else:
+            water_energy = fetch_water_energy_provision(tgt_token, today_start_iso, today_end_iso)
+            we_file_path = f"{root_folder}/master_water_energy_provision.json"
+
+            with open(we_file_path, "w", encoding="utf-8") as f:
+                json.dump(water_energy, f, ensure_ascii=False, indent=4)
+
+            print(f"      [+] master_water_energy_provision saved successfully. Records: {len(water_energy)} -> {we_file_path}")
+    except Exception as e:
+        print(f"      [!] ERROR - A problem occurred while fetching water energy provision snapshot: {e}")
 
     print("\nAll operations completed successfully. EPİAŞ & Macro data is ready!")
 

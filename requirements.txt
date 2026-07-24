@@ -1,6 +1,7 @@
 pandas
 python-dotenv
 eptr2
+requests
 numpy
 matplotlib
 seaborn
