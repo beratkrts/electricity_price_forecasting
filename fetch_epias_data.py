@@ -369,25 +369,26 @@ def main():
         except Exception as e:
             print(f"      [!] ERROR - A problem occurred while fetching licensed generation data: {e}")
 
-        # --- E. SAVE INSTALLED CAPACITY ---
-        print("   -> Calling [13_installed_capacity] direct EPİAŞ API service...")
+
+        # --- C. SAVE INSTALLED CAPACITY ---
+        print("   -> Calling [11_installed_capacity] direct EPİAŞ API service...")
         try:
             if tgt_token is None:
-                print("      [-] 13_installed_capacity skipped because TGT token is missing.")
+                print("      [-] 11_installed_capacity skipped because TGT token is missing.")
             else:
                 period_str = f"{start_str}T00:00:00+03:00"
                 installed_cap = fetch_installed_capacity(tgt_token, period_str)
-                ic_file_path = f"{folder_name}/13_installed_capacity.json"
+                ic_file_path = f"{folder_name}/11_installed_capacity.json"
 
                 with open(ic_file_path, "w", encoding="utf-8") as f:
                     json.dump(installed_cap, f, ensure_ascii=False, indent=4)
 
                 cap_len = len(installed_cap) if isinstance(installed_cap, list) else 1
-                print(f"      [+] 13_installed_capacity saved successfully. Records: {cap_len}")
+                print(f"      [+] 11_installed_capacity saved successfully. Records: {cap_len}")
         except Exception as e:
             print(f"      [!] ERROR - A problem occurred while fetching installed capacity data: {e}")
 
-        # --- F. SAVE MACRO FINANCIAL DATA FOR THIS MONTH ---
+        # --- D. SAVE MACRO FINANCIAL DATA FOR THIS MONTH ---
         print("   -> Processing Financial Data (USD/TRY & Brent Oil)...")
         try:
             # Slicing financial data for the current month
@@ -399,6 +400,22 @@ def main():
             print("      [+] 09_macro_indicators saved successfully.")
         except Exception as e:
             print(f"      [!] ERROR - A problem occurred while saving financial data: {e}")
+
+        # --- E. SAVE Natural Gas Daily Reference Price ---
+        print("   -> Calling [12_natural_gas_daiy_ref_price] direct EPİAŞ API service...")
+        try:
+            if tgt_token is None:
+                print("      [-] 12_natural_gas_daiy_ref_price skipped because TGT token is missing.")
+            else:
+                ng_daily_ref_price = fetch_natural_gas_daily_reference_price(tgt_token, start_iso, end_iso)
+                ng_daily_ref_price_file_path = f"{folder_name}/12_natural_gas_daiy_ref_price.json"
+
+                with open(ng_daily_ref_price_file_path, "w", encoding="utf-8") as f:
+                    json.dump(ng_daily_ref_price, f, ensure_ascii=False, indent=4)
+
+                print(f"      [+] 12_natural_gas_daiy_ref_price saved successfully. Records: {len(ng_daily_ref_price)}")
+        except Exception as e:
+            print(f"      [!] ERROR - A problem occurred while fetching natural gas daiy ref price: {e}")
 
     # --- 6. FETCH SINGLE MASTER SNAPSHOTS (ACTIVE FULLNESS & WATER ENERGY PROVISION) ---
     print("\n⚡ Fetching Static Master Data Snapshots (Active Fullness & Water Energy Provision) ⚡")
