@@ -30,6 +30,10 @@ WATER_ENERGY_PROVISION_URL = (
     "dams/data/water-energy-provision"
 )
 
+NATURAL_GAS_PRICE_URL = (
+    "https://seffaflik.epias.com.tr/natural-gas-service/v1/"
+    "markets/sgp/data/daily-reference-price"
+)
 
 
 
@@ -200,6 +204,54 @@ def fetch_installed_capacity(tgt_token, period):
     response.raise_for_status()
     response_payload = response.json()
     return find_record_list(response_payload) or response_payload
+
+def fetch_natural_gas_daily_reference_price(tgt_token, start_iso, end_iso, page_size = 1000):
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "TGT": tgt_token,
+    }
+
+    all_records = []
+    page_number = 1
+
+    while True:
+        payload = {
+            "startDate": start_iso,
+            "endDate": end_iso,
+            "page": {
+                "number": page_number,
+                "size": page_size,
+            },
+        }
+        response = requests.post(
+            NATURAL_GAS_PRICE_URL,
+            headers=headers,
+            json=payload,
+            timeout=60,
+        )
+        response.raise_for_status()
+
+        response_payload = response.json()
+        records = find_record_list(response_payload) or []
+        all_records.extend(records)
+
+        page_info = find_page_info(response_payload)
+        total_pages = page_info.get("totalPages") or page_info.get("totalPage")
+        if total_pages and page_number >= int(total_pages):
+            break
+
+        total_elements = page_info.get("totalElements") or page_info.get("total")
+        if total_elements and len(all_records) >= int(total_elements):
+            break
+
+        if len(records) < page_size:
+            break
+
+        page_number += 1
+
+    return all_records
+
 
 
 def main():
