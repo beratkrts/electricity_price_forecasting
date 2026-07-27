@@ -39,6 +39,17 @@ EPIAS_PASSWORD=sifreniz
 \`\`\`
 *(Not: Güvenlik sebebiyle `.env` dosyası `.gitignore` içine eklenmeli ve asla GitHub'a pushlanmamalıdır.)*
 
+## 🐳 Docker ile Hızlı Kurulum
+
+Projeyi veritabanı (PostgreSQL) ve 7/24 otomatik veri çekme daemon servisi ile birlikte tek komutla çalıştırmak için:
+
+```bash
+docker compose up --build -d
+```
+
+Kapsamlı Docker mimarisi ve komut rehberi için [docs/docker_guide.md](file:///Users/beratkaratasoglu/etkb_intern_project/enerji_fiyat_tahmini/docs/docker_guide.md) dokümanını inceleyebilirsiniz.
+
+
 ## 💻 Kullanım
 
 Betik dosyası çalıştırıldığında belirtilen tarih aralığındaki tüm saatlik veriler `data/` klasörü içerisine ayrı JSON dosyaları olarak indirilir.

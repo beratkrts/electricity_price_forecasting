@@ -1,29 +1,54 @@
+"""Database Connection & Utility Module.
+
+Provides connection string creation, SHA-256 checksum calculation for in-memory
+API payloads, and database engine management.
+"""
+
 import os
 import hashlib
 import json
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
+from sqlalchemy import create_engine
 
-# Load .env file
-env_path = next((path / '.env' for path in [Path.cwd(), *Path.cwd().parents] if (path / '.env').exists()), None)
+logger = logging.getLogger("DatabaseConnection")
+
+# Load environment variables from .env file
+env_path = next(
+    (path / ".env" for path in [Path.cwd(), *Path.cwd().parents] if (path / ".env").exists()),
+    None
+)
 if env_path:
     load_dotenv(env_path)
 
-def get_db_url():
-    """Generates PostgreSQL connection string from environment variables."""
-    host = os.getenv("POSTGRES_HOST", "localhost")
-    port = os.getenv("POSTGRES_PORT", "5432")
-    db = os.getenv("POSTGRES_DB", "enerji_db")
-    user = os.getenv("POSTGRES_USER", "postgres")
-    password = os.getenv("POSTGRES_PASSWORD", "postgres")
-    return f"postgresql://{user}:{password}@{host}:{port}/{db}"
 
-def calculate_checksum(data):
-    """Calculates SHA-256 hash for raw API data payload (list or dict)."""
+def get_db_url() -> str:
+    """Generates PostgreSQL SQLAlchemy connection URL from environment variables.
+    
+    Supports both POSTGRES_* and DB_* environment variable naming conventions.
+    """
+    host = os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "localhost")
+    port = os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")
+    db_name = os.getenv("POSTGRES_DB") or os.getenv("DB_NAME", "enerji_db")
+    user = os.getenv("POSTGRES_USER") or os.getenv("DB_USER", "postgres")
+    password = os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASS", "postgres")
+    
+    return f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
+
+
+def get_db_engine(db_url: str = None):
+    """Creates and returns a SQLAlchemy Engine with connection pooling and pre-ping."""
+    url = db_url or get_db_url()
+    return create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=20)
+
+
+def calculate_checksum(data) -> str:
+    """Calculates a SHA-256 digital signature hash for an in-memory API payload (list or dict)."""
     if isinstance(data, (dict, list)):
-        serialized = json.dumps(data, sort_keys=True, ensure_ascii=False).encode('utf-8')
+        serialized = json.dumps(data, sort_keys=True, ensure_ascii=False).encode("utf-8")
     elif isinstance(data, str):
-        serialized = data.encode('utf-8')
+        serialized = data.encode("utf-8")
     else:
         serialized = bytes(data)
     return hashlib.sha256(serialized).hexdigest()
