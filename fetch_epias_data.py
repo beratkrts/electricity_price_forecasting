@@ -8,6 +8,7 @@ import requests
 from dotenv import load_dotenv
 from eptr2 import EPTR2
 import yfinance as yf
+from api_trials.weather_fetcher import fetch_turkey_weighted_temperature
 
 CAS_TICKET_URL = "https://giris.epias.com.tr/cas/v1/tickets"
 LICENSED_REALTIME_GENERATION_URL = (
@@ -416,6 +417,17 @@ def main():
                 print(f"      [+] 12_natural_gas_daiy_ref_price saved successfully. Records: {len(ng_daily_ref_price)}")
         except Exception as e:
             print(f"      [!] ERROR - A problem occurred while fetching natural gas daiy ref price: {e}")
+
+        # --- F. SAVE TURKEY WEIGHTED TEMPERATURE ---
+        print("   -> Fetching Turkey Weighted Temperature (Open-Meteo API)...")
+        try:
+            df_temp = fetch_turkey_weighted_temperature(start_str, end_str)
+            if not df_temp.empty:
+                temp_file_path = f"{folder_name}/13_turkey_weighted_temperature.json"
+                df_temp.to_json(temp_file_path, orient="records", force_ascii=False, indent=4)
+                print(f"      [+] 13_turkey_weighted_temperature saved successfully. Records: {len(df_temp)}")
+        except Exception as e:
+            print(f"      [!] ERROR - A problem occurred while fetching weighted temperature: {e}")
 
     # --- 6. FETCH SINGLE MASTER SNAPSHOTS (ACTIVE FULLNESS & WATER ENERGY PROVISION) ---
     print("\n⚡ Fetching Static Master Data Snapshots (Active Fullness & Water Energy Provision) ⚡")

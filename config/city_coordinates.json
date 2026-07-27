@@ -1,0 +1,158 @@
+{
+    "İSTANBUL": {
+        "lat": 41.0082,
+        "lon": 28.9784,
+        "raw_percentage": 15.46,
+        "weight": 0.19315342
+    },
+    "İZMİR": {
+        "lat": 38.4192,
+        "lon": 27.1287,
+        "raw_percentage": 6.26,
+        "weight": 0.07821089
+    },
+    "ANKARA": {
+        "lat": 39.9334,
+        "lon": 32.8597,
+        "raw_percentage": 5.94,
+        "weight": 0.07421289
+    },
+    "KOCAELİ": {
+        "lat": 40.7654,
+        "lon": 29.9408,
+        "raw_percentage": 4.99,
+        "weight": 0.06234383
+    },
+    "BURSA": {
+        "lat": 40.1885,
+        "lon": 29.061,
+        "raw_percentage": 4.8,
+        "weight": 0.05997001
+    },
+    "ANTALYA": {
+        "lat": 36.8969,
+        "lon": 30.7133,
+        "raw_percentage": 4.02,
+        "weight": 0.05022489
+    },
+    "KONYA": {
+        "lat": 37.8746,
+        "lon": 32.4932,
+        "raw_percentage": 3.58,
+        "weight": 0.04472764
+    },
+    "GAZİANTEP": {
+        "lat": 37.0662,
+        "lon": 37.3833,
+        "raw_percentage": 3.19,
+        "weight": 0.03985507
+    },
+    "HATAY": {
+        "lat": 36.2023,
+        "lon": 36.1613,
+        "raw_percentage": 3.1,
+        "weight": 0.03873063
+    },
+    "ADANA": {
+        "lat": 36.9914,
+        "lon": 35.3308,
+        "raw_percentage": 2.97,
+        "weight": 0.03710645
+    },
+    "TEKİRDAĞ": {
+        "lat": 40.9833,
+        "lon": 27.5167,
+        "raw_percentage": 2.71,
+        "weight": 0.03385807
+    },
+    "MERSİN": {
+        "lat": 36.8,
+        "lon": 34.6333,
+        "raw_percentage": 2.43,
+        "weight": 0.03035982
+    },
+    "MANİSA": {
+        "lat": 38.6191,
+        "lon": 27.4289,
+        "raw_percentage": 2.03,
+        "weight": 0.02536232
+    },
+    "ŞANLIURFA": {
+        "lat": 37.1674,
+        "lon": 38.7955,
+        "raw_percentage": 1.92,
+        "weight": 0.02398801
+    },
+    "KAHRAMANMARAŞ": {
+        "lat": 37.5858,
+        "lon": 36.9371,
+        "raw_percentage": 1.62,
+        "weight": 0.02023988
+    },
+    "MUĞLA": {
+        "lat": 37.2153,
+        "lon": 28.3636,
+        "raw_percentage": 1.6,
+        "weight": 0.01999
+    },
+    "SAKARYA": {
+        "lat": 40.7569,
+        "lon": 30.3783,
+        "raw_percentage": 1.55,
+        "weight": 0.01936532
+    },
+    "KAYSERİ": {
+        "lat": 38.7312,
+        "lon": 35.4787,
+        "raw_percentage": 1.59,
+        "weight": 0.01986507
+    },
+    "BALIKESİR": {
+        "lat": 39.6484,
+        "lon": 27.8826,
+        "raw_percentage": 1.54,
+        "weight": 0.01924038
+    },
+    "SAMSUN": {
+        "lat": 41.2928,
+        "lon": 36.3313,
+        "raw_percentage": 1.42,
+        "weight": 0.01774113
+    },
+    "DENİZLİ": {
+        "lat": 37.7765,
+        "lon": 29.0864,
+        "raw_percentage": 1.3,
+        "weight": 0.01624188
+    },
+    "OSMANİYE": {
+        "lat": 37.0742,
+        "lon": 36.2478,
+        "raw_percentage": 1.44,
+        "weight": 0.017991
+    },
+    "ESKİŞEHİR": {
+        "lat": 39.7667,
+        "lon": 30.5256,
+        "raw_percentage": 1.26,
+        "weight": 0.01574213
+    },
+    "AYDIN": {
+        "lat": 37.845,
+        "lon": 27.8416,
+        "raw_percentage": 1.23,
+        "weight": 0.01536732
+    },
+    "DİYARBAKIR": {
+        "lat": 37.9144,
+        "lon": 40.2306,
+        "raw_percentage": 1.24,
+        "weight": 0.01549225
+    },
+    "KIRKLARELİ": {
+        "lat": 41.7351,
+        "lon": 27.2252,
+        "raw_percentage": 0.85,
+        "weight": 0.01061969
+    }
+}
