@@ -18,12 +18,6 @@ logger = logging.getLogger("DataFetcher")
 
 # --- EPİAŞ API CONSTANTS ---
 CAS_TICKET_URL = "https://giris.epias.com.tr/cas/v1/tickets"
-LICENSED_REALTIME_GENERATION_URL = (
-    "https://seffaflik.epias.com.tr/electricity-service/v1/renewables/data/licensed-realtime-generation"
-)
-INSTALLED_CAPACITY_URL = (
-    "https://seffaflik.epias.com.tr/electricity-service/v1/renewables/data/new-installed-capacity"
-)
 ACTIVE_FULLNESS_URL = (
     "https://seffaflik.epias.com.tr/electricity-service/v1/dams/data/active-fullness"
 )
@@ -61,6 +55,9 @@ def find_record_list(payload: Any) -> Optional[List[Dict[str, Any]]]:
             return payload
         return None
 
+    if isinstance(payload, pd.DataFrame):
+        return payload.to_dict(orient="records")
+
     if isinstance(payload, dict):
         for preferred_key in ("items", "data", "content", "body"):
             if preferred_key in payload:
@@ -75,12 +72,18 @@ def find_record_list(payload: Any) -> Optional[List[Dict[str, Any]]]:
 
 
 class EpiasFetcher:
-    """In-memory fetcher for EPİAŞ Transparency API datasets."""
+    """In-memory fetcher for EPİAŞ Transparency API datasets using eptr2 library."""
 
     def __init__(self, username: Optional[str] = None, password: Optional[str] = None, env_path: Optional[str] = None):
         self.username = username
         self.password = password
-        self.eptr = EPTR2(username=username, password=password, dotenv_path=env_path) if username and password else None
+        if username and password:
+            kwargs = {"username": username, "password": password}
+            if env_path:
+                kwargs["dotenv_path"] = str(env_path)
+            self.eptr = EPTR2(**kwargs)
+        else:
+            self.eptr = None
         self._tgt_token = None
 
     def get_token(self) -> Optional[str]:
@@ -100,7 +103,9 @@ class EpiasFetcher:
                 raise ValueError("eptr2 client is not initialized.")
             logger.info(f"Calling eptr2 service: '{service_name}' ({start_iso} to {end_iso})...")
             res = self.eptr.call(service_name, start_date=start_iso, end_date=end_iso)
-            if isinstance(res, list):
+            if isinstance(res, pd.DataFrame):
+                return res.to_dict(orient="records")
+            elif isinstance(res, list):
                 return res
             elif isinstance(res, dict):
                 return find_record_list(res) or []
@@ -109,42 +114,22 @@ class EpiasFetcher:
             logger.error(f"Error fetching eptr2 service '{service_name}': {e}")
             return []
 
-    def fetch_licensed_realtime_generation(self, start_iso: str, end_iso: str, page_size: int = 1000) -> List[Dict[str, Any]]:
-        """Fetches licensed real-time generation with pagination directly into memory."""
-        token = self.get_token()
-        if not token:
-            return []
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
-        all_records = []
-        page_number = 1
-        while True:
-            payload = {"startDate": start_iso, "endDate": end_iso, "page": {"number": page_number, "size": page_size}}
-            try:
-                res = requests.post(LICENSED_REALTIME_GENERATION_URL, headers=headers, json=payload, timeout=60)
-                res.raise_for_status()
-                records = find_record_list(res.json()) or []
-                all_records.extend(records)
-                if len(records) < page_size:
-                    break
-                page_number += 1
-            except Exception as e:
-                logger.error(f"Error fetching licensed realtime generation (page {page_number}): {e}")
-                break
-        return all_records
-
-    def fetch_installed_capacity(self, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
-        """Fetches new installed capacity data into memory."""
-        token = self.get_token()
-        if not token:
-            return []
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
-        payload = {"startDate": start_iso, "endDate": end_iso}
+    def fetch_installed_capacity(self, period_iso: str) -> List[Dict[str, Any]]:
+        """Fetches renewable installed capacity data via eptr2 'ren-capacity' into memory."""
         try:
-            res = requests.post(INSTALLED_CAPACITY_URL, headers=headers, json=payload, timeout=60)
-            res.raise_for_status()
-            return find_record_list(res.json()) or []
+            if not self.eptr:
+                raise ValueError("eptr2 client is not initialized.")
+            logger.info(f"Calling eptr2 service: 'ren-capacity' for period {period_iso}...")
+            res = self.eptr.call("ren-capacity", period=period_iso)
+            if isinstance(res, pd.DataFrame):
+                return res.to_dict(orient="records")
+            elif isinstance(res, list):
+                return res
+            elif isinstance(res, dict):
+                return find_record_list(res) or []
+            return []
         except Exception as e:
-            logger.error(f"Error fetching installed capacity: {e}")
+            logger.error(f"Error fetching installed capacity for period '{period_iso}': {e}")
             return []
 
     def fetch_active_fullness(self, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:

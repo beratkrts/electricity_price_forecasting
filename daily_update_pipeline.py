@@ -19,14 +19,34 @@ from fetch_epias_data import EpiasFetcher, fetch_weather_in_memory, fetch_macro_
 
 # --- LOGGING SETUP ---
 os.makedirs("logs", exist_ok=True)
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-    handlers=[
-        logging.FileHandler("logs/daily_update.log", encoding="utf-8"),
-        logging.StreamHandler(sys.stdout),
-    ],
-)
+
+log_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+# 1. Main log handler (INFO and above)
+main_file_handler = logging.FileHandler("logs/daily_update.log", encoding="utf-8")
+main_file_handler.setLevel(logging.INFO)
+main_file_handler.setFormatter(log_formatter)
+
+# 2. Anomalies / Errors dedicated handler (WARNING and ERROR only - concise, non-repetitive)
+anomaly_file_handler = logging.FileHandler("logs/anomalies.log", encoding="utf-8")
+anomaly_file_handler.setLevel(logging.WARNING)
+anomaly_file_handler.setFormatter(log_formatter)
+
+# 3. Console output handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(log_formatter)
+
+# Root logger configuration
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+
+# Prevent duplicate handlers on re-initialization
+if not root_logger.handlers:
+    root_logger.addHandler(main_file_handler)
+    root_logger.addHandler(anomaly_file_handler)
+    root_logger.addHandler(console_handler)
+
 logger = logging.getLogger("ETLPipeline")
 
 
@@ -101,17 +121,17 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         rt_cons_data = fetcher.fetch_eptr2_service("rt-cons", start_iso, end_iso)
         db.ingest_actual_consumption(rt_cons_data, period_key)
 
-        # 7. Day-Ahead Bids and Offers
-        bids_data = fetcher.fetch_eptr2_service("dpp-bids", start_iso, end_iso)
-        offers_data = fetcher.fetch_eptr2_service("dpp-offers", start_iso, end_iso)
+        # 7. Day-Ahead Bids and Offers (dam-bid & dam-offer)
+        bids_data = fetcher.fetch_eptr2_service("dam-bid", start_iso, end_iso)
+        offers_data = fetcher.fetch_eptr2_service("dam-offer", start_iso, end_iso)
         db.ingest_bids_offers(bids_data, offers_data, period_key)
 
-        # 8. Licensed Real-Time Generation (Custom Endpoint)
-        licensed_gen_data = fetcher.fetch_licensed_realtime_generation(start_iso, end_iso)
+        # 8. Licensed Real-Time Generation (ren-rt-gen via eptr2)
+        licensed_gen_data = fetcher.fetch_eptr2_service("ren-rt-gen", start_iso, end_iso)
         db.ingest_licensed_realtime_generation(licensed_gen_data, period_key)
 
-        # 9. Installed Capacity (Custom Endpoint)
-        installed_cap_data = fetcher.fetch_installed_capacity(start_iso, end_iso)
+        # 9. Installed Capacity (ren-capacity via eptr2)
+        installed_cap_data = fetcher.fetch_installed_capacity(period_iso=f"{start_str}T00:00:00+03:00")
         db.ingest_installed_capacity(installed_cap_data, period_key)
 
         # 10. Dam Active Fullness (Custom Endpoint)

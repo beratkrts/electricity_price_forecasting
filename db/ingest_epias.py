@@ -29,6 +29,26 @@ class EpiasDBIngestor:
                 sql_script = f.read()
             with self.engine.begin() as conn:
                 conn.execute(text(sql_script))
+                
+                # Ensure existing tables allow NULL for metric columns if created previously with NOT NULL
+                alter_statements = [
+                    "ALTER TABLE raw_smp_hourly ALTER COLUMN system_marginal_price_try DROP NOT NULL;",
+                    "ALTER TABLE raw_mcp_hourly ALTER COLUMN price_try DROP NOT NULL;",
+                    "ALTER TABLE raw_load_forecast_hourly ALTER COLUMN load_forecast_mw DROP NOT NULL;",
+                    "ALTER TABLE raw_kgup_hourly ALTER COLUMN total_mw DROP NOT NULL;",
+                    "ALTER TABLE raw_actual_generation_hourly ALTER COLUMN total_mw DROP NOT NULL;",
+                    "ALTER TABLE raw_actual_consumption_hourly ALTER COLUMN consumption_mw DROP NOT NULL;",
+                    "ALTER TABLE raw_macro_daily ALTER COLUMN usd_try DROP NOT NULL;",
+                    "ALTER TABLE raw_macro_daily ALTER COLUMN brent_oil_usd DROP NOT NULL;",
+                    "ALTER TABLE raw_natural_gas_daily ALTER COLUMN gas_reference_price_try DROP NOT NULL;",
+                    "ALTER TABLE raw_licensed_realtime_generation_hourly ALTER COLUMN total_mw DROP NOT NULL;",
+                    "ALTER TABLE raw_weather_hourly ALTER COLUMN turkey_weighted_temperature_c DROP NOT NULL;",
+                ]
+                for stmt in alter_statements:
+                    try:
+                        conn.execute(text(stmt))
+                    except Exception:
+                        pass
             logger.info("Database schema initialized successfully.")
         else:
             logger.warning(f"Schema file '{schema_file}' not found.")
@@ -99,9 +119,9 @@ class EpiasDBIngestor:
         """)
         data = [{
             "ts": r.get("date") or r.get("ts"),
-            "price_try": r.get("price") or r.get("price_try"),
-            "price_usd": r.get("priceUsd") or r.get("price_usd"),
-            "price_eur": r.get("priceEur") or r.get("price_eur"),
+            "price_try": r.get("price") if r.get("price") is not None else r.get("price_try"),
+            "price_usd": r.get("priceUsd") if r.get("priceUsd") is not None else r.get("price_usd"),
+            "price_eur": r.get("priceEur") if r.get("priceEur") is not None else r.get("price_eur"),
             "ingestion_id": ingestion_id,
         } for r in records if r.get("date") or r.get("ts")]
 
@@ -130,7 +150,7 @@ class EpiasDBIngestor:
         """)
         data = [{
             "ts": r.get("date") or r.get("ts"),
-            "smp": r.get("systemMarginalPrice") or r.get("price") or r.get("system_marginal_price_try"),
+            "smp": r.get("systemMarginalPrice") if r.get("systemMarginalPrice") is not None else (r.get("price") if r.get("price") is not None else r.get("system_marginal_price_try")),
             "ingestion_id": ingestion_id,
         } for r in records if r.get("date") or r.get("ts")]
 
@@ -159,7 +179,7 @@ class EpiasDBIngestor:
         """)
         data = [{
             "ts": r.get("date") or r.get("time") or r.get("ts"),
-            "lep": r.get("lep") or r.get("load_forecast_mw"),
+            "lep": r.get("lep") if r.get("lep") is not None else r.get("load_forecast_mw"),
             "ingestion_id": ingestion_id,
         } for r in records if r.get("date") or r.get("time") or r.get("ts")]
 
@@ -208,20 +228,20 @@ class EpiasDBIngestor:
         """)
         data = [{
             "ts": r.get("date") or r.get("ts"),
-            "total": r.get("toplam") or r.get("total_mw") or 0,
-            "gas": r.get("dogalgaz") or r.get("natural_gas_mw") or 0,
-            "wind": r.get("ruzgar") or r.get("wind_mw") or 0,
-            "lignite": r.get("linyit") or r.get("lignite_mw") or 0,
-            "black_coal": r.get("tasKomur") or r.get("black_coal_mw") or 0,
-            "import_coal": r.get("ithalKomur") or r.get("import_coal_mw") or 0,
-            "fuel_oil": r.get("fuelOil") or r.get("fuel_oil_mw") or 0,
-            "geothermal": r.get("jeotermal") or r.get("geothermal_mw") or 0,
-            "dammed_hydro": r.get("barajli") or r.get("dammed_hydro_mw") or 0,
-            "river_hydro": r.get("akarsu") or r.get("river_hydro_mw") or 0,
-            "naphtha": r.get("nafta") or r.get("naphtha_mw") or 0,
-            "biomass": r.get("biokutle") or r.get("biomass_mw") or 0,
-            "solar": r.get("gunes") or r.get("solar_mw") or 0,
-            "other": r.get("diger") or r.get("other_mw") or 0,
+            "total": r.get("toplam") if r.get("toplam") is not None else r.get("total_mw"),
+            "gas": r.get("dogalgaz", 0),
+            "wind": r.get("ruzgar", 0),
+            "lignite": r.get("linyit", 0),
+            "black_coal": r.get("tasKomur", 0),
+            "import_coal": r.get("ithalKomur", 0),
+            "fuel_oil": r.get("fuelOil", 0),
+            "geothermal": r.get("jeotermal", 0),
+            "dammed_hydro": r.get("barajli", 0),
+            "river_hydro": r.get("akarsu", 0),
+            "naphtha": r.get("nafta", 0),
+            "biomass": r.get("biokutle", 0),
+            "solar": r.get("gunes", 0),
+            "other": r.get("diger", 0),
             "ingestion_id": ingestion_id,
         } for r in records if r.get("date") or r.get("ts")]
 
@@ -273,23 +293,23 @@ class EpiasDBIngestor:
         """)
         data = [{
             "ts": r.get("date") or r.get("ts"),
-            "total": r.get("total") or r.get("total_mw") or 0,
-            "gas": r.get("naturalGas") or r.get("natural_gas_mw") or 0,
-            "dammed_hydro": r.get("dammedHydro") or r.get("dammed_hydro_mw") or 0,
-            "lignite": r.get("lignite") or r.get("lignite_mw") or 0,
-            "river_hydro": r.get("river") or r.get("river_hydro_mw") or 0,
-            "import_coal": r.get("importCoal") or r.get("import_coal_mw") or 0,
-            "wind": r.get("wind") or r.get("wind_mw") or 0,
-            "solar": r.get("sun") or r.get("solar_mw") or 0,
-            "fuel_oil": r.get("fueloil") or r.get("fuel_oil_mw") or 0,
-            "geothermal": r.get("geothermal") or r.get("geothermal_mw") or 0,
-            "asphaltite": r.get("asphaltiteCoal") or r.get("asphaltite_coal_mw") or 0,
-            "black_coal": r.get("blackCoal") or r.get("black_coal_mw") or 0,
-            "biomass": r.get("biomass") or r.get("biomass_mw") or 0,
-            "naphtha": r.get("naphta") or r.get("naphtha_mw") or 0,
-            "lng": r.get("lng") or r.get("lng_mw") or 0,
-            "import_export": r.get("importExport") or r.get("import_export_mw") or 0,
-            "waste_heat": r.get("wasteheat") or r.get("waste_heat_mw") or 0,
+            "total": r.get("total") if r.get("total") is not None else r.get("total_mw"),
+            "gas": r.get("naturalGas", 0),
+            "dammed_hydro": r.get("dammedHydro", 0),
+            "lignite": r.get("lignite", 0),
+            "river_hydro": r.get("river", 0),
+            "import_coal": r.get("importCoal", 0),
+            "wind": r.get("wind", 0),
+            "solar": r.get("sun", 0),
+            "fuel_oil": r.get("fueloil", 0),
+            "geothermal": r.get("geothermal", 0),
+            "asphaltite": r.get("asphaltiteCoal", 0),
+            "black_coal": r.get("blackCoal", 0),
+            "biomass": r.get("biomass", 0),
+            "naphtha": r.get("naphta", 0),
+            "lng": r.get("lng", 0),
+            "import_export": r.get("importExport", 0),
+            "waste_heat": r.get("wasteheat", 0),
             "ingestion_id": ingestion_id,
         } for r in records if r.get("date") or r.get("ts")]
 
@@ -318,7 +338,7 @@ class EpiasDBIngestor:
         """)
         data = [{
             "ts": r.get("date") or r.get("ts"),
-            "consumption": r.get("consumption") or r.get("consumption_mw"),
+            "consumption": r.get("consumption") if r.get("consumption") is not None else r.get("consumption_mw"),
             "ingestion_id": ingestion_id,
         } for r in records if r.get("date") or r.get("ts")]
 
@@ -419,7 +439,7 @@ class EpiasDBIngestor:
         """)
         data = [{
             "entry_date": r.get("date") or r.get("gas_date") or r.get("entry_date"),
-            "grf_try": r.get("grfTl") or r.get("price") or r.get("gas_reference_price_try"),
+            "grf_try": r.get("grfTl") if r.get("grfTl") is not None else (r.get("price") if r.get("price") is not None else r.get("gas_reference_price_try")),
             "grf_usd": r.get("grfUsd"),
             "grf_eur": r.get("grfEur"),
             "ingestion_id": ingestion_id,
@@ -465,7 +485,7 @@ class EpiasDBIngestor:
         """)
         data = [{
             "ts": r.get("date") or r.get("hour") or r.get("ts"),
-            "total": r.get("toplam", 0),
+            "total": r.get("toplam") if r.get("toplam") is not None else r.get("total_mw"),
             "wind": r.get("ruzgar", 0),
             "geothermal": r.get("jeotermal", 0),
             "dammed_hydro": r.get("rezervuarli", 0),
@@ -542,7 +562,7 @@ class EpiasDBIngestor:
         """)
         data = [{
             "ts": r.get("date_time") or r.get("date") or r.get("time") or r.get("ts"),
-            "temp": r.get("turkey_weighted_temperature_c") or r.get("temp"),
+            "temp": r.get("turkey_weighted_temperature_c") if r.get("turkey_weighted_temperature_c") is not None else r.get("temp"),
             "ingestion_id": ingestion_id,
         } for r in records if (r.get("date_time") or r.get("date") or r.get("time") or r.get("ts"))]
 

@@ -5,8 +5,6 @@
 
 -- -----------------------------------------------------------------------------
 -- 1. BRONZE KATMANI: API ETL Ingestion Audit & Checksum Takip Tablosu
--- Diskte JSON dosyası saklanmaz; EPİAŞ API'sinden çekilen veri bellekte (RAM)
--- ETL'den geçirilerek SHA-256 dijital imzasıyla bu tabloya kaydedilir.
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS ingestion_batches (
     id SERIAL PRIMARY KEY,
@@ -29,7 +27,7 @@ CREATE INDEX IF NOT EXISTS idx_ingestion_source_period ON ingestion_batches(sour
 -- 2.1 Piyasa Takas Fiyatı (PTF - MCP)
 CREATE TABLE IF NOT EXISTS raw_mcp_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
-    price_try NUMERIC(12, 4) NOT NULL,
+    price_try NUMERIC(12, 4),
     price_usd NUMERIC(12, 4),
     price_eur NUMERIC(12, 4),
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
@@ -39,7 +37,7 @@ CREATE TABLE IF NOT EXISTS raw_mcp_hourly (
 -- 2.2 Sistem Marjinal Fiyatı (SMF - SMP)
 CREATE TABLE IF NOT EXISTS raw_smp_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
-    system_marginal_price_try NUMERIC(12, 4) NOT NULL,
+    system_marginal_price_try NUMERIC(12, 4),
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -47,7 +45,7 @@ CREATE TABLE IF NOT EXISTS raw_smp_hourly (
 -- 2.3 Yük Tahmini (LEP)
 CREATE TABLE IF NOT EXISTS raw_load_forecast_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
-    load_forecast_mw NUMERIC(12, 2) NOT NULL,
+    load_forecast_mw NUMERIC(12, 2),
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -55,7 +53,7 @@ CREATE TABLE IF NOT EXISTS raw_load_forecast_hourly (
 -- 2.4 Kesinleşmiş Gün Öncesi Üretim Planı (KGÜP)
 CREATE TABLE IF NOT EXISTS raw_kgup_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
-    total_mw NUMERIC(12, 2) NOT NULL,
+    total_mw NUMERIC(12, 2),
     natural_gas_mw NUMERIC(12, 2) DEFAULT 0,
     wind_mw NUMERIC(12, 2) DEFAULT 0,
     lignite_mw NUMERIC(12, 2) DEFAULT 0,
@@ -76,7 +74,7 @@ CREATE TABLE IF NOT EXISTS raw_kgup_hourly (
 -- 2.5 Gerçekleşen Üretim (Kaynak Bazlı)
 CREATE TABLE IF NOT EXISTS raw_actual_generation_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
-    total_mw NUMERIC(12, 2) NOT NULL,
+    total_mw NUMERIC(12, 2),
     natural_gas_mw NUMERIC(12, 2) DEFAULT 0,
     dammed_hydro_mw NUMERIC(12, 2) DEFAULT 0,
     lignite_mw NUMERIC(12, 2) DEFAULT 0,
@@ -100,7 +98,7 @@ CREATE TABLE IF NOT EXISTS raw_actual_generation_hourly (
 -- 2.6 Gerçekleşen Tüketim
 CREATE TABLE IF NOT EXISTS raw_actual_consumption_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
-    consumption_mw NUMERIC(12, 2) NOT NULL,
+    consumption_mw NUMERIC(12, 2),
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -117,8 +115,8 @@ CREATE TABLE IF NOT EXISTS raw_bids_offers_hourly (
 -- 2.8 Makro Göstergeler (Dolar & Brent Petrol)
 CREATE TABLE IF NOT EXISTS raw_macro_daily (
     entry_date DATE PRIMARY KEY,
-    usd_try NUMERIC(10, 4) NOT NULL,
-    brent_oil_usd NUMERIC(10, 4) NOT NULL,
+    usd_try NUMERIC(10, 4),
+    brent_oil_usd NUMERIC(10, 4),
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -126,7 +124,7 @@ CREATE TABLE IF NOT EXISTS raw_macro_daily (
 -- 2.9 Doğalgaz Günlük Referans Fiyatı (GRF)
 CREATE TABLE IF NOT EXISTS raw_natural_gas_daily (
     entry_date DATE PRIMARY KEY,
-    gas_reference_price_try NUMERIC(12, 4) NOT NULL,
+    gas_reference_price_try NUMERIC(12, 4),
     grf_usd NUMERIC(12, 4),
     grf_eur NUMERIC(12, 4),
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
@@ -136,7 +134,7 @@ CREATE TABLE IF NOT EXISTS raw_natural_gas_daily (
 -- 2.10 Lisanslı Gerçekleşen Üretim (Kaynak Bazlı - Yenilenebilir ve Diğer)
 CREATE TABLE IF NOT EXISTS raw_licensed_realtime_generation_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
-    total_mw NUMERIC(12, 2) NOT NULL,
+    total_mw NUMERIC(12, 2),
     wind_mw NUMERIC(12, 2) DEFAULT 0,
     geothermal_mw NUMERIC(12, 2) DEFAULT 0,
     dammed_hydro_mw NUMERIC(12, 2) DEFAULT 0,
@@ -166,7 +164,7 @@ CREATE TABLE IF NOT EXISTS raw_installed_capacity_daily (
 -- 2.12 Türkiye Ağırlıklı Saatlik Sıcaklık (Open-Meteo Hava Durumu)
 CREATE TABLE IF NOT EXISTS raw_weather_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
-    turkey_weighted_temperature_c NUMERIC(5, 2) NOT NULL,
+    turkey_weighted_temperature_c NUMERIC(5, 2),
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -178,7 +176,7 @@ CREATE TABLE IF NOT EXISTS raw_master_active_fullness (
     record_id BIGINT,
     basin_name VARCHAR(100) NOT NULL,
     dam_name VARCHAR(100) NOT NULL,
-    active_fullness_percent NUMERIC(8, 4) NOT NULL,
+    active_fullness_percent NUMERIC(8, 4) DEFAULT 0,
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     CONSTRAINT pk_dam_active_fullness PRIMARY KEY (dam_id, date_time)
@@ -199,15 +197,10 @@ CREATE TABLE IF NOT EXISTS raw_master_water_energy_provision (
 -- -----------------------------------------------------------------------------
 -- İNDEKS TASARIMLARI
 -- -----------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_mcp_ts ON raw_mcp_hourly(ts DESC);
-CREATE INDEX IF NOT EXISTS idx_smp_ts ON raw_smp_hourly(ts DESC);
-CREATE INDEX IF NOT EXISTS idx_load_forecast_ts ON raw_load_forecast_hourly(ts DESC);
-CREATE INDEX IF NOT EXISTS idx_kgup_ts ON raw_kgup_hourly(ts DESC);
-CREATE INDEX IF NOT EXISTS idx_actual_gen_ts ON raw_actual_generation_hourly(ts DESC);
-CREATE INDEX IF NOT EXISTS idx_actual_cons_ts ON raw_actual_consumption_hourly(ts DESC);
-CREATE INDEX IF NOT EXISTS idx_licensed_gen_ts ON raw_licensed_realtime_generation_hourly(ts DESC);
-CREATE INDEX IF NOT EXISTS idx_installed_cap_date ON raw_installed_capacity_daily(period_date DESC);
-CREATE INDEX IF NOT EXISTS idx_weather_ts ON raw_weather_hourly(ts DESC);
-CREATE INDEX IF NOT EXISTS idx_active_fullness_date ON raw_master_active_fullness(date_time DESC);
-CREATE INDEX IF NOT EXISTS idx_water_provision_date ON raw_master_water_energy_provision(date_time DESC);
-
+CREATE INDEX IF NOT EXISTS idx_mcp_ts ON raw_mcp_hourly(ts);
+CREATE INDEX IF NOT EXISTS idx_smp_ts ON raw_smp_hourly(ts);
+CREATE INDEX IF NOT EXISTS idx_load_forecast_ts ON raw_load_forecast_hourly(ts);
+CREATE INDEX IF NOT EXISTS idx_kgup_ts ON raw_kgup_hourly(ts);
+CREATE INDEX IF NOT EXISTS idx_actual_gen_ts ON raw_actual_generation_hourly(ts);
+CREATE INDEX IF NOT EXISTS idx_actual_cons_ts ON raw_actual_consumption_hourly(ts);
+CREATE INDEX IF NOT EXISTS idx_weather_ts ON raw_weather_hourly(ts);

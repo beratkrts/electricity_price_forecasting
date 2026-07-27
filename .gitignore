@@ -5,10 +5,11 @@
 .venv/
 venv/
 
-# Project data
+# Project data & logs
 data/
 data_backup/
 epias_data/
+logs/
 
 # Python cache and local tooling
 __pycache__/
