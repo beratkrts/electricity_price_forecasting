@@ -3,6 +3,8 @@
 -- Katmanlar: Bronze (API Ingestion & Audit Track) & Silver (Normalized Time Series)
 -- =============================================================================
 
+SET timezone = 'Europe/Istanbul';
+
 -- -----------------------------------------------------------------------------
 -- 1. BRONZE KATMANI: API ETL Ingestion Audit & Checksum Takip Tablosu
 -- -----------------------------------------------------------------------------

@@ -38,9 +38,15 @@ def get_db_url() -> str:
 
 
 def get_db_engine(db_url: str = None):
-    """Creates and returns a SQLAlchemy Engine with connection pooling and pre-ping."""
+    """Creates and returns a SQLAlchemy Engine with connection pooling and Europe/Istanbul timezone."""
     url = db_url or get_db_url()
-    return create_engine(url, pool_pre_ping=True, pool_size=10, max_overflow=20)
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=20,
+        connect_args={"options": "-c timezone=Europe/Istanbul"},
+    )
 
 
 def calculate_checksum(data) -> str:

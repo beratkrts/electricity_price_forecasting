@@ -6,10 +6,13 @@ services:
     image: postgres:15-alpine
     container_name: enerji_postgres
     restart: always
+    command: postgres -c timezone='Europe/Istanbul'
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-enerji_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      TZ: Europe/Istanbul
+      PGTZ: Europe/Istanbul
     ports:
       - "5432:5432"
     volumes:
@@ -39,6 +42,7 @@ services:
       - POSTGRES_DB=${POSTGRES_DB:-enerji_db}
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - TZ=Europe/Istanbul
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs

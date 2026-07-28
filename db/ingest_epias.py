@@ -53,6 +53,16 @@ class EpiasDBIngestor:
         else:
             logger.warning(f"Schema file '{schema_file}' not found.")
 
+    def is_period_ingested(self, source_name: str, period_key: str) -> bool:
+        """Checks if a source dataset for a specific period_key has already been successfully ingested."""
+        query = text("""
+            SELECT id FROM ingestion_batches 
+            WHERE source_name = :source_name AND period_key = :period_key AND status = 'SUCCESS'
+        """)
+        with self.engine.connect() as conn:
+            result = conn.execute(query, {"source_name": source_name, "period_key": period_key}).fetchone()
+            return result is not None
+
     def is_already_ingested(self, source_name: str, checksum: str) -> Optional[int]:
         """Checks if a batch with the exact SHA-256 checksum has already been ingested successfully."""
         query = text("""
@@ -104,7 +114,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("mcp", checksum):
-            logger.info(f"[MCP] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[MCP] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("mcp", period_key, checksum, len(records))
@@ -137,7 +147,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("smp", checksum):
-            logger.info(f"[SMP] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[SMP] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("smp", period_key, checksum, len(records))
@@ -166,7 +176,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("load_forecast", checksum):
-            logger.info(f"[LOAD_FORECAST] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[LOAD_FORECAST] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("load_forecast", period_key, checksum, len(records))
@@ -195,7 +205,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("kgup", checksum):
-            logger.info(f"[KGUP] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[KGUP] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("kgup", period_key, checksum, len(records))
@@ -257,7 +267,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("actual_generation", checksum):
-            logger.info(f"[ACTUAL_GEN] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[ACTUAL_GEN] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("actual_generation", period_key, checksum, len(records))
@@ -325,7 +335,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("actual_consumption", checksum):
-            logger.info(f"[ACTUAL_CONS] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[ACTUAL_CONS] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("actual_consumption", period_key, checksum, len(records))
@@ -353,7 +363,7 @@ class EpiasDBIngestor:
         combined = {"bids": bids_records, "offers": offers_records}
         checksum = calculate_checksum(combined)
         if self.is_already_ingested("bids_offers", checksum):
-            logger.info(f"[BIDS_OFFERS] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[BIDS_OFFERS] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         total_rows = max(len(bids_records or []), len(offers_records or []))
@@ -393,7 +403,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("macro", checksum):
-            logger.info(f"[MACRO] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[MACRO] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("macro", period_key, checksum, len(records))
@@ -424,7 +434,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("natural_gas_daily", checksum):
-            logger.info(f"[NATURAL_GAS] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[NATURAL_GAS] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("natural_gas_daily", period_key, checksum, len(records))
@@ -457,7 +467,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("licensed_realtime_generation", checksum):
-            logger.info(f"[LICENSED_GEN] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[LICENSED_GEN] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("licensed_realtime_generation", period_key, checksum, len(records))
@@ -511,7 +521,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("installed_capacity", checksum):
-            logger.info(f"[INSTALLED_CAPACITY] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[INSTALLED_CAPACITY] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("installed_capacity", period_key, checksum, len(records))
@@ -549,7 +559,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("weather", checksum):
-            logger.info(f"[WEATHER] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[WEATHER] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("weather", period_key, checksum, len(records))
@@ -578,7 +588,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("active_fullness", checksum):
-            logger.info(f"[ACTIVE_FULLNESS] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[ACTIVE_FULLNESS] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("active_fullness", period_key, checksum, len(records))
@@ -618,7 +628,7 @@ class EpiasDBIngestor:
             return 0
         checksum = calculate_checksum(records)
         if self.is_already_ingested("water_energy_provision", checksum):
-            logger.info(f"[WATER_ENERGY_PROVISION] Period {period_key} already ingested. Skipping.")
+            logger.info(f"[WATER_ENERGY_PROVISION] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
         ingestion_id = self.record_ingestion_batch("water_energy_provision", period_key, checksum, len(records))
