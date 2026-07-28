@@ -649,7 +649,7 @@ class EpiasDBIngestor:
             dt = r.get("date") or r.get("Tarih") or r.get("tarih") or r.get("Date")
             d_name = r.get("damName") or r.get("Baraj Adı") or r.get("dam_name") or r.get("Dam Name")
             b_name = r.get("basinName") or r.get("Havza Adı") or r.get("basin_name") or r.get("Basin Name")
-            prov = r.get("waterEnergyProvision") or r.get("Su Enerji Karşılığı (MWh)") or r.get("provision", 0)
+            prov = r.get("energyGeneration") if r.get("energyGeneration") is not None else (r.get("waterEnergyProvision") if r.get("waterEnergyProvision") is not None else (r.get("Su Enerji Karşılığı (MWh)") if r.get("Su Enerji Karşılığı (MWh)") is not None else r.get("provision", 0)))
             if d_name and dt:
                 data.append({
                     "date_time": dt,
