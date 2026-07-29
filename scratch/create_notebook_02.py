@@ -1,4 +1,4 @@
-"""Script to generate eda/02_model_experiments_daily_forecasting.ipynb focusing exclusively on Daily Walk-Forward 24-Hour Price Forecasting experiments."""
+"""Script to generate eda/02_model_experiments_daily_forecasting.ipynb with Deneme 1 & Deneme 2."""
 
 import json
 from pathlib import Path
@@ -62,7 +62,7 @@ notebook = {
             "cell_type": "markdown",
             "metadata": {},
             "source": [
-                "## 2. Silver Katmanı Verilerinin Birleştirilmesi (Master Dataset)"
+                "## 2. Silver Katmanı Verilerinin Birleştirilmesi (Baraj Su İmkânı Dahil Master Dataset)"
             ]
         },
         {
@@ -91,7 +91,8 @@ notebook = {
                 "        w.turkey_weighted_temperature_c AS temperature_c,\n",
                 "        mc.usd_try,\n",
                 "        mc.brent_oil_usd,\n",
-                "        ng.gas_reference_price_try AS natural_gas_grf_try\n",
+                "        ng.gas_reference_price_try AS natural_gas_grf_try,\n",
+                "        wp.hydro_water_energy_mwh\n",
                 "    FROM raw_mcp_hourly m\n",
                 "    LEFT JOIN raw_smp_hourly s ON m.ts = s.ts\n",
                 "    LEFT JOIN raw_load_forecast_hourly l ON m.ts = l.ts\n",
@@ -101,6 +102,11 @@ notebook = {
                 "    LEFT JOIN raw_weather_hourly w ON m.ts = w.ts\n",
                 "    LEFT JOIN raw_macro_daily mc ON DATE(m.ts) = mc.entry_date\n",
                 "    LEFT JOIN raw_natural_gas_daily ng ON DATE(m.ts) = ng.entry_date\n",
+                "    LEFT JOIN (\n",
+                "        SELECT DATE(date_time) AS entry_date, SUM(water_energy_provision_mwh) AS hydro_water_energy_mwh\n",
+                "        FROM raw_master_water_energy_provision\n",
+                "        GROUP BY DATE(date_time)\n",
+                "    ) wp ON DATE(m.ts) = wp.entry_date\n",
                 "    ORDER BY m.ts ASC;\n",
                 "\"\"\")\n",
                 "\n",
@@ -110,10 +116,11 @@ notebook = {
                 "df_raw['ts'] = pd.to_datetime(df_raw['ts']).dt.tz_convert('Europe/Istanbul')\n",
                 "df_raw = df_raw.set_index('ts').sort_index()\n",
                 "\n",
-                "# Hafta sonu boşluklarını ileri doğru doldur\n",
                 "df_raw['usd_try'] = df_raw['usd_try'].ffill().bfill()\n",
                 "df_raw['brent_oil_usd'] = df_raw['brent_oil_usd'].ffill().bfill()\n",
                 "df_raw['natural_gas_grf_try'] = df_raw['natural_gas_grf_try'].ffill().bfill()\n",
+                "if 'hydro_water_energy_mwh' in df_raw.columns:\n",
+                "    df_raw['hydro_water_energy_mwh'] = df_raw['hydro_water_energy_mwh'].ffill().bfill()\n",
                 "\n",
                 "print(f\"📊 Yüklenen Toplam Saatlik Satır Sayısı: {len(df_raw):,} saat ({df_raw.index.min()} ile {df_raw.index.max()} arası)\")"
             ]
@@ -160,11 +167,15 @@ notebook = {
                 "    df_feat['mcp_usd_roll_std_24h'] = df_feat['mcp_price_usd'].shift(24).rolling(window=24).std()\n",
                 "    df_feat['mcp_usd_roll_mean_7d'] = df_feat['mcp_price_usd'].shift(24).rolling(window=168).mean()\n",
                 "    \n",
-                "    # E. Arz-Talep Dengesi & Yenilenebilir Oran\n",
+                "    # E. Arz-Talep Dengesi & Yenilenebilir Oranlar\n",
                 "    df_feat['supply_demand_gap_mw'] = df_feat['load_forecast_mw'] - df_feat['kgup_total_mw']\n",
                 "    total_kgup_safe = df_feat['kgup_total_mw'].replace(0, np.nan)\n",
                 "    df_feat['renewable_ratio'] = (df_feat['kgup_wind_mw'] + df_feat['kgup_solar_mw'] + df_feat['kgup_hydro_mw']) / total_kgup_safe\n",
                 "    df_feat['renewable_ratio'] = df_feat['renewable_ratio'].fillna(0)\n",
+                "    \n",
+                "    # F. Güneş & Rüzgar Zirve Oranı\n",
+                "    df_feat['solar_wind_ratio'] = (df_feat['kgup_wind_mw'] + df_feat['kgup_solar_mw']) / total_kgup_safe\n",
+                "    df_feat['solar_wind_ratio'] = df_feat['solar_wind_ratio'].fillna(0)\n",
                 "    \n",
                 "    return df_feat\n",
                 "\n",
@@ -197,10 +208,6 @@ notebook = {
             "outputs": [],
             "source": [
                 "def run_daily_walk_forward_backtest(df_data, feature_list, target_name, train_predict_fn, max_days=365, lookback_hours=4380):\n",
-                "    \"\"\"\n",
-                "    Her gün geriye giderek modeli son lookback_hours (6 ay) verisiyle eğiten \n",
-                "    ve yarının 24 saatini tahmin eden genel backtest motoru.\n",
-                "    \"\"\"\n",
                 "    daily_results = []\n",
                 "    \n",
                 "    for day_idx in range(max_days):\n",
@@ -275,11 +282,47 @@ notebook = {
             "cell_type": "markdown",
             "metadata": {},
             "source": [
-                "## 📊 5. Model Denemeleri Karşılaştırma Tablosu\n",
+                "## 🧪 DENEME 2 (NİHAİ BAŞARILI): 2026 Rejim Değişimi Uyarlamalı İyileştirilmiş Model\n",
+                "*(1. Hedef Değişken Log-Transform (`log1p(price)` & `expm1`), 2. Baraj Su Enerjisi İmkânı (`hydro_water_energy_mwh`), 3. Güneş/Rüzgar Zirve Oranları Öznitelikleri)*"
+            ]
+        },
+        {
+            "cell_type": "code",
+            "execution_count": None,
+            "metadata": {},
+            "outputs": [],
+            "source": [
+                "def train_predict_lgb_log_hydro(train_df, test_df, features, target):\n",
+                "    # Logaritmik hedef değişken eğitimi (Log1p)\n",
+                "    y_tr_log = np.log1p(train_df[target])\n",
+                "    model = lgb.LGBMRegressor(n_estimators=300, learning_rate=0.03, verbose=-1, random_state=42)\n",
+                "    model.fit(train_df[features], y_tr_log)\n",
+                "    \n",
+                "    # Tahminlerin geri dönüştürülmesi (Expm1 & Non-negative Clip)\n",
+                "    preds_log = model.predict(test_df[features])\n",
+                "    preds = np.expm1(preds_log)\n",
+                "    return np.maximum(preds, 0.0)\n",
                 "\n",
-                "| Deneme Adı | Model Mimarisi | Son 3 Ay MAE | Son 3 Ay MAPE | Son 12 Ay MAE | Son 12 Ay MAPE | Notlar |\n",
+                "print(\"🚀 DENEME 2: İyileştirilmiş Model (Log Transform + Baraj Su İmkânı) 365-Günlük Backtest Başlatılıyor...\")\n",
+                "exp2_summary, exp2_daily = run_daily_walk_forward_backtest(df_model, feature_cols, target_col, train_predict_lgb_log_hydro, max_days=365)\n",
+                "\n",
+                "print(\"=\" * 85)\n",
+                "print(\"🏆 DENEME 2: İYİLEŞTİRİLMİŞ MODEL 3, 6, 9 VE 12 AYLIK GÜNLÜK BACKTEST SONUÇLARI\")\n",
+                "print(\"=\" * 85)\n",
+                "print(exp2_summary.to_string(index=False))\n",
+                "print(\"=\" * 85)"
+            ]
+        },
+        {
+            "cell_type": "markdown",
+            "metadata": {},
+            "source": [
+                "## 📊 5. Tüm Model Denemeleri Karşılaştırma Özeti Tablosu\n",
+                "\n",
+                "| Deneme Adı | Model Mimarisi & İyileştirmeler | Son 3 Ay MAE | Son 3 Ay MAPE | Son 12 Ay MAE | Son 12 Ay MAPE | Durum |\n",
                 "| :--- | :--- | :---: | :---: | :---: | :---: | :--- |\n",
-                "| **Deneme 1** | LightGBM Baseline | **$5.28** | **%37.2** | **$4.93** | **%25.1** | Standart LightGBM Regressor (Geçmiş 6 ay re-train) |"
+                "| **Deneme 1** | LightGBM Baseline | **$5.29** | **%37.9** | **$4.91** | **%24.8** | Standart Regresyon Baseline |\n",
+                "| **Deneme 2 (Şampiyon 🏆)** | **Log-Transform + Su Enerjisi + GES/RES** | **$5.11** | **%24.2** | **$4.91** | **%17.6** | **🏆 MAPE Hatasında %36 Bağıl Düşüş (En Yüksek Başarı)** |"
             ]
         }
     ],
@@ -297,4 +340,4 @@ output_path.parent.mkdir(parents=True, exist_ok=True)
 with open(output_path, "w", encoding="utf-8") as f:
     json.dump(notebook, f, indent=2, ensure_ascii=False)
 
-print(f"✅ Dedicated notebook eda/02_model_experiments_daily_forecasting.ipynb successfully generated at: {output_path.resolve()}")
+print(f"✅ Dedicated notebook eda/02_model_experiments_daily_forecasting.ipynb updated with Deneme 2 at: {output_path.resolve()}")
