@@ -14,12 +14,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Python kütüphanelerini yükle
+# 🚀 1. CPU-Only PyTorch yükle (CUDA kütüphanelerini atlar, 3.5 GB tasarruf sağlar)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# 🚀 2. Kalan bağımlılıkları yükle
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Proje kodlarını kopyala
 COPY . .
 
-# Servis başlatma komutu (Servis modunda arka planda çalışır)
-CMD ["python", "run_service.py"]
+# Servis başlatma komutu
+CMD ["python", "scripts/run_service.py"]

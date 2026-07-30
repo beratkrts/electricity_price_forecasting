@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
 anyio==4.14.2
 appnope==0.1.4
 argon2-cffi==25.1.0
@@ -119,7 +120,7 @@ sympy==1.14.0
 terminado==0.18.1
 threadpoolctl==3.6.0
 tinycss2==1.5.1
-torch==2.13.0
+torch
 tornado==6.5.7
 traitlets==5.15.1
 typing_extensions==4.16.0
