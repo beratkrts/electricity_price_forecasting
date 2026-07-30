@@ -19,7 +19,7 @@ RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/wh
 
 # 🚀 2. Kalan bağımlılıkları yükle
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Proje kodlarını kopyala
 COPY . .
