@@ -1,3 +1,8 @@
+import sys
+from pathlib import Path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "scripts"))
 """In-Memory Data Fetcher Module for EPİAŞ, Open-Meteo, and Financial APIs.
 
 Fetches data directly into memory without saving intermediate JSON files to disk.
@@ -12,7 +17,7 @@ from eptr2 import EPTR2
 import yfinance as yf
 
 # Import weather fetcher logic
-from api_trials.weather_fetcher import fetch_turkey_weighted_temperature
+from src.data_ingestion.api_trials.weather_fetcher import fetch_turkey_weighted_temperature
 
 logger = logging.getLogger("DataFetcher")
 

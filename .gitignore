@@ -1,23 +1,45 @@
-# Local environment
+# Local environment & secret files
 .env
 .env.*
 .eptr2-tgt
 .venv/
 venv/
+env/
 
-# Project data & logs
+# Project data, database & logs
 data/
 data_backup/
 epias_data/
 logs/
+*.db
+*.sqlite
+*.sqlite3
 
-# Python cache and local tooling
+# Python cache & build artifacts
 __pycache__/
 *.py[cod]
+*$py.class
 .pytest_cache/
 .mypy_cache/
+build/
+dist/
+*.egg-info/
 
-# OS/editor noise
+# Office & OS temporary noise
 .DS_Store
+Thumbs.db
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# IDE & Editor files
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# Temporary scratch folder
+scratch/
+
+# Documentation folder
+docs/

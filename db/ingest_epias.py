@@ -21,7 +21,7 @@ class EpiasDBIngestor:
         self.db_url = db_url or get_db_url()
         self.engine = get_db_engine(self.db_url)
 
-    def init_db(self, schema_file: str = "sql/01_init_schema.sql") -> None:
+    def init_db(self, schema_file: str = "db/sql/01_init_schema.sql") -> None:
         """Executes the SQL schema file to create missing tables and indexes."""
         if os.path.exists(schema_file):
             logger.info(f"Initializing database schema from '{schema_file}'...")
