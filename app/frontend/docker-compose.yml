@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  energy-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: energy_price_dashboard
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production

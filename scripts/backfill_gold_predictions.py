@@ -30,7 +30,7 @@ def backfill_365_days_predictions():
     Son 365 gün için walk-forward LightGBM tahminlerini üretir ve DB'ye yazar.
     """
     logger.info("📦 Veritabanından tüm geçmiş veri yükleniyor...")
-    create_gold_schema_if_not_exists()
+    create_gold_schema_if_not_exists(run_backfill_if_empty=False)
     
     df_raw = load_all_historical_data()
     df_feat = build_robust_features(df_raw)

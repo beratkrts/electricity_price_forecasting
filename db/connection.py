@@ -23,10 +23,17 @@ if env_path:
     load_dotenv(env_path)
 
 
+import socket
+
+_engine = None
+
+
 def get_db_url() -> str:
     """Generates PostgreSQL SQLAlchemy connection URL from environment variables.
     
     Supports both POSTGRES_* and DB_* environment variable naming conventions.
+    Automatically falls back from container hostname ('db') to 'localhost'
+    if hostname resolution fails outside Docker.
     """
     host = os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "localhost")
     port = os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")
@@ -34,19 +41,37 @@ def get_db_url() -> str:
     user = os.getenv("POSTGRES_USER") or os.getenv("DB_USER", "postgres")
     password = os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASS", "postgres")
     
+    if host == "db":
+        try:
+            socket.gethostbyname("db")
+        except socket.gaierror:
+            host = "localhost"
+
     return f"postgresql://{user}:{password}@{host}:{port}/{db_name}"
 
 
 def get_db_engine(db_url: str = None):
     """Creates and returns a SQLAlchemy Engine with connection pooling and Europe/Istanbul timezone."""
-    url = db_url or get_db_url()
-    return create_engine(
-        url,
-        pool_pre_ping=True,
-        pool_size=10,
-        max_overflow=20,
-        connect_args={"options": "-c timezone=Europe/Istanbul"},
-    )
+    global _engine
+    if db_url is None:
+        if _engine is None:
+            url = get_db_url()
+            _engine = create_engine(
+                url,
+                pool_pre_ping=True,
+                pool_size=10,
+                max_overflow=20,
+                connect_args={"options": "-c timezone=Europe/Istanbul"},
+            )
+        return _engine
+    else:
+        return create_engine(
+            db_url,
+            pool_pre_ping=True,
+            pool_size=10,
+            max_overflow=20,
+            connect_args={"options": "-c timezone=Europe/Istanbul"},
+        )
 
 
 def calculate_checksum(data) -> str:

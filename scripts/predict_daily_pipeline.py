@@ -26,9 +26,10 @@ from src.models.lightgbm_model import LightGBMForecaster
 logger = logging.getLogger("DailyPredictionPipeline")
 
 
-def create_gold_schema_if_not_exists():
+def create_gold_schema_if_not_exists(run_backfill_if_empty: bool = True):
     """gold şemasını ve gold.ptf_predictions_daily tablosunu oluşturur. Boşsa son 1 yılı otomatik doldurur."""
     engine = get_db_engine()
+    count = 0
     with engine.connect() as conn:
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS gold;"))
         conn.execute(text("""
@@ -43,15 +44,17 @@ def create_gold_schema_if_not_exists():
         """))
         conn.commit()
         
-        # Eğer tablo ilk defa açılmışsa veya 1 yıldan az veri varsa otomatik backfill çalıştır
+        # Tablo verisini kontrol et
         count = conn.execute(text("SELECT COUNT(*) FROM gold.ptf_predictions_daily;")).scalar()
-        if count < 1000:
-            logger.info("⚡ First-time deployment detected or empty gold table! Automatically running 365-day backfill for dashboard history...")
-            from backfill_gold_predictions import backfill_365_days_predictions
-            try:
-                backfill_365_days_predictions()
-            except Exception as e:
-                logger.error(f"Error during automatic backfill: {e}")
+
+    # Connection kapandıktan sonra backfill gerekiyorsa çalıştır
+    if run_backfill_if_empty and count < 1000:
+        logger.info("⚡ First-time deployment detected or empty gold table! Automatically running 365-day backfill for dashboard history...")
+        from backfill_gold_predictions import backfill_365_days_predictions
+        try:
+            backfill_365_days_predictions()
+        except Exception as e:
+            logger.error(f"Error during automatic backfill: {e}")
 
 
 def load_all_historical_data():
