@@ -44,6 +44,18 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+  # 3. Frontend Dashboard Servisi (React + Vite + Nginx)
+  dashboard:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile
+    container_name: enerji_dashboard
+    restart: always
+    ports:
+      - "3000:80"
+    depends_on:
+      - db
+      - app
 
 volumes:
   postgres_data:
