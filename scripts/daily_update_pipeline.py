@@ -21,6 +21,7 @@ from dotenv import load_dotenv
 
 from db.ingest_epias import EpiasDBIngestor
 from fetch_epias_data import EpiasFetcher, fetch_weather_in_memory, fetch_macro_in_memory
+from predict_daily_pipeline import run_daily_prediction
 
 # --- LOGGING SETUP ---
 os.makedirs("logs", exist_ok=True)
@@ -188,6 +189,13 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     db.ingest_macro(macro_data, period_key="ALL")
 
     logger.info("🎉 In-Memory Direct Database Pipeline completed successfully!")
+
+    # 15. LightGBM Daily Prediction Execution & DB Ingestion
+    logger.info("\n🔮 Step 15: Executing LightGBM Daily Prediction & Gold Ingestion...")
+    try:
+        run_daily_prediction()
+    except Exception as e:
+        logger.error(f"❌ Error during LightGBM daily prediction step: {e}")
 
 
 if __name__ == "__main__":
