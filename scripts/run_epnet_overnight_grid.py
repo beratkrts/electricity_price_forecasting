@@ -28,7 +28,13 @@ sys.path.insert(0, str(project_root / "scripts"))
 
 from db.connection import get_db_engine
 from sqlalchemy import text
-
+from src.features.feature_engineering import (
+    build_base_features, 
+    build_core_features, 
+    build_full_features, 
+    build_robust_features,
+    get_feature_columns
+)
 
 # --- Output Directories & Checkpoint Files ---
 def setup_log_environment(mode="fast"):
@@ -183,55 +189,13 @@ def load_master_dataset():
     df_raw['usd_try'] = df_raw['usd_try'].ffill().bfill()
     df_raw['brent_oil_usd'] = df_raw['brent_oil_usd'].ffill().bfill()
     df_raw['natural_gas_grf_try'] = df_raw['natural_gas_grf_try'].ffill().bfill()
-    if 'hydro_water_energy_mwh' in df_raw.columns:
-        df_raw['hydro_water_energy_mwh'] = df_raw['hydro_water_energy_mwh'].ffill().bfill()
-
     return df_raw
 
 
 def build_feature_matrices(df):
     """Engineers 4 distinct feature sets (Set_Pure_PTF, Set_Core, Set_Full, Set_Cyclic)."""
-    df_feat = df.copy()
-    
-    # Base calendar features
-    df_feat['hour'] = df_feat.index.hour
-    df_feat['dayofweek'] = df_feat.index.dayofweek
-    df_feat['month'] = df_feat.index.month
-    df_feat['is_weekend'] = (df_feat.index.dayofweek >= 5).astype(int)
-    df_feat['is_peak_hour'] = df_feat['hour'].isin([17, 18, 19, 20, 21]).astype(int)
-    
-    # Cyclic Sin/Cos features
-    df_feat['sin_hour'] = np.sin(2 * np.pi * df_feat['hour'] / 24.0)
-    df_feat['cos_hour'] = np.cos(2 * np.pi * df_feat['hour'] / 24.0)
-    df_feat['sin_dow'] = np.sin(2 * np.pi * df_feat['dayofweek'] / 7.0)
-    df_feat['cos_dow'] = np.cos(2 * np.pi * df_feat['dayofweek'] / 7.0)
-    
-    # Lag features
-    for lag in [24, 48, 168]:
-        df_feat[f'mcp_usd_lag_{lag}'] = df_feat['mcp_price_usd'].shift(lag)
-        df_feat[f'load_lag_{lag}'] = df_feat['load_forecast_mw'].shift(lag)
-        df_feat[f'kgup_lag_{lag}'] = df_feat['kgup_total_mw'].shift(lag)
-        df_feat[f'kgup_wind_lag_{lag}'] = df_feat['kgup_wind_mw'].shift(lag)
-        df_feat[f'kgup_solar_lag_{lag}'] = df_feat['kgup_solar_mw'].shift(lag)
-        df_feat[f'kgup_hydro_lag_{lag}'] = df_feat['kgup_hydro_mw'].shift(lag)
-        df_feat[f'kgup_gas_lag_{lag}'] = df_feat['kgup_gas_mw'].shift(lag)
-        
-    for lag in [48, 168]:
-        if 'actual_gen_total_mw' in df_feat.columns:
-            df_feat[f'actual_gen_lag_{lag}'] = df_feat['actual_gen_total_mw'].shift(lag)
-        if 'actual_cons_mw' in df_feat.columns:
-            df_feat[f'actual_cons_lag_{lag}'] = df_feat['actual_cons_mw'].shift(lag)
-            
-    df_feat['mcp_usd_roll_mean_24h'] = df_feat['mcp_price_usd'].shift(24).rolling(window=24).mean()
-    df_feat['mcp_usd_roll_std_24h'] = df_feat['mcp_price_usd'].shift(24).rolling(window=24).std()
-    df_feat['mcp_usd_roll_mean_7d'] = df_feat['mcp_price_usd'].shift(24).rolling(window=168).mean()
-    
-    df_feat['supply_demand_gap_mw'] = df_feat['load_lag_24'] - df_feat['kgup_lag_24']
-    total_kgup_safe = df_feat['kgup_lag_24'].replace(0, np.nan)
-    df_feat['renewable_ratio'] = (df_feat['kgup_wind_lag_24'] + df_feat['kgup_solar_lag_24'] + df_feat['kgup_hydro_lag_24']) / total_kgup_safe
-    df_feat['renewable_ratio'] = df_feat['renewable_ratio'].fillna(0)
-    
-    df_model = df_feat.dropna().copy()
+    df_robust = build_robust_features(df)
+    df_model = df_robust.dropna().copy()
     
     # Define Column Sets
     set_pure_ptf = ['hour', 'dayofweek', 'is_weekend', 'mcp_usd_lag_24', 'mcp_usd_lag_48', 'mcp_usd_lag_168', 'mcp_usd_roll_mean_24h', 'mcp_usd_roll_std_24h', 'mcp_usd_roll_mean_7d']

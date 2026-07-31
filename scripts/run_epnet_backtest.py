@@ -25,6 +25,8 @@ sys.path.insert(0, str(project_root / "scripts"))
 
 from db.connection import get_db_engine
 from sqlalchemy import text
+from src.features.feature_engineering import build_full_features, get_feature_columns
+
 
 
 def set_seed(seed=42):
@@ -120,45 +122,6 @@ def load_master_dataset():
         df_raw['hydro_water_energy_mwh'] = df_raw['hydro_water_energy_mwh'].ffill().bfill()
 
     return df_raw
-
-
-def build_features(df):
-    """Engineers zero-leakage lag features."""
-    df_feat = df.copy()
-    df_feat['hour'] = df_feat.index.hour
-    df_feat['dayofweek'] = df_feat.index.dayofweek
-    df_feat['month'] = df_feat.index.month
-    df_feat['quarter'] = df_feat.index.quarter
-    df_feat['is_weekend'] = (df_feat.index.dayofweek >= 5).astype(int)
-    df_feat['is_peak_hour'] = df_feat['hour'].isin([17, 18, 19, 20, 21]).astype(int)
-    
-    for lag in [24, 48, 168]:
-        df_feat[f'mcp_usd_lag_{lag}'] = df_feat['mcp_price_usd'].shift(lag)
-        df_feat[f'load_lag_{lag}'] = df_feat['load_forecast_mw'].shift(lag)
-        df_feat[f'kgup_lag_{lag}'] = df_feat['kgup_total_mw'].shift(lag)
-        df_feat[f'kgup_wind_lag_{lag}'] = df_feat['kgup_wind_mw'].shift(lag)
-        df_feat[f'kgup_solar_lag_{lag}'] = df_feat['kgup_solar_mw'].shift(lag)
-        df_feat[f'kgup_hydro_lag_{lag}'] = df_feat['kgup_hydro_mw'].shift(lag)
-        df_feat[f'kgup_gas_lag_{lag}'] = df_feat['kgup_gas_mw'].shift(lag)
-    
-    for lag in [48, 168]:
-        if 'actual_gen_total_mw' in df_feat.columns:
-            df_feat[f'actual_gen_lag_{lag}'] = df_feat['actual_gen_total_mw'].shift(lag)
-        if 'actual_cons_mw' in df_feat.columns:
-            df_feat[f'actual_cons_lag_{lag}'] = df_feat['actual_cons_mw'].shift(lag)
-    
-    df_feat['mcp_usd_roll_mean_24h'] = df_feat['mcp_price_usd'].shift(24).rolling(window=24).mean()
-    df_feat['mcp_usd_roll_std_24h'] = df_feat['mcp_price_usd'].shift(24).rolling(window=24).std()
-    df_feat['mcp_usd_roll_mean_7d'] = df_feat['mcp_price_usd'].shift(24).rolling(window=168).mean()
-    
-    df_feat['supply_demand_gap_mw'] = df_feat['load_lag_24'] - df_feat['kgup_lag_24']
-    total_kgup_safe = df_feat['kgup_lag_24'].replace(0, np.nan)
-    df_feat['renewable_ratio'] = (df_feat['kgup_wind_lag_24'] + df_feat['kgup_solar_lag_24'] + df_feat['kgup_hydro_lag_24']) / total_kgup_safe
-    df_feat['renewable_ratio'] = df_feat['renewable_ratio'].fillna(0)
-    df_feat['solar_wind_ratio'] = (df_feat['kgup_wind_lag_24'] + df_feat['kgup_solar_lag_24']) / total_kgup_safe
-    df_feat['solar_wind_ratio'] = df_feat['solar_wind_ratio'].fillna(0)
-    
-    return df_feat
 
 
 def calculate_safe_mape(y_true, y_pred):
@@ -473,16 +436,10 @@ def main():
     
     print("📦 EPİAŞ Veritabanından Veriler Yükleniyor...")
     df_raw = load_master_dataset()
-    df_feat = build_features(df_raw)
+    df_feat = build_full_features(df_raw)
     df_model = df_feat.dropna().copy()
     
-    exclude_cols = [
-        'mcp_price_usd', 'mcp_price_try', 'smp_price_try', 
-        'actual_gen_total_mw', 'actual_cons_mw',
-        'load_forecast_mw', 'kgup_total_mw', 'kgup_gas_mw', 
-        'kgup_wind_mw', 'kgup_solar_mw', 'kgup_hydro_mw', 'kgup_coal_mw'
-    ]
-    feature_cols = [c for c in df_model.columns if c not in exclude_cols]
+    feature_cols = get_feature_columns('full', df_model)
     target_col = 'mcp_price_usd'
     
     if args.mode == "fast":

@@ -32,6 +32,7 @@ sys.path.insert(0, str(project_root / "scripts"))
 
 from db.connection import get_db_engine
 from sqlalchemy import text
+from src.features.feature_engineering import build_robust_features as base_build_robust_features
 
 
 # --- Output Directories & Log Files ---
@@ -139,58 +140,12 @@ def load_master_dataset():
     df_raw['usd_try'] = df_raw['usd_try'].ffill().bfill()
     df_raw['brent_oil_usd'] = df_raw['brent_oil_usd'].ffill().bfill()
     df_raw['natural_gas_grf_try'] = df_raw['natural_gas_grf_try'].ffill().bfill()
-    if 'hydro_water_energy_mwh' in df_raw.columns:
-        df_raw['hydro_water_energy_mwh'] = df_raw['hydro_water_energy_mwh'].ffill().bfill()
-
     return df_raw
 
 
 def build_robust_features(df):
     """Engineers Zero-Price Robust features including Pressure Ratios and Cyclic Seasonality."""
-    df_feat = df.copy()
-    
-    # Calendar & Cyclic Features
-    df_feat['hour'] = df_feat.index.hour
-    df_feat['dayofweek'] = df_feat.index.dayofweek
-    df_feat['month'] = df_feat.index.month
-    df_feat['dayofyear'] = df_feat.index.dayofyear
-    df_feat['is_weekend'] = (df_feat.index.dayofweek >= 5).astype(int)
-    df_feat['is_peak_hour'] = df_feat['hour'].isin([17, 18, 19, 20, 21]).astype(int)
-    
-    df_feat['sin_hour'] = np.sin(2 * np.pi * df_feat['hour'] / 24.0)
-    df_feat['cos_hour'] = np.cos(2 * np.pi * df_feat['hour'] / 24.0)
-    df_feat['sin_month'] = np.sin(2 * np.pi * df_feat['month'] / 12.0)
-    df_feat['cos_month'] = np.cos(2 * np.pi * df_feat['month'] / 12.0)
-    df_feat['sin_doy'] = np.sin(2 * np.pi * df_feat['dayofyear'] / 365.25)
-    df_feat['cos_doy'] = np.cos(2 * np.pi * df_feat['dayofyear'] / 365.25)
-    
-    # Lag Features
-    for lag in [24, 48, 168]:
-        df_feat[f'mcp_usd_lag_{lag}'] = df_feat['mcp_price_usd'].shift(lag)
-        df_feat[f'load_lag_{lag}'] = df_feat['load_forecast_mw'].shift(lag)
-        df_feat[f'kgup_lag_{lag}'] = df_feat['kgup_total_mw'].shift(lag)
-        df_feat[f'kgup_wind_lag_{lag}'] = df_feat['kgup_wind_mw'].shift(lag)
-        df_feat[f'kgup_solar_lag_{lag}'] = df_feat['kgup_solar_mw'].shift(lag)
-        df_feat[f'kgup_hydro_lag_{lag}'] = df_feat['kgup_hydro_mw'].shift(lag)
-        df_feat[f'kgup_gas_lag_{lag}'] = df_feat['kgup_gas_mw'].shift(lag)
-        
-    for lag in [48, 168]:
-        if 'actual_gen_total_mw' in df_feat.columns:
-            df_feat[f'actual_gen_lag_{lag}'] = df_feat['actual_gen_total_mw'].shift(lag)
-        if 'actual_cons_mw' in df_feat.columns:
-            df_feat[f'actual_cons_lag_{lag}'] = df_feat['actual_cons_mw'].shift(lag)
-            
-    df_feat['mcp_usd_roll_mean_24h'] = df_feat['mcp_price_usd'].shift(24).rolling(window=24).mean()
-    df_feat['mcp_usd_roll_std_24h'] = df_feat['mcp_price_usd'].shift(24).rolling(window=24).std()
-    df_feat['mcp_usd_roll_mean_7d'] = df_feat['mcp_price_usd'].shift(24).rolling(window=168).mean()
-    
-    # Zero-Price Supply Pressure Ratios (Crucial for May-June zero price detection)
-    load_safe = df_feat['load_lag_24'].replace(0, np.nan)
-    df_feat['supply_demand_gap_mw'] = df_feat['load_lag_24'] - df_feat['kgup_lag_24']
-    df_feat['hydro_pressure_ratio'] = (df_feat['kgup_hydro_lag_24'] / load_safe).fillna(0)
-    df_feat['renewable_pressure_ratio'] = ((df_feat['kgup_wind_lag_24'] + df_feat['kgup_solar_lag_24'] + df_feat['kgup_hydro_lag_24']) / load_safe).fillna(0)
-    df_feat['solar_peak_pressure_ratio'] = ((df_feat['kgup_solar_lag_24']) / load_safe).fillna(0)
-    
+    df_feat = base_build_robust_features(df)
     df_model = df_feat.dropna().copy()
     
     # Feature Matrices
