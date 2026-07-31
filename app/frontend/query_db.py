@@ -1,9 +1,11 @@
 import sys
 import json
 from datetime import datetime
+from pathlib import Path
 
-# Add project root to sys.path
-sys.path.append('c:/Users/ASUS/Desktop/enerji_fiyat_tahmini')
+# Add project root to sys.path dynamically regardless of OS or user directory
+project_root = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(project_root))
 
 try:
     from db.connection import get_db_engine

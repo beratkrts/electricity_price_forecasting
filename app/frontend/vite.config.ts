@@ -5,7 +5,7 @@ import path from 'path';
 import https from 'https';
 import { execSync } from 'child_process';
 
-const dataDir = 'c:/Users/ASUS/Desktop/enerji_fiyat_tahmini/data';
+const dataDir = path.resolve(__dirname, '../../data');
 
 function energyDataPlugin() {
   return {
@@ -24,7 +24,15 @@ function energyDataPlugin() {
 
           try {
             const pyPath = path.join(process.cwd(), 'query_db.py');
-            const pythonExe = 'c:/Users/ASUS/Desktop/enerji_fiyat_tahmini/.venv/Scripts/python.exe';
+            // Try active environment python or fallback to system python/python3
+            const pythonExe = process.platform === 'win32'
+              ? (fs.existsSync(path.resolve(__dirname, '../../.venv/Scripts/python.exe')) 
+                  ? path.resolve(__dirname, '../../.venv/Scripts/python.exe') 
+                  : 'python')
+              : (fs.existsSync(path.resolve(__dirname, '../../.venv/bin/python')) 
+                  ? path.resolve(__dirname, '../../.venv/bin/python') 
+                  : 'python3');
+
             const pyOutput = execSync(`"${pythonExe}" "${pyPath}" "${dateParam}" "${typeParam}"`, { encoding: 'utf-8' });
             res.setHeader('Content-Type', 'application/json');
             return res.end(pyOutput);
