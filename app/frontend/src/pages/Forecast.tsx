@@ -30,8 +30,13 @@ export const Forecast: React.FC<ForecastProps> = ({
 }) => {
   const [selectedIntersection, setSelectedIntersection] = useState<IntersectionPoint | null>(null);
   
-  const [historyStartDate, setHistoryStartDate] = useState<string>('2026-07-31');
-  const [historyEndDate, setHistoryEndDate] = useState<string>('2026-07-31');
+  const todayStr = React.useMemo(() => {
+    const d = new Date();
+    return d.toISOString().split('T')[0];
+  }, []);
+
+  const [historyStartDate, setHistoryStartDate] = useState<string>(todayStr);
+  const [historyEndDate, setHistoryEndDate] = useState<string>(todayStr);
   const [showTable, setShowTable] = useState<boolean>(false);
   const [chartData, setChartData] = useState<EnergyDataPoint[]>(initialData);
 
@@ -73,8 +78,9 @@ export const Forecast: React.FC<ForecastProps> = ({
               <button
                 key={preset.id}
                 onClick={() => {
-                  const today = new Date('2026-07-31');
-                  setHistoryEndDate('2026-07-31');
+                  const today = new Date();
+                  const endStr = today.toISOString().split('T')[0];
+                  setHistoryEndDate(endStr);
                   let start = new Date(today);
                   if (preset.id === '1d') start.setDate(today.getDate() - 1);
                   else if (preset.id === '7d') start.setDate(today.getDate() - 7);
