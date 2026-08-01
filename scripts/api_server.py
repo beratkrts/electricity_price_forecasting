@@ -98,6 +98,8 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                         WHERE m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly);
                     """
                 else:
+                    days_map = {"1d": 1, "7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
+                    days = days_map.get(date, 365)
                     sql = """
                         SELECT 
                             COUNT(*) as total_hours,
@@ -108,7 +110,7 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                             ROUND(AVG(m.price_try), 2) as avg_actual
                         FROM gold.ptf_predictions_daily g
                         JOIN raw_mcp_hourly m ON g.target_ts = m.ts
-                        WHERE g.target_ts >= (SELECT MAX(ts) FROM raw_mcp_hourly) - INTERVAL ':days days';
+                        WHERE g.target_ts::date >= ((SELECT MAX(ts::date) FROM raw_mcp_hourly) - (:days || ' days')::INTERVAL);
                     """.replace(":days", str(days))
                 with engine.connect() as conn:
                     res = conn.execute(text(sql)).mappings().all()
