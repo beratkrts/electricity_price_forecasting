@@ -72,13 +72,13 @@ export async function fetchLatestRealizedComparison(dateStr: string = '2026-07-3
 }
 
 // Backward compatibility wrapper
-export async function fetchRealEnergyData(dateStr: string = '2026-07-31'): Promise<EnergyDataPoint[]> {
+export async function fetchRealEnergyData(_dateStr: string = '2026-07-31'): Promise<EnergyDataPoint[]> {
   return fetchNextDayForecast();
 }
 
 export function generateEnergyData(
-  dateRange: DateRangeState,
-  hybridWeights: { epnet: number; lgb: number } = { epnet: 55, lgb: 45 }
+  _dateRange: DateRangeState,
+  _hybridWeights: { epnet: number; lgb: number } = { epnet: 55, lgb: 45 }
 ): EnergyDataPoint[] {
   return [];
 }
