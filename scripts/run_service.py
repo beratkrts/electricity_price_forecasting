@@ -61,7 +61,7 @@ def main() -> None:
         if seconds_remaining <= 0:
             logger.info("⏰ 4:00 AM Scheduled Trigger (or missed run detected after sleep)! Running daily ETL pipeline...")
             try:
-                run_daily_pipeline()
+                run_daily_pipeline(force_prediction=True)
             except Exception as e:
                 logger.error(f"Error during scheduled ETL execution: {e}")
             

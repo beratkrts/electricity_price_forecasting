@@ -56,7 +56,7 @@ if not root_logger.handlers:
 logger = logging.getLogger("ETLPipeline")
 
 
-def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optional[str] = None) -> None:
+def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optional[str] = None, force_prediction: bool = False) -> None:
     """Executes the in-memory ETL pipeline for the specified date range or defaults to historical sync."""
     logger.info("🚀 Starting In-Memory Direct Database Ingestion Pipeline...")
 
@@ -193,7 +193,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     # 15. LightGBM Daily Prediction Execution & DB Ingestion
     logger.info("\n🔮 Step 15: Executing LightGBM Daily Prediction & Gold Ingestion...")
     try:
-        run_daily_prediction()
+        run_daily_prediction(force=force_prediction)
     except Exception as e:
         logger.error(f"❌ Error during LightGBM daily prediction step: {e}")
 

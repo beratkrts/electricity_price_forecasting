@@ -112,16 +112,35 @@ def load_all_historical_data():
     return df_raw
 
 
-def run_daily_prediction():
+def run_daily_prediction(force: bool = False):
     """
     Tüm veriyle LightGBM modelini eğitir, gelecek 24 saat için tahmin yapar ve DB'ye yazar.
+    force=False ise ve bugün/yarın için tahminler zaten DB'de varsa çalıştırmayı atlar.
     """
     logger.info("🔮 Running Daily LightGBM Prediction Pipeline...")
     
     # 1. DB tablosunu doğrula
     create_gold_schema_if_not_exists()
+
+    engine = get_db_engine()
+
+    # 2. Eğer force=False ise veritabanında son günün tahminlerinin tam (24 saat) olup olmadığını kontrol et
+    if not force:
+        with engine.connect() as conn:
+            check_sql = text("""
+                SELECT COUNT(*) 
+                FROM gold.ptf_predictions_daily 
+                WHERE target_ts::date = (
+                    SELECT MAX(target_ts::date) FROM gold.ptf_predictions_daily
+                );
+            """)
+            count = conn.execute(check_sql).scalar()
+            if count and count >= 24:
+                max_date = conn.execute(text("SELECT MAX(target_ts::date) FROM gold.ptf_predictions_daily;")).scalar()
+                logger.info(f"✅ Predictions for target date {max_date} already exist ({count} hours). Skipping re-prediction to preserve existing forecasts.")
+                return
     
-    # 2. Tüm geçmiş veriyi yükle
+    # 3. Tüm geçmiş veriyi yükle
     df_raw = load_all_historical_data()
     logger.info(f"📊 Total historical dataset loaded: {len(df_raw)} records ({df_raw.index.min()} -> {df_raw.index.max()})")
 
