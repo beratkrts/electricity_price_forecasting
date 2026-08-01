@@ -38,8 +38,11 @@ export const Forecast: React.FC<ForecastProps> = ({
   React.useEffect(() => {
     let mounted = true;
     const updateComparisonData = async () => {
-      if (historyEndDate) {
-        const newData = await fetchLatestRealizedComparison(historyEndDate);
+      if (historyStartDate && historyEndDate) {
+        const queryParam = historyStartDate === historyEndDate 
+          ? historyEndDate 
+          : `${historyStartDate}_to_${historyEndDate}`;
+        const newData = await fetchLatestRealizedComparison(queryParam);
         if (mounted && newData && newData.length > 0) {
           setChartData(newData);
         }
@@ -47,7 +50,7 @@ export const Forecast: React.FC<ForecastProps> = ({
     };
     updateComparisonData();
     return () => { mounted = false; };
-  }, [historyEndDate]);
+  }, [historyStartDate, historyEndDate]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

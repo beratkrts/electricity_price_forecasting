@@ -101,21 +101,43 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     data = [dict(r) for r in res]
                     return JSONResponse(content=json.loads(json.dumps(data, default=str)))
 
-        elif type == "today_performance":
-            sql = """
-                SELECT 
-                    TO_CHAR(m.ts, 'HH24:00') as hour,
-                    ROUND(m.price_try, 2) as ptf,
-                    ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast
-                FROM raw_mcp_hourly m
-                LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
-                WHERE m.ts::date = :dt
-                ORDER BY m.ts;
-            """
-            with engine.connect() as conn:
-                res = conn.execute(text(sql), {"dt": date}).mappings().all()
-                data = [dict(r) for r in res]
-                return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+        elif type == "today_performance" or type == "range_performance":
+            if "_to_" in date:
+                parts = date.split("_to_")
+                start_dt, end_dt = parts[0], parts[1]
+                sql = """
+                    SELECT 
+                        TO_CHAR(m.ts, 'YYYY-MM-DD HH24:00') as timestamp,
+                        TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
+                        TO_CHAR(m.ts, 'HH24:00') as hour,
+                        ROUND(m.price_try, 2) as ptf,
+                        ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast
+                    FROM raw_mcp_hourly m
+                    LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
+                    WHERE m.ts::date >= :start_dt AND m.ts::date <= :end_dt
+                    ORDER BY m.ts;
+                """
+                with engine.connect() as conn:
+                    res = conn.execute(text(sql), {"start_dt": start_dt, "end_dt": end_dt}).mappings().all()
+                    data = [dict(r) for r in res]
+                    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+            else:
+                sql = """
+                    SELECT 
+                        TO_CHAR(m.ts, 'YYYY-MM-DD HH24:00') as timestamp,
+                        TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
+                        TO_CHAR(m.ts, 'HH24:00') as hour,
+                        ROUND(m.price_try, 2) as ptf,
+                        ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast
+                    FROM raw_mcp_hourly m
+                    LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
+                    WHERE m.ts::date = :dt
+                    ORDER BY m.ts;
+                """
+                with engine.connect() as conn:
+                    res = conn.execute(text(sql), {"dt": date}).mappings().all()
+                    data = [dict(r) for r in res]
+                    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
 
         else:
             sql_map = {

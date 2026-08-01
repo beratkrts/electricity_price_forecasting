@@ -45,17 +45,21 @@ export async function fetchLatestRealizedComparison(dateStr: string = '2026-07-3
     const res = await fetch(`/api/db-data?date=${dateStr}&type=today_performance`);
     const data = res.ok ? await res.json() : [];
 
-    return Array.from({ length: 24 }, (_, i) => {
-      const hourStr = i.toString().padStart(2, '0') + ':00';
-      const item = Array.isArray(data) ? data.find((x: any) => x.hour === hourStr) : null;
+    if (!Array.isArray(data) || data.length === 0) {
+      return [];
+    }
 
-      const ptfVal = item && item.ptf ? parseFloat(item.ptf) : 0;
-      const lgbVal = item && item.lightgbm_forecast ? parseFloat(item.lightgbm_forecast) : ptfVal;
+    return data.map((item: any) => {
+      const ptfVal = item && item.ptf !== undefined && item.ptf !== null ? parseFloat(item.ptf) : 0;
+      const lgbVal = item && item.lightgbm_forecast !== undefined && item.lightgbm_forecast !== null ? parseFloat(item.lightgbm_forecast) : ptfVal;
+      const dateVal = item.date || dateStr;
+      const hourVal = item.hour || '00:00';
+      const tsVal = item.timestamp || `${dateVal} ${hourVal}`;
 
       return {
-        timestamp: `${dateStr} ${hourStr}`,
-        hour: hourStr,
-        date: dateStr,
+        timestamp: tsVal,
+        hour: hourVal,
+        date: dateVal,
         ptf: isNaN(ptfVal) ? 0 : ptfVal,
         epnetForecast: lgbVal,
         lightgbmForecast: isNaN(lgbVal) ? ptfVal : lgbVal,

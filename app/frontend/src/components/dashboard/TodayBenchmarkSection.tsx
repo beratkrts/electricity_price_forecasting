@@ -31,7 +31,8 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
   const chartOption = useMemo(() => {
     if (!data || data.length === 0) return {};
 
-    const xAxisLabels = data.map((d) => d.hour);
+    const isMultiDay = data.length > 24;
+    const xAxisLabels = data.map((d) => isMultiDay ? (d.timestamp || `${d.date} ${d.hour}`) : d.hour);
     const seriesList: any[] = [];
 
     // Add active series (including PTF Realized)
