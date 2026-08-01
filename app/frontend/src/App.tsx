@@ -59,7 +59,6 @@ export const App: React.FC = () => {
   };
 
   const displayNextDayData = useMemo(() => convertDataCurrency(nextDayData), [nextDayData, currencyMode, usdRate]);
-  const displayComparisonData = useMemo(() => convertDataCurrency(comparisonData), [comparisonData, currencyMode, usdRate]);
 
   const updatedSeriesConfigs = useMemo(() => {
     const unitStr = currencyMode === 'TRY' ? '₺/MWh' : '$/MWh';
@@ -156,7 +155,7 @@ export const App: React.FC = () => {
               path="/forecast" 
               element={
                 <Forecast 
-                  data={displayComparisonData}
+                  data={comparisonData}
                   seriesConfigs={updatedSeriesConfigs}
                   toggleSeriesVisibility={toggleSeriesVisibility}
                   changeSeriesChartType={changeSeriesChartType}
