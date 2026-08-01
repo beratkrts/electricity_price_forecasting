@@ -32,7 +32,14 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
     };
   }, [data]);
 
-  // ECharts Option for 1 Ağustos PTF Forecast (Tomorrow)
+  const targetDateStr = useMemo(() => {
+    if (data && data.length > 0 && data[0].date) {
+      return data[0].date;
+    }
+    return 'Gelecek Gün';
+  }, [data]);
+
+  // ECharts Option for PTF Forecast (Tomorrow)
   const chartOption = useMemo(() => {
     if (!data || data.length === 0) return {};
 
@@ -105,7 +112,7 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
         textStyle: { color: '#fff', fontSize: 12 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
-          let res = `<div style="font-weight:700;margin-bottom:6px;color:#fbbf24;">🕒 1 Ağustos Saat: ${params[0].name}</div>`;
+          let res = `<div style="font-weight:700;margin-bottom:6px;color:#fbbf24;">🕒 ${targetDateStr} Saat: ${params[0].name}</div>`;
           params.forEach((item: any) => {
             if (item.seriesName.includes('Güven Aralığı')) return;
             const val = typeof item.value === 'number' ? item.value.toLocaleString('tr-TR') : item.value;
@@ -138,7 +145,35 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
       },
       series: seriesList
     };
-  }, [data, seriesConfigs]);
+  }, [data, seriesConfigs, targetDateStr]);
+
+  const [perfMetric, setPerfMetric] = React.useState<{ mape: string; accuracy: string }>({
+    mape: '0.52',
+    accuracy: '99.48'
+  });
+
+  React.useEffect(() => {
+    let mounted = true;
+    const fetch1dPerf = async () => {
+      try {
+        const res = await fetch('/api/db-data?date=1d&type=performance');
+        if (!res.ok) return;
+        const pData = await res.json();
+        if (mounted && Array.isArray(pData) && pData.length > 0 && pData[0].mape) {
+          const mapeVal = parseFloat(pData[0].mape);
+          const accVal = Math.max(0, 100 - mapeVal).toFixed(2);
+          setPerfMetric({
+            mape: pData[0].mape,
+            accuracy: accVal
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch 1d performance metric:', err);
+      }
+    };
+    fetch1dPerf();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <section style={{ marginBottom: '28px' }}>
@@ -151,10 +186,10 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
           </div>
           <div>
             <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-              BÖLÜM 1: Gelecek PTF Fiyat Tahminleri
+              BÖLÜM 1: Gelecek PTF Fiyat Tahminleri ({targetDateStr})
             </h2>
             <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
-              30 Temmuz verileri ile 31 Temmuz sabahı üretilen güncel PTF fiyat tahmin eğrileri
+              Üretilen güncel PTF fiyat tahmin eğrileri ({targetDateStr})
             </p>
           </div>
         </div>
@@ -273,22 +308,22 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
 
             <div className="glass-panel" style={{ padding: '14px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#10b981', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span>Model Başarı Metriği</span>
+                <span>Model Başarı Metriği (Son 24s)</span>
                 <TrendingUp size={16} />
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', margin: '4px 0', fontFamily: 'Outfit' }}>
-                %99.48 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Doğruluk</span>
+                %{perfMetric.accuracy} <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Doğruluk</span>
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ortalama MAPE %0.52</div>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ortalama MAPE %{perfMetric.mape}</div>
             </div>
 
           </div>
 
-          {/* Main Chart 1: Tomorrow 1 Ağustos PTF Forecast */}
+          {/* Main Chart 1: Tomorrow PTF Forecast */}
           <div className="glass-panel" style={{ padding: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-                1 Ağustos 24 Saatlik PTF Gelecek Fiyat Tahmin Grafiği
+                {targetDateStr} 24 Saatlik PTF Gelecek Fiyat Tahmin Grafiği
               </h3>
               <span className="ping-badge">
                 🔮 D+1 Tahmini Yayında (EPİAŞ Öncesi)

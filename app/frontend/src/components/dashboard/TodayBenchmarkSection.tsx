@@ -129,6 +129,13 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
     }
   };
 
+  const currentDateStr = useMemo(() => {
+    if (data && data.length > 0 && data[0].date) {
+      return data[0].date;
+    }
+    return 'Seçilen Tarih';
+  }, [data]);
+
   return (
     <section style={{ marginBottom: '28px' }}>
       
@@ -139,10 +146,10 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
         </div>
         <div>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-            BÖLÜM 2: 31 Temmuz Sabah Tahminimiz vs EPİAŞ Gerçekleşen PTF Kıyaslaması
+            BÖLÜM 2: {currentDateStr} Model Tahminimiz vs EPİAŞ Gerçekleşen PTF Kıyaslaması
           </h2>
           <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
-            EPİAŞ ilan bülteni geldikten sonra sabahki tahminimiz ile gerçek fiyatların karşılaştırılması ve hata payları
+            EPİAŞ ilan bülteni geldikten sonra model tahmini ile gerçek fiyatların karşılaştırılması ve hata payları ({currentDateStr})
           </p>
         </div>
       </div>
