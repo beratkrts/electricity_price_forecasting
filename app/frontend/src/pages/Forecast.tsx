@@ -5,6 +5,7 @@ import { IntersectionList } from '../components/dashboard/IntersectionList';
 import { EnergyDataPoint, SeriesConfig, IntersectionPoint, DashboardMetrics, ChartTypeOption } from '../types/energy';
 import { Calendar, Table as TableIcon } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
+import { fetchLatestRealizedComparison } from '../services/energyDataService';
 
 interface ForecastProps {
   data: EnergyDataPoint[];
@@ -18,20 +19,35 @@ interface ForecastProps {
 }
 
 export const Forecast: React.FC<ForecastProps> = ({
-  data,
+  data: initialData,
   seriesConfigs,
   toggleSeriesVisibility,
   changeSeriesChartType,
   intersections,
   showIntersections,
   setShowIntersections,
-  metrics
+  metrics,
 }) => {
   const [selectedIntersection, setSelectedIntersection] = useState<IntersectionPoint | null>(null);
   
-  const [historyStartDate, setHistoryStartDate] = useState<string>('2026-07-01');
+  const [historyStartDate, setHistoryStartDate] = useState<string>('2026-07-31');
   const [historyEndDate, setHistoryEndDate] = useState<string>('2026-07-31');
   const [showTable, setShowTable] = useState<boolean>(false);
+  const [chartData, setChartData] = useState<EnergyDataPoint[]>(initialData);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const updateComparisonData = async () => {
+      if (historyEndDate) {
+        const newData = await fetchLatestRealizedComparison(historyEndDate);
+        if (mounted && newData && newData.length > 0) {
+          setChartData(newData);
+        }
+      }
+    };
+    updateComparisonData();
+    return () => { mounted = false; };
+  }, [historyEndDate]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -139,7 +155,7 @@ export const Forecast: React.FC<ForecastProps> = ({
       </div>
 
       <TodayBenchmarkSection
-        data={data}
+        data={chartData}
         seriesConfigs={seriesConfigs}
         toggleSeriesVisibility={toggleSeriesVisibility}
         changeSeriesChartType={changeSeriesChartType}
@@ -181,7 +197,7 @@ export const Forecast: React.FC<ForecastProps> = ({
                 </tr>
               </thead>
               <tbody>
-                {data.map((row, idx) => {
+                {chartData.map((row, idx) => {
                   const mape = row.ptf ? Math.abs((row.hybridForecast - row.ptf) / row.ptf) * 100 : 0;
                   const wape = row.ptf ? Math.abs(row.hybridForecast - row.ptf) / (row.ptf > 0 ? row.ptf : 1) * 100 : 0;
                   
