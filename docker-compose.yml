@@ -44,6 +44,8 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
+    expose:
+      - "8000"
   # 3. Frontend Dashboard Servisi (React + Vite + Nginx)
   dashboard:
     build:
