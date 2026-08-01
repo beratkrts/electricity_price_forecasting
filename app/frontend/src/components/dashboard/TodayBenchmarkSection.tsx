@@ -14,6 +14,7 @@ interface TodayBenchmarkSectionProps {
   setShowIntersections: (show: boolean) => void;
   metrics: DashboardMetrics;
   onIntersectionSelect?: (intersection: IntersectionPoint) => void;
+  currencyMode?: 'TRY' | 'USD';
 }
 
 export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
@@ -25,7 +26,8 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
   showIntersections,
   setShowIntersections,
   metrics: _metrics,
-  onIntersectionSelect
+  onIntersectionSelect,
+  currencyMode = 'TRY'
 }) => {
   const computedMetrics = useMemo(() => {
     if (!data || data.length === 0) {
@@ -72,6 +74,9 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
   }, [data]);
 
   const displayMetrics = computedMetrics;
+
+  const symbolStr = currencyMode === 'USD' ? '$' : '₺';
+  const unitStr = currencyMode === 'USD' ? '$/MWh' : '₺/MWh';
 
   // Chart Option for Morning Forecast vs Realized EPİAŞ PTF
   const chartOption = useMemo(() => {
@@ -135,13 +140,13 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
         textStyle: { color: '#fff', fontSize: 12 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
-          let res = `<div style="font-weight:700;margin-bottom:6px;color:#38bdf8;">🕒 31 Temmuz Saat: ${params[0].name}</div>`;
+          let res = `<div style="font-weight:700;margin-bottom:6px;color:#38bdf8;">🕒 Saat: ${params[0].name}</div>`;
           params.forEach((item: any) => {
             if (item.seriesName === 'Kesişim Pingleme') return;
             const val = typeof item.value === 'number' ? item.value.toLocaleString('tr-TR') : item.value;
             res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;">
               <span>${item.marker} ${item.seriesName}:</span>
-              <strong style="font-family:JetBrains Mono;">${val} ₺/MWh</strong>
+              <strong style="font-family:JetBrains Mono;">${val} ${unitStr}</strong>
             </div>`;
           });
           return res;
@@ -161,14 +166,14 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
       },
       yAxis: {
         type: 'value',
-        name: '₺ / MWh',
+        name: unitStr,
         nameTextStyle: { color: '#94a3b8' },
-        axisLabel: { color: '#94a3b8', formatter: '{value} ₺' },
+        axisLabel: { color: '#94a3b8', formatter: `{value} ${symbolStr}` },
         splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } }
       },
       series: seriesList
     };
-  }, [data, seriesConfigs, intersections, showIntersections]);
+  }, [data, seriesConfigs, intersections, showIntersections, symbolStr, unitStr]);
 
   const onChartClick = (params: any) => {
     if (params.seriesName === 'Kesişim Pingleme' && params.data?.intersectionObj && onIntersectionSelect) {
@@ -326,7 +331,7 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
                 <span>Ortalama PTF</span>
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: '8px 0', fontFamily: 'Outfit' }}>
-                {formatCurrency(displayMetrics.avgPtf, '₺')}
+                {formatCurrency(displayMetrics.avgPtf, symbolStr)}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>EPİAŞ Bülteni Kesinleşti</div>
             </div>
@@ -347,7 +352,7 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ort. Tahmin:</span>
-                <strong style={{ fontSize: '0.8rem', color: '#c084fc' }}>{formatCurrency(displayMetrics.avgLightgbmForecast, '₺')}</strong>
+                <strong style={{ fontSize: '0.8rem', color: '#c084fc' }}>{formatCurrency(displayMetrics.avgLightgbmForecast, symbolStr)}</strong>
               </div>
             </div>
 

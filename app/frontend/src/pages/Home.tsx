@@ -99,6 +99,7 @@ export const Home: React.FC<HomeProps> = ({
         toggleSeriesVisibility={toggleSeriesVisibility}
         changeSeriesChartType={changeSeriesChartType}
         dateSelectorNode={dateSelectorNode}
+        currencyMode={_currencyMode}
       />
 
       {/* Conditional Data Table for Future Forecasts */}

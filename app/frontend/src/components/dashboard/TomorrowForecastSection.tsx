@@ -10,6 +10,7 @@ interface TomorrowForecastSectionProps {
   toggleSeriesVisibility: (id: string) => void;
   changeSeriesChartType: (id: string, chartType: ChartTypeOption) => void;
   dateSelectorNode?: React.ReactNode;
+  currencyMode?: 'TRY' | 'USD';
 }
 
 export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = ({
@@ -17,7 +18,8 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
   seriesConfigs,
   toggleSeriesVisibility,
   changeSeriesChartType,
-  dateSelectorNode
+  dateSelectorNode,
+  currencyMode = 'TRY'
 }) => {
   // Compute Tomorrow Averages
   const averages = useMemo(() => {
@@ -38,6 +40,9 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
     }
     return 'Gelecek Gün';
   }, [data]);
+
+  const symbolStr = currencyMode === 'USD' ? '$' : '₺';
+  const unitStr = currencyMode === 'USD' ? '$/MWh' : '₺/MWh';
 
   // ECharts Option for PTF Forecast (Tomorrow)
   const chartOption = useMemo(() => {
@@ -118,7 +123,7 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
             const val = typeof item.value === 'number' ? item.value.toLocaleString('tr-TR') : item.value;
             res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;">
               <span>${item.marker} ${item.seriesName}:</span>
-              <strong style="font-family:JetBrains Mono;">${val} ₺/MWh</strong>
+              <strong style="font-family:JetBrains Mono;">${val} ${unitStr}</strong>
             </div>`;
           });
           return res;
@@ -138,14 +143,14 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
       },
       yAxis: {
         type: 'value',
-        name: '₺ / MWh',
+        name: unitStr,
         nameTextStyle: { color: '#94a3b8' },
-        axisLabel: { color: '#94a3b8', formatter: '{value} ₺' },
+        axisLabel: { color: '#94a3b8', formatter: `{value} ${symbolStr}` },
         splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } }
       },
       series: seriesList
     };
-  }, [data, seriesConfigs, targetDateStr]);
+  }, [data, seriesConfigs, targetDateStr, symbolStr, unitStr]);
 
   const [perfMetric, setPerfMetric] = React.useState<{ mape: string; accuracy: string }>({
     mape: '0.52',
@@ -301,7 +306,7 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
                 <Cpu size={16} />
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: '4px 0', fontFamily: 'Outfit' }}>
-                {formatCurrency(averages.lgb, '₺')}
+                {formatCurrency(averages.lgb, symbolStr)}
               </div>
               <div style={{ fontSize: '0.7rem', color: '#c084fc' }}>Aktif Model (Gradient Boosting)</div>
             </div>
