@@ -70,9 +70,9 @@ export const App: React.FC = () => {
 
   const loadData = async () => {
     const nextDay = await fetchNextDayForecast();
-    const comp = await fetchLatestRealizedComparison(dateRange.startDate || '2026-07-31');
+    const compResult = await fetchLatestRealizedComparison(dateRange.startDate || 'latest');
     setNextDayData(nextDay);
-    setComparisonData(comp);
+    setComparisonData(compResult.series || []);
   };
 
   useEffect(() => {

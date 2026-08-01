@@ -15,6 +15,7 @@ interface TodayBenchmarkSectionProps {
   metrics: DashboardMetrics;
   onIntersectionSelect?: (intersection: IntersectionPoint) => void;
   currencyMode?: 'TRY' | 'USD';
+  backendMetrics?: any;
 }
 
 export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
@@ -27,7 +28,8 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
   setShowIntersections,
   metrics: _metrics,
   onIntersectionSelect,
-  currencyMode = 'TRY'
+  currencyMode = 'TRY',
+  backendMetrics
 }) => {
   const computedMetrics = useMemo(() => {
     if (!data || data.length === 0) {
@@ -39,6 +41,16 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
         bestModel: 'LightGBM'
       };
     }
+    if (backendMetrics && backendMetrics.mape !== undefined && backendMetrics.mape !== null) {
+      return {
+        avgPtf: Number(backendMetrics.avg_actual || 0),
+        mapeLightgbm: String(backendMetrics.mape),
+        wapeLightgbm: String(backendMetrics.wape),
+        avgLightgbmForecast: Number(backendMetrics.avg_predicted || 0),
+        bestModel: 'LightGBM'
+      };
+    }
+
     let sumPtf = 0;
     let sumLgb = 0;
     let sumAbsDiff = 0;
@@ -71,7 +83,7 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
       avgLightgbmForecast,
       bestModel: 'LightGBM'
     };
-  }, [data]);
+  }, [data, backendMetrics]);
 
   const displayMetrics = computedMetrics;
 

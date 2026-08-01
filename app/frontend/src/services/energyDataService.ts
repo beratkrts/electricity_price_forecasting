@@ -40,16 +40,19 @@ export async function fetchNextDayForecast(): Promise<EnergyDataPoint[]> {
 /**
  * Fetches LATEST REALIZED PTF DAY comparison (31 Temmuz 2026) for Page 2 (Forecast).
  */
-export async function fetchLatestRealizedComparison(dateStr: string = 'latest'): Promise<EnergyDataPoint[]> {
+export async function fetchLatestRealizedComparison(dateStr: string = 'latest'): Promise<{ series: EnergyDataPoint[]; metrics: any }> {
   try {
     const res = await fetch(`/api/db-data?date=${dateStr}&type=today_performance`);
-    const data = res.ok ? await res.json() : [];
+    const payload = res.ok ? await res.json() : {};
+    
+    const data = Array.isArray(payload) ? payload : (payload.series || []);
+    const metrics = payload.metrics || {};
 
     if (!Array.isArray(data) || data.length === 0) {
-      return [];
+      return { series: [], metrics: {} };
     }
 
-    return data.map((item: any) => {
+    const seriesData = data.map((item: any) => {
       const ptfVal = item && item.ptf !== undefined && item.ptf !== null ? parseFloat(item.ptf) : 0;
       const lgbVal = item && item.lightgbm_forecast !== undefined && item.lightgbm_forecast !== null ? parseFloat(item.lightgbm_forecast) : ptfVal;
       const dateVal = item.date || dateStr;
@@ -69,9 +72,11 @@ export async function fetchLatestRealizedComparison(dateStr: string = 'latest'):
         smf: ptfVal
       };
     });
+
+    return { series: seriesData, metrics };
   } catch (err) {
     console.error('Error fetching realized comparison:', err);
-    return [];
+    return { series: [], metrics: {} };
   }
 }
 

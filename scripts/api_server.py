@@ -121,50 +121,55 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
             if "_to_" in date:
                 parts = date.split("_to_")
                 start_dt, end_dt = parts[0], parts[1]
-                sql = """
-                    SELECT 
-                        TO_CHAR(m.ts, 'YYYY-MM-DD HH24:00') as timestamp,
-                        TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
-                        TO_CHAR(m.ts, 'HH24:00') as hour,
-                        ROUND(m.price_try, 2) as ptf,
-                        ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast
-                    FROM raw_mcp_hourly m
-                    LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
-                    WHERE m.ts::date >= :start_dt AND m.ts::date <= :end_dt
-                    ORDER BY m.ts;
-                """
-                with engine.connect() as conn:
-                    res = conn.execute(text(sql), {"start_dt": start_dt, "end_dt": end_dt}).mappings().all()
-                    data = [dict(r) for r in res]
-                    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+                target_clause = "m.ts::date >= :start_dt AND m.ts::date <= :end_dt"
+                params = {"start_dt": start_dt, "end_dt": end_dt}
+            elif date in ["latest", "today", "1d"]:
+                target_clause = "m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly)"
+                params = {}
+            elif date in ["7d", "1m", "3m", "6m", "1y"]:
+                days_map = {"7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
+                days = days_map.get(date, 365)
+                target_clause = f"m.ts::date >= ((SELECT MAX(ts::date) FROM raw_mcp_hourly) - INTERVAL '{days} days')"
+                params = {}
             else:
-                if date in ["latest", "today", "1d"]:
-                    target_clause = "m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly)"
-                    params = {}
-                elif date in ["7d", "1m", "3m", "6m", "1y"]:
-                    days_map = {"7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
-                    days = days_map.get(date, 365)
-                    target_clause = f"m.ts::date >= ((SELECT MAX(ts::date) FROM raw_mcp_hourly) - INTERVAL '{days} days')"
-                    params = {}
-                else:
-                    target_clause = "m.ts::date = :dt"
-                    params = {"dt": date}
-                sql = f"""
-                    SELECT 
-                        TO_CHAR(m.ts, 'YYYY-MM-DD HH24:00') as timestamp,
-                        TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
-                        TO_CHAR(m.ts, 'HH24:00') as hour,
-                        ROUND(m.price_try, 2) as ptf,
-                        ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast
-                    FROM raw_mcp_hourly m
-                    LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
-                    WHERE {target_clause}
-                    ORDER BY m.ts;
-                """
-                with engine.connect() as conn:
-                    res = conn.execute(text(sql), params).mappings().all()
-                    data = [dict(r) for r in res]
-                    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+                target_clause = "m.ts::date = :dt"
+                params = {"dt": date}
+
+            sql = f"""
+                SELECT 
+                    TO_CHAR(m.ts, 'YYYY-MM-DD HH24:00') as timestamp,
+                    TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
+                    TO_CHAR(m.ts, 'HH24:00') as hour,
+                    ROUND(m.price_try, 2) as ptf,
+                    ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast
+                FROM raw_mcp_hourly m
+                LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
+                WHERE {target_clause}
+                ORDER BY m.ts;
+            """
+            metrics_sql = f"""
+                SELECT 
+                    COUNT(*) as total_hours,
+                    ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
+                    ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                    ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
+                    ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
+                    ROUND(AVG(m.price_try), 2) as avg_actual
+                FROM gold.ptf_predictions_daily g
+                JOIN raw_mcp_hourly m ON g.target_ts = m.ts
+                WHERE {target_clause};
+            """
+            with engine.connect() as conn:
+                res = conn.execute(text(sql), params).mappings().all()
+                data = [dict(r) for r in res]
+                
+                m_res = conn.execute(text(metrics_sql), params).mappings().first()
+                metrics = dict(m_res) if m_res else {}
+
+                return JSONResponse(content={
+                    "series": data,
+                    "metrics": metrics
+                })
 
         else:
             sql_map = {

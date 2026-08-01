@@ -40,15 +40,22 @@ export const Forecast: React.FC<ForecastProps> = ({
   const [showTable, setShowTable] = useState<boolean>(false);
   const [rawChartData, setRawChartData] = useState<EnergyDataPoint[]>(initialData);
 
+  const [backendMetrics, setBackendMetrics] = useState<any>({});
+
   React.useEffect(() => {
     let mounted = true;
     const updateComparisonData = async () => {
       const queryParam = (historyStartDate === 'latest' || historyStartDate === historyEndDate)
         ? historyStartDate 
         : `${historyStartDate}_to_${historyEndDate}`;
-      const newData = await fetchLatestRealizedComparison(queryParam);
-      if (mounted && newData && newData.length > 0) {
-        setRawChartData(newData);
+      const resData = await fetchLatestRealizedComparison(queryParam);
+      if (mounted) {
+        if (resData.series && resData.series.length > 0) {
+          setRawChartData(resData.series);
+        }
+        if (resData.metrics) {
+          setBackendMetrics(resData.metrics);
+        }
       }
     };
     updateComparisonData();
@@ -184,6 +191,7 @@ export const Forecast: React.FC<ForecastProps> = ({
         metrics={metrics}
         onIntersectionSelect={(it) => setSelectedIntersection(it)}
         currencyMode={currencyMode}
+        backendMetrics={backendMetrics}
       />
 
       <HistoricalPerformanceSection 
