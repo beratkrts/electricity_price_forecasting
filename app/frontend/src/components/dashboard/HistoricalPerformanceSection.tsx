@@ -4,9 +4,10 @@ import { formatNumber } from '../../utils/formatters';
 
 interface HistoricalPerformanceSectionProps {
   selectedRange?: string;
+  currencyMode?: 'TRY' | 'USD';
 }
 
-export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSectionProps> = ({ selectedRange }) => {
+export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSectionProps> = ({ selectedRange, currencyMode = 'USD' }) => {
   const [range, setRange] = useState<string>(selectedRange || '1y');
   const [viewType, setViewType] = useState<'cards' | 'table'>('cards');
 
@@ -67,6 +68,13 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
     { value: '6m', label: '6 Ay' },
     { value: '1y', label: '1 Yıl' }
   ];
+
+  const rate = currencyMode === 'USD' ? 33.15 : 1;
+  const symbol = currencyMode === 'USD' ? '$' : '₺';
+
+  const maeVal = (Number(perfData.mae) / rate).toFixed(2);
+  const avgPredVal = (Number(perfData.avgPredicted) / rate).toFixed(2);
+  const avgActVal = (Number(perfData.avgActual) / rate).toFixed(2);
 
   return (
     <section className="glass-panel" style={{ padding: '24px', marginTop: '20px' }}>
@@ -167,17 +175,17 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
                 <span style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '2px' }}>MAE (Ort. Mutlak Hata)</span>
-                <strong style={{ color: '#38bdf8', fontSize: '1.2rem', fontFamily: 'Outfit' }}>{perfData.mae} ₺</strong>
+                <strong style={{ color: '#38bdf8', fontSize: '1.2rem', fontFamily: 'Outfit' }}>{maeVal} {symbol}</strong>
               </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Ortalama Model Tahmini</span>
-              <strong style={{ color: '#c084fc', fontSize: '0.95rem', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(perfData.avgPredicted), 2)} ₺</strong>
+              <strong style={{ color: '#c084fc', fontSize: '0.95rem', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(avgPredVal), 2)} {symbol}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Ortalama Gerçekleşen PTF</span>
-              <strong style={{ color: '#38bdf8', fontSize: '0.95rem', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(perfData.avgActual), 2)} ₺</strong>
+              <strong style={{ color: '#38bdf8', fontSize: '0.95rem', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(avgActVal), 2)} {symbol}</strong>
             </div>
           </div>
 
@@ -200,9 +208,9 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
                 <td style={{ padding: '12px', color: '#c084fc', fontWeight: 600 }}>LightGBM_v1 (PostgreSQL Gold)</td>
                 <td style={{ padding: '12px', color: '#fff' }}>{perfData.totalHours} Saat</td>
                 <td style={{ padding: '12px', color: '#10b981', fontWeight: 700 }}>%{perfData.wape}</td>
-                <td style={{ padding: '12px', color: '#38bdf8', fontWeight: 700 }}>{perfData.mae} ₺</td>
-                <td style={{ padding: '12px', color: '#fff', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(perfData.avgPredicted), 2)} ₺</td>
-                <td style={{ padding: '12px', color: '#fff', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(perfData.avgActual), 2)} ₺</td>
+                <td style={{ padding: '12px', color: '#38bdf8', fontWeight: 700 }}>{maeVal} {symbol}</td>
+                <td style={{ padding: '12px', color: '#fff', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(avgPredVal), 2)} {symbol}</td>
+                <td style={{ padding: '12px', color: '#fff', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(avgActVal), 2)} {symbol}</td>
               </tr>
             </tbody>
           </table>

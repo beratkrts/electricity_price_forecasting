@@ -202,7 +202,10 @@ export const Forecast: React.FC<ForecastProps> = ({
         currencyMode={currencyMode}
       />
 
-      <HistoricalPerformanceSection selectedRange={historyStartDate && historyEndDate ? `${historyStartDate}_to_${historyEndDate}` : '1y'} />
+      <HistoricalPerformanceSection 
+        selectedRange={historyStartDate && historyEndDate ? `${historyStartDate}_to_${historyEndDate}` : '1y'} 
+        currencyMode={currencyMode}
+      />
 
       {showIntersections && intersections.length > 0 && (
         <IntersectionList
