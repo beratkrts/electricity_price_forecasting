@@ -12,7 +12,7 @@ import { Analysis } from './pages/Analysis';
 import { DateRangeState, EnergyDataPoint, SeriesConfig, ChartTypeOption } from './types/energy';
 import { CurrencyRate } from './types/currency';
 
-import { INITIAL_CURRENCY_RATES, fetchMarketData, simulateMarketTick } from './services/fxService';
+import { INITIAL_CURRENCY_RATES, fetchMarketData } from './services/fxService';
 import { findSeriesIntersections } from './utils/intersectionDetector';
 import { fetchNextDayForecast, fetchLatestRealizedComparison } from './services/energyDataService';
 import { calculateDashboardMetrics } from './utils/mathHelpers';
