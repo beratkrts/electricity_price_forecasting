@@ -102,7 +102,12 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
     seriesConfigs.forEach((sc) => {
       if (!sc.visible) return;
 
-      const seriesData = data.map((d) => d[sc.id] as number);
+      const seriesData = data.map((d: any) => {
+        if (sc.id === 'lightgbmForecast') {
+          return d.lightgbmForecast !== undefined ? d.lightgbmForecast : (d.lightgbm_forecast !== undefined ? d.lightgbm_forecast : d.epnetForecast);
+        }
+        return d[sc.id] !== undefined ? d[sc.id] : 0;
+      });
       const isRealized = sc.id === 'ptf';
 
       seriesList.push({
