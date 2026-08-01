@@ -9,7 +9,7 @@ import { Home } from './pages/Home';
 import { Forecast } from './pages/Forecast';
 import { Analysis } from './pages/Analysis';
 
-import { DateRangeState, EnergyDataPoint, SeriesConfig, ChartTypeOption } from './types/energy';
+import { DateRangeState, EnergyDataPoint, SeriesConfig, ChartTypeOption, CurrencyMode } from './types/energy';
 import { CurrencyRate } from './types/currency';
 
 import { INITIAL_CURRENCY_RATES, fetchMarketData } from './services/fxService';
@@ -35,8 +35,36 @@ export const App: React.FC = () => {
     { id: 'ptf', name: 'EPİAŞ PTF (Gerçekleşen)', color: '#38bdf8', visible: true, chartType: 'smooth', unit: '₺/MWh' }
   ]);
 
-  // Currency Ticker State
+  const [currencyMode, setCurrencyMode] = useState<CurrencyMode>('TRY');
   const [currencyRates, setCurrencyRates] = useState<CurrencyRate[]>(INITIAL_CURRENCY_RATES);
+
+  // Convert values based on selected currencyMode (TRY / USD)
+  const usdRate = useMemo(() => {
+    const usdObj = currencyRates.find(r => r.symbol === 'USD/TRY');
+    return usdObj && usdObj.price > 0 ? usdObj.price : 33.15;
+  }, [currencyRates]);
+
+  const convertDataCurrency = (dataPoints: EnergyDataPoint[]): EnergyDataPoint[] => {
+    if (currencyMode === 'TRY') return dataPoints;
+    return dataPoints.map(d => ({
+      ...d,
+      ptf: Number((d.ptf / usdRate).toFixed(2)),
+      epnetForecast: Number((d.epnetForecast / usdRate).toFixed(2)),
+      lightgbmForecast: Number((d.lightgbmForecast / usdRate).toFixed(2)),
+      hybridForecast: Number((d.hybridForecast / usdRate).toFixed(2)),
+      upperBound: Number((d.upperBound / usdRate).toFixed(2)),
+      lowerBound: Number((d.lowerBound / usdRate).toFixed(2)),
+      smf: d.smf ? Number((d.smf / usdRate).toFixed(2)) : undefined
+    }));
+  };
+
+  const displayNextDayData = useMemo(() => convertDataCurrency(nextDayData), [nextDayData, currencyMode, usdRate]);
+  const displayComparisonData = useMemo(() => convertDataCurrency(comparisonData), [comparisonData, currencyMode, usdRate]);
+
+  const updatedSeriesConfigs = useMemo(() => {
+    const unitStr = currencyMode === 'TRY' ? '₺/MWh' : '$/MWh';
+    return seriesConfigs.map(s => ({ ...s, unit: unitStr }));
+  }, [seriesConfigs, currencyMode]);
   const [lastRefreshTime, setLastRefreshTime] = useState<string>(
     new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   );
@@ -102,6 +130,8 @@ export const App: React.FC = () => {
           onRefresh={loadData}
           onOpenExport={() => setIsExportOpen(true)}
           intersectionCount={intersections.length}
+          currencyMode={currencyMode}
+          onCurrencyChange={(mode) => setCurrencyMode(mode)}
         />
 
         {/* Page Content Area */}
@@ -111,12 +141,13 @@ export const App: React.FC = () => {
               path="/" 
               element={
                 <Home 
-                  data={nextDayData}
-                  seriesConfigs={seriesConfigs}
+                  data={displayNextDayData}
+                  seriesConfigs={updatedSeriesConfigs}
                   toggleSeriesVisibility={toggleSeriesVisibility}
                   changeSeriesChartType={changeSeriesChartType}
                   dateRange={dateRange}
                   setDateRange={setDateRange}
+                  currencyMode={currencyMode}
                 />
               } 
             />
@@ -125,14 +156,15 @@ export const App: React.FC = () => {
               path="/forecast" 
               element={
                 <Forecast 
-                  data={comparisonData}
-                  seriesConfigs={seriesConfigs}
+                  data={displayComparisonData}
+                  seriesConfigs={updatedSeriesConfigs}
                   toggleSeriesVisibility={toggleSeriesVisibility}
                   changeSeriesChartType={changeSeriesChartType}
                   intersections={intersections}
                   showIntersections={showIntersections}
                   setShowIntersections={setShowIntersections}
                   metrics={metrics}
+                  currencyMode={currencyMode}
                 />
               } 
             />

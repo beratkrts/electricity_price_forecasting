@@ -11,6 +11,7 @@ interface HomeProps {
   changeSeriesChartType: (id: string, chartType: ChartTypeOption) => void;
   dateRange: DateRangeState;
   setDateRange: React.Dispatch<React.SetStateAction<DateRangeState>>;
+  currencyMode?: 'TRY' | 'USD';
 }
 
 export const Home: React.FC<HomeProps> = ({
@@ -19,7 +20,8 @@ export const Home: React.FC<HomeProps> = ({
   toggleSeriesVisibility,
   changeSeriesChartType,
   dateRange,
-  setDateRange
+  setDateRange,
+  currencyMode: _currencyMode = 'TRY'
 }) => {
   const [showTable, setShowTable] = useState<boolean>(false);
 

@@ -16,6 +16,7 @@ interface ForecastProps {
   showIntersections: boolean;
   setShowIntersections: (show: boolean) => void;
   metrics: DashboardMetrics;
+  currencyMode?: 'TRY' | 'USD';
 }
 
 export const Forecast: React.FC<ForecastProps> = ({
@@ -27,6 +28,7 @@ export const Forecast: React.FC<ForecastProps> = ({
   showIntersections,
   setShowIntersections,
   metrics,
+  currencyMode: _currencyMode = 'TRY'
 }) => {
   const [selectedIntersection, setSelectedIntersection] = useState<IntersectionPoint | null>(null);
   

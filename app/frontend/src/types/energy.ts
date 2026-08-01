@@ -68,3 +68,6 @@ export interface DateRangeState {
   startDate: string; // 'YYYY-MM-DD'
   endDate: string; // 'YYYY-MM-DD'
 }
+
+export type CurrencyMode = 'TRY' | 'USD';
+

@@ -6,12 +6,16 @@ interface HeaderProps {
   onRefresh: () => void;
   onOpenExport: () => void;
   intersectionCount: number;
+  currencyMode?: 'TRY' | 'USD';
+  onCurrencyChange?: (mode: 'TRY' | 'USD') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   onRefresh,
   onOpenExport,
-  intersectionCount
+  intersectionCount,
+  currencyMode = 'TRY',
+  onCurrencyChange
 }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const location = useLocation();
@@ -92,8 +96,50 @@ export const Header: React.FC<HeaderProps> = ({
         </nav>
 
         {/* Right Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           
+          {/* TRY / USD Currency Mode Switcher */}
+          <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.8)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+            <button
+              onClick={() => onCurrencyChange && onCurrencyChange('TRY')}
+              style={{
+                background: currencyMode === 'TRY' ? 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)' : 'transparent',
+                color: currencyMode === 'TRY' ? '#0f172a' : '#94a3b8',
+                border: 'none',
+                padding: '5px 12px',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <span>₺</span> TRY
+            </button>
+            <button
+              onClick={() => onCurrencyChange && onCurrencyChange('USD')}
+              style={{
+                background: currencyMode === 'USD' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
+                color: currencyMode === 'USD' ? '#0f172a' : '#94a3b8',
+                border: 'none',
+                padding: '5px 12px',
+                borderRadius: '6px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <span>$</span> USD
+            </button>
+          </div>
+
           {/* Refresh button */}
           <button
             onClick={handleRefreshClick}
