@@ -110,8 +110,8 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
       });
     });
 
-    // Add Intersection Pings Scatter if enabled
-    if (showIntersections && intersections.length > 0) {
+    // Add Intersection Pings Scatter if enabled (Only for single-day charts)
+    if (!isMultiDay && showIntersections && intersections.length > 0) {
       const pingData = intersections.map((it) => ({
         name: `Kesişim: ${it.series1Name} & ${it.series2Name}`,
         value: [it.xIndex, it.exactValue],
