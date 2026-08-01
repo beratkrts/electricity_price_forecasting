@@ -169,7 +169,9 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
         name: unitStr,
         nameTextStyle: { color: '#94a3b8' },
         axisLabel: { color: '#94a3b8', formatter: `{value} ${symbolStr}` },
-        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } }
+        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } },
+        min: currencyMode === 'USD' ? (value: any) => Math.max(0, Math.floor(value.min * 0.9)) : undefined,
+        max: currencyMode === 'USD' ? (value: any) => Math.ceil(value.max * 1.1) : undefined
       },
       series: seriesList
     };

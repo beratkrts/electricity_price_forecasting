@@ -21,7 +21,7 @@ export const Home: React.FC<HomeProps> = ({
   changeSeriesChartType,
   dateRange,
   setDateRange,
-  currencyMode: _currencyMode = 'TRY'
+  currencyMode = 'USD'
 }) => {
   const [showTable, setShowTable] = useState<boolean>(false);
 
@@ -99,7 +99,7 @@ export const Home: React.FC<HomeProps> = ({
         toggleSeriesVisibility={toggleSeriesVisibility}
         changeSeriesChartType={changeSeriesChartType}
         dateSelectorNode={dateSelectorNode}
-        currencyMode={_currencyMode}
+        currencyMode={currencyMode}
       />
 
       {/* Conditional Data Table for Future Forecasts */}
