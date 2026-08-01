@@ -40,7 +40,7 @@ export async function fetchNextDayForecast(): Promise<EnergyDataPoint[]> {
 /**
  * Fetches LATEST REALIZED PTF DAY comparison (31 Temmuz 2026) for Page 2 (Forecast).
  */
-export async function fetchLatestRealizedComparison(dateStr: string = '2026-07-31'): Promise<EnergyDataPoint[]> {
+export async function fetchLatestRealizedComparison(dateStr: string = 'latest'): Promise<EnergyDataPoint[]> {
   try {
     const res = await fetch(`/api/db-data?date=${dateStr}&type=today_performance`);
     const data = res.ok ? await res.json() : [];

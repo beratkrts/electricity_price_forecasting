@@ -138,7 +138,13 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     data = [dict(r) for r in res]
                     return JSONResponse(content=json.loads(json.dumps(data, default=str)))
             else:
-                sql = """
+                if date == "latest" or date == "today":
+                    target_clause = "m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly)"
+                    params = {}
+                else:
+                    target_clause = "m.ts::date = :dt"
+                    params = {"dt": date}
+                sql = f"""
                     SELECT 
                         TO_CHAR(m.ts, 'YYYY-MM-DD HH24:00') as timestamp,
                         TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
@@ -147,11 +153,11 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                         ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast
                     FROM raw_mcp_hourly m
                     LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
-                    WHERE m.ts::date = :dt
+                    WHERE {target_clause}
                     ORDER BY m.ts;
                 """
                 with engine.connect() as conn:
-                    res = conn.execute(text(sql), {"dt": date}).mappings().all()
+                    res = conn.execute(text(sql), params).mappings().all()
                     data = [dict(r) for r in res]
                     return JSONResponse(content=json.loads(json.dumps(data, default=str)))
 
