@@ -114,8 +114,8 @@ export const Forecast: React.FC<ForecastProps> = ({
                   setHistoryEndDate(endStr);
                   let start = new Date(today);
                   if (preset.id === '1d') {
-                    // Single day (24 hours)
-                    setHistoryStartDate(endStr);
+                    setHistoryStartDate(todayStr);
+                    setHistoryEndDate(todayStr);
                     return;
                   }
                   else if (preset.id === '7d') start.setDate(today.getDate() - 7);
