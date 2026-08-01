@@ -35,7 +35,7 @@ export const App: React.FC = () => {
     { id: 'ptf', name: 'EPİAŞ PTF (Gerçekleşen)', color: '#38bdf8', visible: true, chartType: 'smooth', unit: '₺/MWh' }
   ]);
 
-  const [currencyMode, setCurrencyMode] = useState<CurrencyMode>('TRY');
+  const [currencyMode, setCurrencyMode] = useState<CurrencyMode>('USD');
   const [currencyRates, setCurrencyRates] = useState<CurrencyRate[]>(INITIAL_CURRENCY_RATES);
 
   // Convert values based on selected currencyMode (TRY / USD)
