@@ -24,10 +24,56 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
   intersections,
   showIntersections,
   setShowIntersections,
-  metrics,
+  metrics: _metrics,
   onIntersectionSelect
 }) => {
-  // Chart Option for 31 Temmuz Morning Forecast vs Realized EPİAŞ PTF
+  const computedMetrics = useMemo(() => {
+    if (!data || data.length === 0) {
+      return {
+        avgPtf: 0,
+        mapeLightgbm: '0.00',
+        wapeLightgbm: '0.00',
+        avgLightgbmForecast: 0,
+        bestModel: 'LightGBM'
+      };
+    }
+    let sumPtf = 0;
+    let sumLgb = 0;
+    let sumAbsDiff = 0;
+    let sumRelErr = 0;
+    let countPtf = 0;
+
+    data.forEach((d) => {
+      const ptfVal = d.ptf || 0;
+      const lgbVal = d.lightgbmForecast || d.epnetForecast || 0;
+      sumLgb += lgbVal;
+
+      if (ptfVal > 0) {
+        sumPtf += ptfVal;
+        countPtf += 1;
+        const absDiff = Math.abs(lgbVal - ptfVal);
+        sumAbsDiff += absDiff;
+        sumRelErr += absDiff / ptfVal;
+      }
+    });
+
+    const avgPtf = countPtf > 0 ? sumPtf / countPtf : (sumLgb / data.length);
+    const avgLightgbmForecast = sumLgb / data.length;
+    const mape = countPtf > 0 ? (sumRelErr / countPtf) * 100 : 0;
+    const wape = sumPtf > 0 ? (sumAbsDiff / sumPtf) * 100 : 0;
+
+    return {
+      avgPtf,
+      mapeLightgbm: mape.toFixed(2),
+      wapeLightgbm: wape.toFixed(2),
+      avgLightgbmForecast,
+      bestModel: 'LightGBM'
+    };
+  }, [data]);
+
+  const displayMetrics = computedMetrics;
+
+  // Chart Option for Morning Forecast vs Realized EPİAŞ PTF
   const chartOption = useMemo(() => {
     if (!data || data.length === 0) return {};
 
@@ -271,7 +317,6 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
         {/* Sağ Taraf: Metrik Kartları + Kıyaslama Grafiği */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           
-          {/* Top Cards for 31 Temmuz Realized vs Forecast */}
           {/* Top Cards for Realized vs Forecast Models */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
             
@@ -281,40 +326,38 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
                 <span>Ortalama PTF</span>
               </div>
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: '8px 0', fontFamily: 'Outfit' }}>
-                {formatCurrency(metrics.avgPtf, '₺')}
+                {formatCurrency(displayMetrics.avgPtf, '₺')}
               </div>
               <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>EPİAŞ Bülteni Kesinleşti</div>
             </div>
-
-
 
             {/* LightGBM Card */}
             <div className="glass-panel" style={{ padding: '16px', borderTop: '3px solid #c084fc' }}>
               <div style={{ fontSize: '0.9rem', color: '#c084fc', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>LightGBM</span>
-                {metrics.bestModel.includes('LightGBM') && <CheckCircle2 size={16} />}
+                {displayMetrics.bestModel.includes('LightGBM') && <CheckCircle2 size={16} />}
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>MAPE:</span>
-                <strong style={{ fontSize: '0.9rem', color: '#fff' }}>%{metrics.mapeLightgbm}</strong>
+                <strong style={{ fontSize: '0.9rem', color: '#fff' }}>%{displayMetrics.mapeLightgbm}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>WAPE:</span>
-                <strong style={{ fontSize: '0.9rem', color: '#fff' }}>%{metrics.wapeLightgbm}</strong>
+                <strong style={{ fontSize: '0.9rem', color: '#fff' }}>%{displayMetrics.wapeLightgbm}</strong>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ort. Tahmin:</span>
-                <strong style={{ fontSize: '0.8rem', color: '#c084fc' }}>{formatCurrency(metrics.avgLightgbmForecast, '₺')}</strong>
+                <strong style={{ fontSize: '0.8rem', color: '#c084fc' }}>{formatCurrency(displayMetrics.avgLightgbmForecast, '₺')}</strong>
               </div>
             </div>
 
           </div>
 
-          {/* Main Chart 2: 31 Temmuz Forecast vs Realized */}
+          {/* Main Chart 2: Forecast vs Realized */}
           <div className="glass-panel" style={{ padding: '18px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-                31 Temmuz Sabah Tahmini vs EPİAŞ Gerçekleşen PTF Kıyaslama Grafiği
+                {currentDateStr} Sabah Tahmini vs EPİAŞ Gerçekleşen PTF Kıyaslama Grafiği
               </h3>
               {showIntersections && intersections.length > 0 && (
                 <span className="ping-badge">
