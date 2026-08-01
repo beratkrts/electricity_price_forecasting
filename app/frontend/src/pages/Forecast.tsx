@@ -6,6 +6,7 @@ import { EnergyDataPoint, SeriesConfig, IntersectionPoint, DashboardMetrics, Cha
 import { Calendar, Table as TableIcon } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 import { fetchLatestRealizedComparison } from '../services/energyDataService';
+import { findSeriesIntersections } from '../utils/intersectionDetector';
 
 interface ForecastProps {
   data: EnergyDataPoint[];
@@ -24,7 +25,7 @@ export const Forecast: React.FC<ForecastProps> = ({
   seriesConfigs,
   toggleSeriesVisibility,
   changeSeriesChartType,
-  intersections,
+  intersections: _propIntersections,
   showIntersections,
   setShowIntersections,
   metrics,
@@ -79,9 +80,13 @@ export const Forecast: React.FC<ForecastProps> = ({
       hybridForecast: Number((d.hybridForecast / rate).toFixed(2)),
       upperBound: Number((d.upperBound / rate).toFixed(2)),
       lowerBound: Number((d.lowerBound / rate).toFixed(2)),
-      smf: d.smf ? Number((d.smf / rate).toFixed(2)) : undefined
     }));
   }, [rawChartData, currencyMode]);
+
+  const intersections = React.useMemo(() => {
+    if (!showIntersections) return [];
+    return findSeriesIntersections(chartData, seriesConfigs);
+  }, [chartData, seriesConfigs, showIntersections]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
