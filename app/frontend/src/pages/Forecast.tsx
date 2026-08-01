@@ -35,8 +35,10 @@ export const Forecast: React.FC<ForecastProps> = ({
   
 
 
-  const [historyStartDate, setHistoryStartDate] = useState<string>('latest');
-  const [historyEndDate, setHistoryEndDate] = useState<string>('latest');
+  const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
+  const [activeQueryParam, setActiveQueryParam] = useState<string>('latest');
+  const [historyStartDate, setHistoryStartDate] = useState<string>(todayStr);
+  const [historyEndDate, setHistoryEndDate] = useState<string>(todayStr);
   const [showTable, setShowTable] = useState<boolean>(false);
   const [rawChartData, setRawChartData] = useState<EnergyDataPoint[]>(initialData);
 
@@ -45,13 +47,14 @@ export const Forecast: React.FC<ForecastProps> = ({
   React.useEffect(() => {
     let mounted = true;
     const updateComparisonData = async () => {
-      const queryParam = (historyStartDate === 'latest' || historyStartDate === historyEndDate)
-        ? historyStartDate 
-        : `${historyStartDate}_to_${historyEndDate}`;
-      const resData = await fetchLatestRealizedComparison(queryParam);
+      const resData = await fetchLatestRealizedComparison(activeQueryParam);
       if (mounted) {
         if (resData.series && resData.series.length > 0) {
           setRawChartData(resData.series);
+          const firstDate = resData.series[0].date;
+          const lastDate = resData.series[resData.series.length - 1].date;
+          if (firstDate) setHistoryStartDate(firstDate);
+          if (lastDate) setHistoryEndDate(lastDate);
         }
         if (resData.metrics) {
           setBackendMetrics(resData.metrics);
@@ -60,7 +63,7 @@ export const Forecast: React.FC<ForecastProps> = ({
     };
     updateComparisonData();
     return () => { mounted = false; };
-  }, [historyStartDate, historyEndDate]);
+  }, [activeQueryParam]);
 
   // Convert rawChartData based on currencyMode
   const chartData = React.useMemo(() => {
@@ -104,8 +107,7 @@ export const Forecast: React.FC<ForecastProps> = ({
               <button
                 key={preset.id}
                 onClick={() => {
-                  setHistoryStartDate(preset.id);
-                  setHistoryEndDate(preset.id);
+                  setActiveQueryParam(preset.id);
                 }}
                 style={{
                   padding: '4px 8px',
@@ -114,11 +116,9 @@ export const Forecast: React.FC<ForecastProps> = ({
                   fontSize: '0.75rem',
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: 'transparent',
-                  color: '#94a3b8'
+                  background: activeQueryParam === preset.id ? '#38bdf8' : 'transparent',
+                  color: activeQueryParam === preset.id ? '#0f172a' : '#94a3b8'
                 }}
-                onMouseOver={(e) => { e.currentTarget.style.color = '#fff'; }}
-                onMouseOut={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
               >
                 {preset.label}
               </button>
@@ -128,7 +128,13 @@ export const Forecast: React.FC<ForecastProps> = ({
           <input
             type="date"
             value={historyStartDate}
-            onChange={(e) => setHistoryStartDate(e.target.value)}
+            onChange={(e) => {
+              const newStart = e.target.value;
+              setHistoryStartDate(newStart);
+              if (newStart && historyEndDate) {
+                setActiveQueryParam(newStart === historyEndDate ? newStart : `${newStart}_to_${historyEndDate}`);
+              }
+            }}
             style={{
               background: 'rgba(15, 23, 42, 0.9)',
               border: '1px solid rgba(244, 63, 94, 0.4)',
@@ -144,7 +150,13 @@ export const Forecast: React.FC<ForecastProps> = ({
           <input
             type="date"
             value={historyEndDate}
-            onChange={(e) => setHistoryEndDate(e.target.value)}
+            onChange={(e) => {
+              const newEnd = e.target.value;
+              setHistoryEndDate(newEnd);
+              if (historyStartDate && newEnd) {
+                setActiveQueryParam(historyStartDate === newEnd ? newEnd : `${historyStartDate}_to_${newEnd}`);
+              }
+            }}
             style={{
               background: 'rgba(15, 23, 42, 0.9)',
               border: '1px solid rgba(244, 63, 94, 0.4)',
