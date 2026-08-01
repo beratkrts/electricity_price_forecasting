@@ -124,20 +124,18 @@ def run_daily_prediction(force: bool = False):
 
     engine = get_db_engine()
 
-    # 2. Eğer force=False ise veritabanında son günün tahminlerinin tam (24 saat) olup olmadığını kontrol et
+    # 2. Eğer force=False ise veritabanında yarının (gelecek günün) tahminlerinin tam (24 saat) olup olmadığını kontrol et
     if not force:
         with engine.connect() as conn:
             check_sql = text("""
                 SELECT COUNT(*) 
                 FROM gold.ptf_predictions_daily 
-                WHERE target_ts::date = (
-                    SELECT MAX(target_ts::date) FROM gold.ptf_predictions_daily
-                );
+                WHERE target_ts::date >= (CURRENT_DATE + INTERVAL '1 day');
             """)
             count = conn.execute(check_sql).scalar()
             if count and count >= 24:
                 max_date = conn.execute(text("SELECT MAX(target_ts::date) FROM gold.ptf_predictions_daily;")).scalar()
-                logger.info(f"✅ Predictions for target date {max_date} already exist ({count} hours). Skipping re-prediction to preserve existing forecasts.")
+                logger.info(f"✅ Tomorrow's predictions ({max_date}) already exist in database ({count} hours). Skipping re-prediction.")
                 return
     
     # 3. Tüm geçmiş veriyi yükle
