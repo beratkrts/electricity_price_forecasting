@@ -64,17 +64,11 @@ export const App: React.FC = () => {
     };
 
     fetchRealData(); // Initial real fetch
-    const fetchInterval = setInterval(fetchRealData, 60000); // 1 minute
-    
-    const simulateInterval = setInterval(() => {
-      setCurrencyRates((prev) => simulateMarketTick(prev));
-      setLastRefreshTime(new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    }, 5000); // Simulate every 5 seconds
+    const fetchInterval = setInterval(fetchRealData, 60000); // Fetch real data every 60 seconds
     
     return () => {
       mounted = false;
       clearInterval(fetchInterval);
-      clearInterval(simulateInterval);
     };
   }, []);
 

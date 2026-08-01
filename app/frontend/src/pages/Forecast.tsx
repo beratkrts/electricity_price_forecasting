@@ -42,18 +42,26 @@ export const Forecast: React.FC<ForecastProps> = ({
           <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.9rem' }}>Kıyaslama Aralığı:</span>
           
           <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.6)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)', marginRight: '8px' }}>
-            {['24h', '7d', '1m', '6m', '1y'].map((preset) => (
+            {[
+              { id: '1d', label: '1g' },
+              { id: '7d', label: '7g' },
+              { id: '1m', label: '1a' },
+              { id: '3m', label: '3a' },
+              { id: '6m', label: '6a' },
+              { id: '1y', label: '1y' }
+            ].map((preset) => (
               <button
-                key={preset}
+                key={preset.id}
                 onClick={() => {
                   const today = new Date('2026-07-31');
                   setHistoryEndDate('2026-07-31');
                   let start = new Date(today);
-                  if (preset === '24h') start.setDate(today.getDate() - 1);
-                  else if (preset === '7d') start.setDate(today.getDate() - 7);
-                  else if (preset === '1m') start.setMonth(today.getMonth() - 1);
-                  else if (preset === '6m') start.setMonth(today.getMonth() - 6);
-                  else if (preset === '1y') start.setFullYear(today.getFullYear() - 1);
+                  if (preset.id === '1d') start.setDate(today.getDate() - 1);
+                  else if (preset.id === '7d') start.setDate(today.getDate() - 7);
+                  else if (preset.id === '1m') start.setMonth(today.getMonth() - 1);
+                  else if (preset.id === '3m') start.setMonth(today.getMonth() - 3);
+                  else if (preset.id === '6m') start.setMonth(today.getMonth() - 6);
+                  else if (preset.id === '1y') start.setFullYear(today.getFullYear() - 1);
                   setHistoryStartDate(start.toISOString().split('T')[0]);
                 }}
                 style={{
@@ -69,7 +77,7 @@ export const Forecast: React.FC<ForecastProps> = ({
                 onMouseOver={(e) => { e.currentTarget.style.color = '#fff'; }}
                 onMouseOut={(e) => { e.currentTarget.style.color = '#94a3b8'; }}
               >
-                {preset === '24h' ? '1g' : preset === '7d' ? '7g' : preset === '1m' ? '1a' : preset === '6m' ? '6a' : '1y'}
+                {preset.label}
               </button>
             ))}
           </div>
@@ -85,7 +93,8 @@ export const Forecast: React.FC<ForecastProps> = ({
               padding: '6px 12px',
               borderRadius: '8px',
               fontSize: '0.85rem',
-              outline: 'none'
+              outline: 'none',
+              colorScheme: 'dark'
             }}
           />
           <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>-</span>
@@ -100,7 +109,8 @@ export const Forecast: React.FC<ForecastProps> = ({
               padding: '6px 12px',
               borderRadius: '8px',
               fontSize: '0.85rem',
-              outline: 'none'
+              outline: 'none',
+              colorScheme: 'dark'
             }}
           />
         </div>

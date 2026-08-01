@@ -40,7 +40,7 @@ export const Home: React.FC<HomeProps> = ({
         <span style={{ color: '#94a3b8', fontWeight: 600, fontSize: '0.8rem' }}>Tahmin Aralığı:</span>
         <div style={{ display: 'flex', gap: '6px' }}>
           {(['24h', '7d', '30d'] as TimeRangePreset[]).map((r) => {
-            const labels: Record<string, string> = { '24h': '24 Saat', '7d': '7 Gün', '30d': '1 Ay' };
+            const labels: Record<string, string> = { '24h': '1 Gün (Aktif)', '7d': '7 Gün (Yakında)', '30d': '1 Ay (Yakında)' };
             return (
               <button
                 key={r}
@@ -54,7 +54,8 @@ export const Home: React.FC<HomeProps> = ({
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                   background: dateRange.preset === r ? '#38bdf8' : 'transparent',
-                  color: dateRange.preset === r ? '#070a12' : '#94a3b8'
+                  color: dateRange.preset === r ? '#070a12' : '#94a3b8',
+                  opacity: r === '24h' ? 1 : 0.6
                 }}
               >
                 {labels[r] || r.toUpperCase()}
