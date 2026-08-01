@@ -124,12 +124,12 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                 target_clause = "m.ts::date >= :start_dt AND m.ts::date <= :end_dt"
                 params = {"start_dt": start_dt, "end_dt": end_dt}
             elif date in ["latest", "today", "1d"]:
-                target_clause = "m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly)"
+                target_clause = "m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly WHERE price_try IS NOT NULL)"
                 params = {}
             elif date in ["7d", "1m", "3m", "6m", "1y"]:
                 days_map = {"7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
                 days = days_map.get(date, 365)
-                target_clause = f"m.ts::date >= ((SELECT MAX(ts::date) FROM raw_mcp_hourly) - INTERVAL '{days} days')"
+                target_clause = f"m.ts::date >= ((SELECT MAX(ts::date) FROM raw_mcp_hourly WHERE price_try IS NOT NULL) - INTERVAL '{days} days')"
                 params = {}
             else:
                 target_clause = "m.ts::date = :dt"

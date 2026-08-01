@@ -1,4 +1,7 @@
 .venv
+venv
+ENV
+env
 .git
 .gitignore
 __pycache__
@@ -8,3 +11,10 @@ __pycache__
 .DS_Store
 data/*.json
 logs/*.log
+node_modules
+npm-debug.log
+dist
+build
+.pytest_cache
+app/frontend/node_modules
+app/frontend/dist

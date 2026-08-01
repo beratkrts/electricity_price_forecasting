@@ -40,9 +40,15 @@ export const Forecast: React.FC<ForecastProps> = ({
   const [historyStartDate, setHistoryStartDate] = useState<string>(todayStr);
   const [historyEndDate, setHistoryEndDate] = useState<string>(todayStr);
   const [showTable, setShowTable] = useState<boolean>(false);
-  const [rawChartData, setRawChartData] = useState<EnergyDataPoint[]>(initialData);
+  const [rawChartData, setRawChartData] = useState<EnergyDataPoint[]>(initialData || []);
 
   const [backendMetrics, setBackendMetrics] = useState<any>({});
+
+  React.useEffect(() => {
+    if (initialData && initialData.length > 0) {
+      setRawChartData(initialData);
+    }
+  }, [initialData]);
 
   React.useEffect(() => {
     let mounted = true;
