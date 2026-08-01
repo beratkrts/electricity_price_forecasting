@@ -7,8 +7,10 @@ export interface EnergyDataPoint {
   hour: string; // '00:00'
   date: string; // '2026-07-31'
   ptf: number; // Gerçekleşen EPİAŞ PTF (₺/MWh)
+  ptfUsd?: number; // Gerçekleşen EPİAŞ PTF ($/MWh - DB)
   epnetForecast: number; // EPNet (CNN+LSTM) PTF Tahmini (₺/MWh)
   lightgbmForecast: number; // LightGBM PTF Tahmini (₺/MWh)
+  lightgbmForecastUsd?: number; // LightGBM PTF Tahmini ($/MWh - DB)
   hybridForecast: number; // Hibrit Model (EPNet + LightGBM Ensemble) PTF Tahmini (₺/MWh)
   upperBound: number; // %95 Güven Aralığı Üst Sınır (₺/MWh)
   lowerBound: number; // %95 Güven Aralığı Alt Sınır (₺/MWh)

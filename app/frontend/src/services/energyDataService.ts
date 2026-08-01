@@ -59,13 +59,18 @@ export async function fetchLatestRealizedComparison(dateStr: string = 'latest'):
       const hourVal = item.hour || '00:00';
       const tsVal = item.timestamp || `${dateVal} ${hourVal}`;
 
+      const ptfUsdVal = item && item.ptf_usd !== undefined && item.ptf_usd !== null ? parseFloat(item.ptf_usd) : 0;
+      const lgbUsdVal = item && item.lightgbm_forecast_usd !== undefined && item.lightgbm_forecast_usd !== null ? parseFloat(item.lightgbm_forecast_usd) : ptfUsdVal;
+
       return {
         timestamp: tsVal,
         hour: hourVal,
         date: dateVal,
         ptf: isNaN(ptfVal) ? 0 : ptfVal,
+        ptfUsd: isNaN(ptfUsdVal) ? 0 : ptfUsdVal,
         epnetForecast: lgbVal,
         lightgbmForecast: isNaN(lgbVal) ? ptfVal : lgbVal,
+        lightgbmForecastUsd: isNaN(lgbUsdVal) ? ptfUsdVal : lgbUsdVal,
         hybridForecast: lgbVal,
         upperBound: Math.round(lgbVal * 1.05),
         lowerBound: Math.round(lgbVal * 0.95),

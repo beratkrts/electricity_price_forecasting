@@ -90,19 +90,23 @@ export const Forecast: React.FC<ForecastProps> = ({
     return () => { mounted = false; };
   }, [activeQueryParam]);
 
-  // Convert rawChartData based on currencyMode
+  // Convert rawChartData based on currencyMode (Use DB USD values if available)
   const chartData = React.useMemo(() => {
     if (currencyMode === 'TRY') return rawChartData;
-    const rate = usdRate > 0 ? usdRate : 33.15;
-    return rawChartData.map(d => ({
-      ...d,
-      ptf: Number((d.ptf / rate).toFixed(2)),
-      epnetForecast: Number((d.epnetForecast / rate).toFixed(2)),
-      lightgbmForecast: Number((d.lightgbmForecast / rate).toFixed(2)),
-      hybridForecast: Number((d.hybridForecast / rate).toFixed(2)),
-      upperBound: Number((d.upperBound / rate).toFixed(2)),
-      lowerBound: Number((d.lowerBound / rate).toFixed(2)),
-    }));
+    const fallbackRate = usdRate > 0 ? usdRate : 33.15;
+    return rawChartData.map(d => {
+      const ptfVal = d.ptfUsd !== undefined && d.ptfUsd !== null ? d.ptfUsd : Number((d.ptf / fallbackRate).toFixed(2));
+      const lgbVal = d.lightgbmForecastUsd !== undefined && d.lightgbmForecastUsd !== null ? d.lightgbmForecastUsd : Number((d.lightgbmForecast / fallbackRate).toFixed(2));
+      return {
+        ...d,
+        ptf: ptfVal,
+        epnetForecast: lgbVal,
+        lightgbmForecast: lgbVal,
+        hybridForecast: lgbVal,
+        upperBound: Number((lgbVal * 1.05).toFixed(2)),
+        lowerBound: Number((lgbVal * 0.95).toFixed(2)),
+      };
+    });
   }, [rawChartData, currencyMode, usdRate]);
 
   const intersections = React.useMemo(() => {

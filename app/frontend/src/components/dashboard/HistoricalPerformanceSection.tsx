@@ -21,15 +21,21 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
     wape: string;
     mape: string;
     mae: string;
+    maeUsd: string;
     avgPredicted: string;
     avgActual: string;
+    avgPredictedUsd: string;
+    avgActualUsd: string;
     totalHours: number;
   }>({
     wape: '16.88',
     mape: '18.42',
     mae: '371.35',
+    maeUsd: '11.20',
     avgPredicted: '2169.32',
     avgActual: '2199.63',
+    avgPredictedUsd: '65.44',
+    avgActualUsd: '66.35',
     totalHours: 8688
   });
 
@@ -46,8 +52,11 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
             wape: item.wape || '16.88',
             mape: item.mape || '18.42',
             mae: item.mae || '371.35',
+            maeUsd: item.mae_usd || '11.20',
             avgPredicted: item.avg_predicted || '2169.32',
             avgActual: item.avg_actual || '2199.63',
+            avgPredictedUsd: item.avg_predicted_usd || '65.44',
+            avgActualUsd: item.avg_actual_usd || '66.35',
             totalHours: item.total_hours || 8688
           });
         }
@@ -69,12 +78,11 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
     { value: '1y', label: '1 Yıl' }
   ];
 
-  const rate = currencyMode === 'USD' ? 33.15 : 1;
   const symbol = currencyMode === 'USD' ? '$' : '₺';
 
-  const maeVal = (Number(perfData.mae) / rate).toFixed(2);
-  const avgPredVal = (Number(perfData.avgPredicted) / rate).toFixed(2);
-  const avgActVal = (Number(perfData.avgActual) / rate).toFixed(2);
+  const maeVal = currencyMode === 'USD' ? perfData.maeUsd : perfData.mae;
+  const avgPredVal = currencyMode === 'USD' ? perfData.avgPredictedUsd : perfData.avgPredicted;
+  const avgActVal = currencyMode === 'USD' ? perfData.avgActualUsd : perfData.avgActual;
 
   return (
     <section className="glass-panel" style={{ padding: '24px', marginTop: '20px' }}>

@@ -43,14 +43,20 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
         bestModel: 'LightGBM'
       };
     }
-    const rate = (currencyMode === 'USD' && usdRate && usdRate > 0) ? usdRate : 1;
-
     if (backendMetrics && backendMetrics.mape !== undefined && backendMetrics.mape !== null) {
+      const isUsd = currencyMode === 'USD';
+      const avgPtfVal = isUsd && backendMetrics.avg_actual_usd !== undefined
+        ? Number(backendMetrics.avg_actual_usd)
+        : Number(backendMetrics.avg_actual || 0) / (isUsd && usdRate ? usdRate : 1);
+      const avgLgbVal = isUsd && backendMetrics.avg_predicted_usd !== undefined
+        ? Number(backendMetrics.avg_predicted_usd)
+        : Number(backendMetrics.avg_predicted || 0) / (isUsd && usdRate ? usdRate : 1);
+
       return {
-        avgPtf: Number(backendMetrics.avg_actual || 0) / rate,
+        avgPtf: avgPtfVal,
         mapeLightgbm: String(backendMetrics.mape),
         wapeLightgbm: String(backendMetrics.wape),
-        avgLightgbmForecast: Number(backendMetrics.avg_predicted || 0) / rate,
+        avgLightgbmForecast: avgLgbVal,
         bestModel: 'LightGBM'
       };
     }
