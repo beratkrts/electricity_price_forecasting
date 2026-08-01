@@ -84,7 +84,7 @@ export const Forecast: React.FC<ForecastProps> = ({
   }, [rawChartData, currencyMode]);
 
   const intersections = React.useMemo(() => {
-    if (!showIntersections) return [];
+    if (!showIntersections || chartData.length > 24) return [];
     return findSeriesIntersections(chartData, seriesConfigs);
   }, [chartData, seriesConfigs, showIntersections]);
 
