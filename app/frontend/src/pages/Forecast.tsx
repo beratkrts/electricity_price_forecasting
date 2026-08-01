@@ -45,7 +45,7 @@ export const Forecast: React.FC<ForecastProps> = ({
   const [backendMetrics, setBackendMetrics] = useState<any>({});
 
   React.useEffect(() => {
-    if (initialData && initialData.length > 0) {
+    if (initialData && initialData.length > 0 && rawChartData.length === 0) {
       setRawChartData(initialData);
     }
   }, [initialData]);
