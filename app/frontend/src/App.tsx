@@ -164,6 +164,7 @@ export const App: React.FC = () => {
                   setShowIntersections={setShowIntersections}
                   metrics={metrics}
                   currencyMode={currencyMode}
+                  usdRate={usdRate}
                 />
               } 
             />

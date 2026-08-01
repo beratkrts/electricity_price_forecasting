@@ -18,6 +18,7 @@ interface ForecastProps {
   setShowIntersections: (show: boolean) => void;
   metrics: DashboardMetrics;
   currencyMode?: 'TRY' | 'USD';
+  usdRate?: number;
 }
 
 export const Forecast: React.FC<ForecastProps> = ({
@@ -29,7 +30,8 @@ export const Forecast: React.FC<ForecastProps> = ({
   showIntersections,
   setShowIntersections,
   metrics,
-  currencyMode = 'USD'
+  currencyMode = 'USD',
+  usdRate = 33.15
 }) => {
   const [selectedIntersection, setSelectedIntersection] = useState<IntersectionPoint | null>(null);
   
@@ -91,8 +93,7 @@ export const Forecast: React.FC<ForecastProps> = ({
   // Convert rawChartData based on currencyMode
   const chartData = React.useMemo(() => {
     if (currencyMode === 'TRY') return rawChartData;
-    // Assuming USD conversion rate if raw data is TRY
-    const rate = 33.15;
+    const rate = usdRate > 0 ? usdRate : 33.15;
     return rawChartData.map(d => ({
       ...d,
       ptf: Number((d.ptf / rate).toFixed(2)),
@@ -102,7 +103,7 @@ export const Forecast: React.FC<ForecastProps> = ({
       upperBound: Number((d.upperBound / rate).toFixed(2)),
       lowerBound: Number((d.lowerBound / rate).toFixed(2)),
     }));
-  }, [rawChartData, currencyMode]);
+  }, [rawChartData, currencyMode, usdRate]);
 
   const intersections = React.useMemo(() => {
     if (!showIntersections || chartData.length > 24) return [];
@@ -227,6 +228,7 @@ export const Forecast: React.FC<ForecastProps> = ({
         onIntersectionSelect={(it) => setSelectedIntersection(it)}
         currencyMode={currencyMode}
         backendMetrics={backendMetrics}
+        usdRate={usdRate}
       />
 
       <HistoricalPerformanceSection 
@@ -255,27 +257,26 @@ export const Forecast: React.FC<ForecastProps> = ({
                 <tr style={{ background: '#0f172a', color: '#38bdf8', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Tarih / Saat</th>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Gerçekleşen PTF</th>
-                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Hibrit Tahmin</th>
-                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>EPNet Tahmin</th>
-                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>LightGBM Tahmin</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>LightGBM PTF Tahmini</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Fark (Hata)</th>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>MAPE (%)</th>
-                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>WAPE (%)</th>
                 </tr>
               </thead>
               <tbody>
                 {chartData.map((row, idx) => {
-                  const mape = row.ptf ? Math.abs((row.hybridForecast - row.ptf) / row.ptf) * 100 : 0;
-                  const wape = row.ptf ? Math.abs(row.hybridForecast - row.ptf) / (row.ptf > 0 ? row.ptf : 1) * 100 : 0;
+                  const ptfVal = row.ptf || 0;
+                  const lgbVal = row.lightgbmForecast || 0;
+                  const diff = Math.abs(lgbVal - ptfVal);
+                  const mape = ptfVal > 0 ? (diff / ptfVal) * 100 : 0;
+                  const symbolStr = currencyMode === 'USD' ? '$' : '₺';
                   
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
                       <td style={{ padding: '8px 12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{row.timestamp}</td>
-                      <td style={{ padding: '8px 12px', color: '#fff', fontWeight: 600 }}>{formatCurrency(row.ptf, '₺')}</td>
-                      <td style={{ padding: '8px 12px', color: '#fbbf24' }}>{formatCurrency(row.hybridForecast, '₺')}</td>
-                      <td style={{ padding: '8px 12px', color: '#10b981' }}>{formatCurrency(row.epnetForecast, '₺')}</td>
-                      <td style={{ padding: '8px 12px', color: '#c084fc' }}>{formatCurrency(row.lightgbmForecast, '₺')}</td>
+                      <td style={{ padding: '8px 12px', color: '#fff', fontWeight: 600 }}>{formatCurrency(ptfVal, symbolStr)}</td>
+                      <td style={{ padding: '8px 12px', color: '#c084fc', fontWeight: 600 }}>{formatCurrency(lgbVal, symbolStr)}</td>
+                      <td style={{ padding: '8px 12px', color: '#38bdf8' }}>{formatCurrency(diff, symbolStr)}</td>
                       <td style={{ padding: '8px 12px', color: mape > 10 ? '#f43f5e' : '#10b981' }}>%{mape.toFixed(2)}</td>
-                      <td style={{ padding: '8px 12px', color: wape > 10 ? '#f43f5e' : '#10b981' }}>%{wape.toFixed(2)}</td>
                     </tr>
                   )
                 })}
