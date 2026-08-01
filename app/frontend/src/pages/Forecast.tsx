@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TodayBenchmarkSection } from '../components/dashboard/TodayBenchmarkSection';
+import { HistoricalPerformanceSection } from '../components/dashboard/HistoricalPerformanceSection';
 import { IntersectionList } from '../components/dashboard/IntersectionList';
 import { EnergyDataPoint, SeriesConfig, IntersectionPoint, DashboardMetrics, ChartTypeOption } from '../types/energy';
 import { Calendar, Table as TableIcon } from 'lucide-react';
@@ -148,6 +149,8 @@ export const Forecast: React.FC<ForecastProps> = ({
         metrics={metrics}
         onIntersectionSelect={(it) => setSelectedIntersection(it)}
       />
+
+      <HistoricalPerformanceSection selectedRange={historyStartDate && historyEndDate ? `${historyStartDate}_to_${historyEndDate}` : '1y'} />
 
       {showIntersections && intersections.length > 0 && (
         <IntersectionList

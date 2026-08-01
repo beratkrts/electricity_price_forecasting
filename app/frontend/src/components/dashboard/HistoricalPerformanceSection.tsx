@@ -2,11 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { BarChart2, History } from 'lucide-react';
 import { formatNumber } from '../../utils/formatters';
 
-type HistoryRange = '1d' | '7d' | '1m' | '3m' | '6m' | '1y';
+interface HistoricalPerformanceSectionProps {
+  selectedRange?: string;
+}
 
-export const HistoricalPerformanceSection: React.FC = () => {
-  const [range, setRange] = useState<HistoryRange>('1y');
+export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSectionProps> = ({ selectedRange }) => {
+  const [range, setRange] = useState<string>(selectedRange || '1y');
   const [viewType, setViewType] = useState<'cards' | 'table'>('cards');
+
+  useEffect(() => {
+    if (selectedRange) {
+      setRange(selectedRange);
+    }
+  }, [selectedRange]);
   
   const [perfData, setPerfData] = useState<{
     wape: string;
@@ -51,7 +59,7 @@ export const HistoricalPerformanceSection: React.FC = () => {
     return () => { mounted = false; };
   }, [range]);
 
-  const ranges: { value: HistoryRange, label: string }[] = [
+  const ranges: { value: string, label: string }[] = [
     { value: '1d', label: '1 Gün' },
     { value: '7d', label: '7 Gün' },
     { value: '1m', label: '1 Ay' },

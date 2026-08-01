@@ -62,24 +62,44 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                 return JSONResponse(content=json.loads(json.dumps(data, default=str)))
 
         elif type == "performance":
-            days_map = {"1d": 1, "7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
-            days = days_map.get(date, 365)
-            sql = """
-                SELECT 
-                    COUNT(*) as total_hours,
-                    ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
-                    ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
-                    ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
-                    ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
-                    ROUND(AVG(m.price_try), 2) as avg_actual
-                FROM gold.ptf_predictions_daily g
-                JOIN raw_mcp_hourly m ON g.target_ts = m.ts
-                WHERE g.target_ts >= (SELECT MAX(ts) FROM raw_mcp_hourly) - INTERVAL ':days days';
-            """.replace(":days", str(days))
-            with engine.connect() as conn:
-                res = conn.execute(text(sql)).mappings().all()
-                data = [dict(r) for r in res]
-                return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+            if "_to_" in date:
+                parts = date.split("_to_")
+                start_dt, end_dt = parts[0], parts[1]
+                sql = """
+                    SELECT 
+                        COUNT(*) as total_hours,
+                        ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
+                        ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                        ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
+                        ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
+                        ROUND(AVG(m.price_try), 2) as avg_actual
+                    FROM gold.ptf_predictions_daily g
+                    JOIN raw_mcp_hourly m ON g.target_ts = m.ts
+                    WHERE g.target_ts::date >= :start_dt AND g.target_ts::date <= :end_dt;
+                """
+                with engine.connect() as conn:
+                    res = conn.execute(text(sql), {"start_dt": start_dt, "end_dt": end_dt}).mappings().all()
+                    data = [dict(r) for r in res]
+                    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+            else:
+                days_map = {"1d": 1, "7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
+                days = days_map.get(date, 365)
+                sql = """
+                    SELECT 
+                        COUNT(*) as total_hours,
+                        ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
+                        ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                        ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
+                        ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
+                        ROUND(AVG(m.price_try), 2) as avg_actual
+                    FROM gold.ptf_predictions_daily g
+                    JOIN raw_mcp_hourly m ON g.target_ts = m.ts
+                    WHERE g.target_ts >= (SELECT MAX(ts) FROM raw_mcp_hourly) - INTERVAL ':days days';
+                """.replace(":days", str(days))
+                with engine.connect() as conn:
+                    res = conn.execute(text(sql)).mappings().all()
+                    data = [dict(r) for r in res]
+                    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
 
         elif type == "today_performance":
             sql = """
@@ -121,31 +141,51 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
 
 @app.get("/api/fx")
 async def fx_rates():
-    """Fetches live USD/TRY and EUR/TRY exchange rates from Yahoo Finance."""
+    """Fetches live USD/TRY and EUR/TRY exchange rates with multiple fallback APIs."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=8.0, headers=headers, follow_redirects=True) as client:
             usd_resp = await client.get("https://query1.finance.yahoo.com/v8/finance/chart/USDTRY=X")
             eur_resp = await client.get("https://query1.finance.yahoo.com/v8/finance/chart/EURTRY=X")
 
-        usd_data = usd_resp.json()
-        usd_result = usd_data["chart"]["result"][0]
+            if usd_resp.status_code == 200 and eur_resp.status_code == 200:
+                usd_data = usd_resp.json()
+                eur_data = eur_resp.json()
+                usd_result = usd_data["chart"]["result"][0]
+                eur_result = eur_data["chart"]["result"][0]
 
-        eur_data = eur_resp.json()
-        eur_result = eur_data["chart"]["result"][0]
-
-        return JSONResponse(content={
-            "USD": {
-                "price": usd_result["meta"]["regularMarketPrice"],
-                "prevClose": usd_result["meta"]["previousClose"],
-            },
-            "EUR": {
-                "price": eur_result["meta"]["regularMarketPrice"],
-                "prevClose": eur_result["meta"]["previousClose"],
-            },
-        })
+                return JSONResponse(content={
+                    "USD": {
+                        "price": usd_result["meta"]["regularMarketPrice"],
+                        "prevClose": usd_result["meta"].get("previousClose", usd_result["meta"]["regularMarketPrice"]),
+                    },
+                    "EUR": {
+                        "price": eur_result["meta"]["regularMarketPrice"],
+                        "prevClose": eur_result["meta"].get("previousClose", eur_result["meta"]["regularMarketPrice"]),
+                    },
+                })
     except Exception as e:
-        logger.error(f"FX fetch error: {e}")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        logger.warning(f"Yahoo Finance fetch failed: {e}. Trying fallback API...")
+
+    # Fallback to open exchange rate API
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get("https://api.exchangerate-api.com/v4/latest/USD")
+            if resp.status_code == 200:
+                rates = resp.json().get("rates", {})
+                usd_try = rates.get("TRY", 33.15)
+                eur_val = rates.get("EUR", 0.92)
+                eur_try = usd_try / eur_val if eur_val else 36.10
+                return JSONResponse(content={
+                    "USD": {"price": round(usd_try, 4), "prevClose": round(usd_try * 0.998, 4)},
+                    "EUR": {"price": round(eur_try, 4), "prevClose": round(eur_try * 0.998, 4)},
+                })
+    except Exception as e:
+        logger.error(f"Fallback FX fetch error: {e}")
+
+    return JSONResponse(content={"error": "Failed to fetch live FX rates"}, status_code=500)
 
 
 if __name__ == "__main__":
