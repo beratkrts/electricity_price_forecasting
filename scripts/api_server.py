@@ -84,18 +84,32 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
             else:
                 days_map = {"1d": 1, "7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
                 days = days_map.get(date, 365)
-                sql = """
-                    SELECT 
-                        COUNT(*) as total_hours,
-                        ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
-                        ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
-                        ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
-                        ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
-                        ROUND(AVG(m.price_try), 2) as avg_actual
-                    FROM gold.ptf_predictions_daily g
-                    JOIN raw_mcp_hourly m ON g.target_ts = m.ts
-                    WHERE g.target_ts >= (SELECT MAX(ts) FROM raw_mcp_hourly) - INTERVAL ':days days';
-                """.replace(":days", str(days))
+                if date == "1d":
+                    sql = """
+                        SELECT 
+                            COUNT(*) as total_hours,
+                            ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
+                            ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                            ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
+                            ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
+                            ROUND(AVG(m.price_try), 2) as avg_actual
+                        FROM gold.ptf_predictions_daily g
+                        JOIN raw_mcp_hourly m ON g.target_ts = m.ts
+                        WHERE g.target_ts::date = (SELECT MAX(target_ts::date) FROM gold.ptf_predictions_daily);
+                    """
+                else:
+                    sql = """
+                        SELECT 
+                            COUNT(*) as total_hours,
+                            ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
+                            ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                            ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
+                            ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
+                            ROUND(AVG(m.price_try), 2) as avg_actual
+                        FROM gold.ptf_predictions_daily g
+                        JOIN raw_mcp_hourly m ON g.target_ts = m.ts
+                        WHERE g.target_ts >= (SELECT MAX(ts) FROM raw_mcp_hourly) - INTERVAL ':days days';
+                    """.replace(":days", str(days))
                 with engine.connect() as conn:
                     res = conn.execute(text(sql)).mappings().all()
                     data = [dict(r) for r in res]
