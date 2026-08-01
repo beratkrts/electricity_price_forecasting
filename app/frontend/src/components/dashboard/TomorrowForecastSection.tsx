@@ -154,8 +154,8 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
   }, [data, seriesConfigs, targetDateStr, symbolStr, unitStr]);
 
   const [perfMetric, setPerfMetric] = React.useState<{ mape: string; accuracy: string }>({
-    mape: '0.52',
-    accuracy: '99.48'
+    mape: '--',
+    accuracy: '--'
   });
 
   React.useEffect(() => {
@@ -165,11 +165,11 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
         const res = await fetch('/api/db-data?date=1d&type=performance');
         if (!res.ok) return;
         const pData = await res.json();
-        if (mounted && Array.isArray(pData) && pData.length > 0 && pData[0].mape) {
+        if (mounted && Array.isArray(pData) && pData.length > 0 && pData[0].mape !== undefined && pData[0].mape !== null) {
           const mapeVal = parseFloat(pData[0].mape);
           const accVal = Math.max(0, 100 - mapeVal).toFixed(2);
           setPerfMetric({
-            mape: pData[0].mape,
+            mape: pData[0].mape.toString(),
             accuracy: accVal
           });
         }

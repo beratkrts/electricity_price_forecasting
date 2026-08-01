@@ -95,7 +95,7 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                             ROUND(AVG(m.price_try), 2) as avg_actual
                         FROM gold.ptf_predictions_daily g
                         JOIN raw_mcp_hourly m ON g.target_ts = m.ts
-                        WHERE g.target_ts::date = (SELECT MAX(target_ts::date) FROM gold.ptf_predictions_daily);
+                        WHERE m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly);
                     """
                 else:
                     sql = """
