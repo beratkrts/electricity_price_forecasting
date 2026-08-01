@@ -33,13 +33,10 @@ export const Forecast: React.FC<ForecastProps> = ({
 }) => {
   const [selectedIntersection, setSelectedIntersection] = useState<IntersectionPoint | null>(null);
   
-  const todayStr = React.useMemo(() => {
-    const d = new Date();
-    return d.toISOString().split('T')[0];
-  }, []);
 
-  const [historyStartDate, setHistoryStartDate] = useState<string>(todayStr);
-  const [historyEndDate, setHistoryEndDate] = useState<string>(todayStr);
+
+  const [historyStartDate, setHistoryStartDate] = useState<string>('latest');
+  const [historyEndDate, setHistoryEndDate] = useState<string>('latest');
   const [showTable, setShowTable] = useState<boolean>(false);
   const [rawChartData, setRawChartData] = useState<EnergyDataPoint[]>(initialData);
 
@@ -54,8 +51,8 @@ export const Forecast: React.FC<ForecastProps> = ({
     let mounted = true;
     const updateComparisonData = async () => {
       if (historyStartDate && historyEndDate) {
-        const queryParam = historyStartDate === historyEndDate 
-          ? historyEndDate 
+        const queryParam = (historyStartDate === 'latest' || historyStartDate === historyEndDate)
+          ? historyStartDate 
           : `${historyStartDate}_to_${historyEndDate}`;
         const newData = await fetchLatestRealizedComparison(queryParam);
         if (mounted && newData && newData.length > 0) {
@@ -114,8 +111,8 @@ export const Forecast: React.FC<ForecastProps> = ({
                   setHistoryEndDate(endStr);
                   let start = new Date(today);
                   if (preset.id === '1d') {
-                    setHistoryStartDate(todayStr);
-                    setHistoryEndDate(todayStr);
+                    setHistoryStartDate('latest');
+                    setHistoryEndDate('latest');
                     return;
                   }
                   else if (preset.id === '7d') start.setDate(today.getDate() - 7);
