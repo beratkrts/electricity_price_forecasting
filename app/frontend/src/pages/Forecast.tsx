@@ -28,7 +28,7 @@ export const Forecast: React.FC<ForecastProps> = ({
   showIntersections,
   setShowIntersections,
   metrics,
-  currencyMode: _currencyMode = 'TRY'
+  currencyMode = 'USD'
 }) => {
   const [selectedIntersection, setSelectedIntersection] = useState<IntersectionPoint | null>(null);
   
@@ -40,7 +40,14 @@ export const Forecast: React.FC<ForecastProps> = ({
   const [historyStartDate, setHistoryStartDate] = useState<string>(todayStr);
   const [historyEndDate, setHistoryEndDate] = useState<string>(todayStr);
   const [showTable, setShowTable] = useState<boolean>(false);
-  const [chartData, setChartData] = useState<EnergyDataPoint[]>(initialData);
+  const [rawChartData, setRawChartData] = useState<EnergyDataPoint[]>(initialData);
+
+  // Sync rawChartData when initialData prop changes
+  React.useEffect(() => {
+    if (initialData && initialData.length > 0) {
+      setRawChartData(initialData);
+    }
+  }, [initialData]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -51,13 +58,30 @@ export const Forecast: React.FC<ForecastProps> = ({
           : `${historyStartDate}_to_${historyEndDate}`;
         const newData = await fetchLatestRealizedComparison(queryParam);
         if (mounted && newData && newData.length > 0) {
-          setChartData(newData);
+          setRawChartData(newData);
         }
       }
     };
     updateComparisonData();
     return () => { mounted = false; };
   }, [historyStartDate, historyEndDate]);
+
+  // Convert rawChartData based on currencyMode
+  const chartData = React.useMemo(() => {
+    if (currencyMode === 'TRY') return rawChartData;
+    // Assuming USD conversion rate if raw data is TRY
+    const rate = 33.15;
+    return rawChartData.map(d => ({
+      ...d,
+      ptf: Number((d.ptf / rate).toFixed(2)),
+      epnetForecast: Number((d.epnetForecast / rate).toFixed(2)),
+      lightgbmForecast: Number((d.lightgbmForecast / rate).toFixed(2)),
+      hybridForecast: Number((d.hybridForecast / rate).toFixed(2)),
+      upperBound: Number((d.upperBound / rate).toFixed(2)),
+      lowerBound: Number((d.lowerBound / rate).toFixed(2)),
+      smf: d.smf ? Number((d.smf / rate).toFixed(2)) : undefined
+    }));
+  }, [rawChartData, currencyMode]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -175,7 +199,7 @@ export const Forecast: React.FC<ForecastProps> = ({
         setShowIntersections={setShowIntersections}
         metrics={metrics}
         onIntersectionSelect={(it) => setSelectedIntersection(it)}
-        currencyMode={_currencyMode}
+        currencyMode={currencyMode}
       />
 
       <HistoricalPerformanceSection selectedRange={historyStartDate && historyEndDate ? `${historyStartDate}_to_${historyEndDate}` : '1y'} />
