@@ -138,8 +138,13 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     data = [dict(r) for r in res]
                     return JSONResponse(content=json.loads(json.dumps(data, default=str)))
             else:
-                if date == "latest" or date == "today":
+                if date in ["latest", "today", "1d"]:
                     target_clause = "m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly)"
+                    params = {}
+                elif date in ["7d", "1m", "3m", "6m", "1y"]:
+                    days_map = {"7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
+                    days = days_map.get(date, 365)
+                    target_clause = f"m.ts::date >= ((SELECT MAX(ts::date) FROM raw_mcp_hourly) - INTERVAL '{days} days')"
                     params = {}
                 else:
                     target_clause = "m.ts::date = :dt"

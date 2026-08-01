@@ -40,24 +40,15 @@ export const Forecast: React.FC<ForecastProps> = ({
   const [showTable, setShowTable] = useState<boolean>(false);
   const [rawChartData, setRawChartData] = useState<EnergyDataPoint[]>(initialData);
 
-  // Sync rawChartData when initialData prop changes
-  React.useEffect(() => {
-    if (initialData && initialData.length > 0) {
-      setRawChartData(initialData);
-    }
-  }, [initialData]);
-
   React.useEffect(() => {
     let mounted = true;
     const updateComparisonData = async () => {
-      if (historyStartDate && historyEndDate) {
-        const queryParam = (historyStartDate === 'latest' || historyStartDate === historyEndDate)
-          ? historyStartDate 
-          : `${historyStartDate}_to_${historyEndDate}`;
-        const newData = await fetchLatestRealizedComparison(queryParam);
-        if (mounted && newData && newData.length > 0) {
-          setRawChartData(newData);
-        }
+      const queryParam = (historyStartDate === 'latest' || historyStartDate === historyEndDate)
+        ? historyStartDate 
+        : `${historyStartDate}_to_${historyEndDate}`;
+      const newData = await fetchLatestRealizedComparison(queryParam);
+      if (mounted && newData && newData.length > 0) {
+        setRawChartData(newData);
       }
     };
     updateComparisonData();
@@ -106,21 +97,8 @@ export const Forecast: React.FC<ForecastProps> = ({
               <button
                 key={preset.id}
                 onClick={() => {
-                  const today = new Date();
-                  const endStr = today.toISOString().split('T')[0];
-                  setHistoryEndDate(endStr);
-                  let start = new Date(today);
-                  if (preset.id === '1d') {
-                    setHistoryStartDate('latest');
-                    setHistoryEndDate('latest');
-                    return;
-                  }
-                  else if (preset.id === '7d') start.setDate(today.getDate() - 7);
-                  else if (preset.id === '1m') start.setMonth(today.getMonth() - 1);
-                  else if (preset.id === '3m') start.setMonth(today.getMonth() - 3);
-                  else if (preset.id === '6m') start.setMonth(today.getMonth() - 6);
-                  else if (preset.id === '1y') start.setFullYear(today.getFullYear() - 1);
-                  setHistoryStartDate(start.toISOString().split('T')[0]);
+                  setHistoryStartDate(preset.id);
+                  setHistoryEndDate(preset.id);
                 }}
                 style={{
                   padding: '4px 8px',
