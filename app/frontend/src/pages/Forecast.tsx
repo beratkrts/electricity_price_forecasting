@@ -57,10 +57,14 @@ export const Forecast: React.FC<ForecastProps> = ({
       if (mounted) {
         if (resData.series && resData.series.length > 0) {
           setRawChartData(resData.series);
-          const firstDate = resData.series[0].date;
-          const lastDate = resData.series[resData.series.length - 1].date;
-          if (firstDate) setHistoryStartDate(firstDate);
-          if (lastDate) setHistoryEndDate(lastDate);
+          // Set date inputs to the actual database dates being displayed
+          if (activeQueryParam === 'latest' || activeQueryParam === '1d') {
+            const actualDbDate = resData.series[0].date;
+            if (actualDbDate) {
+              setHistoryStartDate(actualDbDate);
+              setHistoryEndDate(actualDbDate);
+            }
+          }
         }
         if (resData.metrics) {
           setBackendMetrics(resData.metrics);
