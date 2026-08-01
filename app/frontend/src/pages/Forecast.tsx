@@ -65,8 +65,21 @@ export const Forecast: React.FC<ForecastProps> = ({
               setHistoryEndDate(actualDbDate);
             }
           }
+        } else if (activeQueryParam !== 'latest') {
+          // If selected specific date (e.g. 2026-08-01) has no realized PTF data yet,
+          // fall back to 'latest' so the graph doesn't render empty $0.00
+          const fallbackData = await fetchLatestRealizedComparison('latest');
+          if (mounted && fallbackData.series && fallbackData.series.length > 0) {
+            setRawChartData(fallbackData.series);
+            const actualDbDate = fallbackData.series[0].date;
+            if (actualDbDate) {
+              setHistoryStartDate(actualDbDate);
+              setHistoryEndDate(actualDbDate);
+            }
+            if (fallbackData.metrics) setBackendMetrics(fallbackData.metrics);
+          }
         }
-        if (resData.metrics) {
+        if (resData.metrics && Object.keys(resData.metrics).length > 0) {
           setBackendMetrics(resData.metrics);
         }
       }

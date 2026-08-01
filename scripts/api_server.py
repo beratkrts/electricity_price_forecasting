@@ -166,10 +166,11 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                 m_res = conn.execute(text(metrics_sql), params).mappings().first()
                 metrics = dict(m_res) if m_res else {}
 
-                return JSONResponse(content={
+                payload = {
                     "series": data,
                     "metrics": metrics
-                })
+                }
+                return JSONResponse(content=json.loads(json.dumps(payload, default=str)))
 
         else:
             sql_map = {
