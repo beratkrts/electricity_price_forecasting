@@ -130,6 +130,16 @@ def build_robust_features(df):
     mean_safe = rolling_mean_24.replace(0, np.nan)
     df_feat['price_volatility_24h'] = (rolling_std_24 / mean_safe).fillna(0)
     
+    # 48h Lags for Exogenous Variables (SMF, Temperature, Brent Oil, Natural Gas GRF) to prevent leakage
+    if 'smp_price_try' in df_feat.columns and 'usd_try' in df_feat.columns:
+        df_feat['smp_usd_lag_48'] = (df_feat['smp_price_try'] / df_feat['usd_try']).shift(48)
+    if 'temperature_c' in df_feat.columns:
+        df_feat['temperature_lag_48'] = df_feat['temperature_c'].shift(48)
+    if 'brent_oil_usd' in df_feat.columns:
+        df_feat['brent_oil_lag_48'] = df_feat['brent_oil_usd'].shift(48)
+    if 'natural_gas_grf_try' in df_feat.columns and 'usd_try' in df_feat.columns:
+        df_feat['natural_gas_grf_lag_48'] = (df_feat['natural_gas_grf_try'] / df_feat['usd_try']).shift(48)
+
     return df_feat
 
 
@@ -164,7 +174,8 @@ def get_feature_columns(set_name='full', df=None):
     robust_cols = full_cols + [
         'sin_hour', 'cos_hour', 'sin_dow', 'cos_dow', 'sin_month', 'cos_month', 'sin_doy', 'cos_doy',
         'hydro_pressure_ratio', 'renewable_pressure_ratio', 'solar_peak_pressure_ratio',
-        'is_low_price_regime', 'is_zero_price_hour', 'price_volatility_24h'
+        'is_low_price_regime', 'is_zero_price_hour', 'price_volatility_24h',
+        'smp_usd_lag_48', 'temperature_lag_48', 'brent_oil_lag_48', 'natural_gas_grf_lag_48'
     ]
     
     set_map = {

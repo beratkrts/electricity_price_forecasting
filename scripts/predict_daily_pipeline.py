@@ -178,7 +178,7 @@ def run_daily_prediction(force: bool = False):
     future_df['is_weekend'] = (future_df.index.dayofweek >= 5).astype(int)
     future_df['is_peak_hour'] = future_df['hour'].isin([17, 18, 19, 20, 21]).astype(int)
 
-    # 🚀 Gelecek 24 saatin 24h lag özniteliklerini en son bilinen 24 saatlik gerçek değerlerle güncelle!
+    # 🚀 Gelecek 24 saatin 24h ve 48h lag özniteliklerini en son bilinen gerçek değerlerle güncelle!
     if 'mcp_price_usd' in df_model.columns:
         future_df['mcp_usd_lag_24'] = df_model['mcp_price_usd'].tail(24).values
     if 'load_forecast_mw' in df_model.columns:
@@ -193,6 +193,15 @@ def run_daily_prediction(force: bool = False):
         future_df['kgup_hydro_lag_24'] = df_model['kgup_hydro_mw'].tail(24).values
     if 'kgup_gas_mw' in df_model.columns:
         future_df['kgup_gas_lag_24'] = df_model['kgup_gas_mw'].tail(24).values
+
+    if 'smp_usd_lag_48' in df_model.columns:
+        future_df['smp_usd_lag_48'] = df_model['smp_usd_lag_48'].tail(24).values
+    if 'temperature_lag_48' in df_model.columns:
+        future_df['temperature_lag_48'] = df_model['temperature_lag_48'].tail(24).values
+    if 'brent_oil_lag_48' in df_model.columns:
+        future_df['brent_oil_lag_48'] = df_model['brent_oil_lag_48'].tail(24).values
+    if 'natural_gas_grf_lag_48' in df_model.columns:
+        future_df['natural_gas_grf_lag_48'] = df_model['natural_gas_grf_lag_48'].tail(24).values
 
     from src.features.holidays import add_holiday_features
     future_df = add_holiday_features(future_df)
