@@ -163,12 +163,20 @@ CREATE TABLE IF NOT EXISTS raw_installed_capacity_daily (
     CONSTRAINT pk_installed_capacity PRIMARY KEY (period_date, energy_type)
 );
 
--- 2.12 Türkiye Ağırlıklı Saatlik Sıcaklık (Open-Meteo Hava Durumu)
+-- 2.12 Türkiye Ağırlıklı Saatlik Sıcaklık (Open-Meteo Gerçekleşen Hava Durumu)
 CREATE TABLE IF NOT EXISTS raw_weather_hourly (
     ts TIMESTAMPTZ PRIMARY KEY,
     turkey_weighted_temperature_c NUMERIC(5, 2),
     ingestion_id INT REFERENCES ingestion_batches(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2.12b Türkiye Ağırlıklı Saatlik Sıcaklık Tahminleri (Open-Meteo Weather Forecast)
+CREATE TABLE IF NOT EXISTS raw_weather_forecast_hourly (
+    ts TIMESTAMPTZ PRIMARY KEY,
+    turkey_weighted_temperature_forecast_c NUMERIC(5, 2),
+    forecast_run_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 2.13 Baraj Aktif Doluluk Oranları (Master Snapshot)

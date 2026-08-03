@@ -188,7 +188,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
             db.ingest_weather(weather_data, period_key)
             weather_fc_data = fetch_tomorrow_weather_forecast_in_memory()
             if weather_fc_data:
-                db.ingest_weather(weather_fc_data, "forecast_tomorrow")
+                db.ingest_weather_forecast(weather_fc_data)
 
         time.sleep(0.5)
 

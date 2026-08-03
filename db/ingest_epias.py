@@ -582,6 +582,28 @@ class EpiasDBIngestor:
             logger.info(f"[WEATHER] Ingested {len(data)} records for {period_key}.")
         return len(data)
 
+    def ingest_weather_forecast(self, records: List[Dict[str, Any]]) -> int:
+        """Ingests live temperature forecast records into dedicated table raw_weather_forecast_hourly."""
+        if not records:
+            return 0
+        insert_query = text("""
+            INSERT INTO raw_weather_forecast_hourly (ts, turkey_weighted_temperature_forecast_c)
+            VALUES (:ts, :temp)
+            ON CONFLICT (ts) DO UPDATE SET
+                turkey_weighted_temperature_forecast_c = EXCLUDED.turkey_weighted_temperature_forecast_c,
+                forecast_run_at = CURRENT_TIMESTAMP;
+        """)
+        data = [{
+            "ts": r.get("date_time") or r.get("date") or r.get("time") or r.get("ts"),
+            "temp": r.get("turkey_weighted_temperature_c") if r.get("turkey_weighted_temperature_c") is not None else r.get("temp")
+        } for r in records if (r.get("date_time") or r.get("date") or r.get("time") or r.get("ts"))]
+
+        if data:
+            with self.engine.begin() as conn:
+                conn.execute(insert_query, data)
+            logger.info(f"[WEATHER_FORECAST] Ingested {len(data)} forecast records into raw_weather_forecast_hourly.")
+        return len(data)
+
     def ingest_active_fullness(self, records: List[Dict[str, Any]], period_key: str = "master_snapshot") -> int:
         """Ingests Dam Active Fullness snapshot into raw_master_active_fullness."""
         if not records:
