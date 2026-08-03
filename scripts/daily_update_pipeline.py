@@ -19,6 +19,7 @@ from typing import Optional
 import pandas as pd
 from dotenv import load_dotenv
 
+from db.ingest_epias import EpiasDBIngestor
 from fetch_epias_data import (
     EpiasFetcher,
     fetch_weather_in_memory,
