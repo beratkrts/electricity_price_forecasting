@@ -165,9 +165,30 @@ def run_daily_prediction(force: bool = False):
     last_ts = df_model.index.max()
     next_24h_index = pd.date_range(start=last_ts + pd.Timedelta(hours=1), periods=24, freq='h')
     
-    # Son mevcuttaki verileri future df olarak doldur
+    # Son mevcuttaki verileri future df olarak kopyala
     future_df = df_model.tail(24).copy()
     future_df.index = next_24h_index
+
+    # 🚀 Gelecek 24 saatin takvim ve döngüsel özniteliklerini yeni indekse göre güncelle!
+    future_df['hour'] = future_df.index.hour
+    future_df['dayofweek'] = future_df.index.dayofweek
+    future_df['month'] = future_df.index.month
+    future_df['quarter'] = future_df.index.quarter
+    future_df['dayofyear'] = future_df.index.dayofyear
+    future_df['is_weekend'] = (future_df.index.dayofweek >= 5).astype(int)
+    future_df['is_peak_hour'] = future_df['hour'].isin([17, 18, 19, 20, 21]).astype(int)
+
+    from src.features.holidays import add_holiday_features
+    future_df = add_holiday_features(future_df)
+
+    future_df['sin_hour'] = np.sin(2 * np.pi * future_df['hour'] / 24.0)
+    future_df['cos_hour'] = np.cos(2 * np.pi * future_df['hour'] / 24.0)
+    future_df['sin_dow'] = np.sin(2 * np.pi * future_df['dayofweek'] / 7.0)
+    future_df['cos_dow'] = np.cos(2 * np.pi * future_df['dayofweek'] / 7.0)
+    future_df['sin_month'] = np.sin(2 * np.pi * future_df['month'] / 12.0)
+    future_df['cos_month'] = np.cos(2 * np.pi * future_df['month'] / 12.0)
+    future_df['sin_doy'] = np.sin(2 * np.pi * future_df['dayofyear'] / 365.25)
+    future_df['cos_doy'] = np.cos(2 * np.pi * future_df['dayofyear'] / 365.25)
 
     # Tahmin Üret
     preds_usd = forecaster.predict(future_df[feature_cols])
