@@ -26,9 +26,9 @@ from predict_daily_pipeline import create_gold_schema_if_not_exists, load_all_hi
 logger = logging.getLogger("GoldBackfill")
 
 
-def backfill_365_days_predictions():
+def backfill_historical_predictions(num_days: int = 730):
     """
-    Son 365 gün için walk-forward LightGBM tahminlerini üretir ve DB'ye yazar.
+    Son 2 yıl (730 gün) için walk-forward LightGBM tahminlerini üretir ve DB'ye yazar.
     """
     logger.info("📦 Veritabanından tüm geçmiş veri yükleniyor...")
     create_gold_schema_if_not_exists(run_backfill_if_empty=False)
@@ -41,11 +41,14 @@ def backfill_365_days_predictions():
 
     df_model = df_feat.dropna(subset=feature_cols + [target_col]).copy()
     
-    max_days = 365
+    max_days = num_days
     max_ts = df_model.index.max()
-    logger.info(f"⏳ Son {max_days} gün için walk-forward backfill başlatılıyor...")
+    logger.info(f"⏳ Son {max_days} gün (2 yıl) için walk-forward backfill başlatılıyor...")
 
     all_records = []
+
+# Backward compatibility alias
+backfill_365_days_predictions = backfill_historical_predictions
     
     for day_idx in range(max_days - 1, -1, -1):
         test_end = max_ts - pd.Timedelta(days=day_idx)

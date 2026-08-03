@@ -49,10 +49,10 @@ def create_gold_schema_if_not_exists(run_backfill_if_empty: bool = True):
 
     # Connection kapandıktan sonra backfill gerekiyorsa çalıştır
     if run_backfill_if_empty and count < 1000:
-        logger.info("⚡ First-time deployment detected or empty gold table! Automatically running 365-day backfill for dashboard history...")
-        from backfill_gold_predictions import backfill_365_days_predictions
+        logger.info("⚡ First-time deployment detected or empty gold table! Automatically running 2-year (730-day) backfill for dashboard history...")
+        from backfill_gold_predictions import backfill_historical_predictions
         try:
-            backfill_365_days_predictions()
+            backfill_historical_predictions(num_days=730)
         except Exception as e:
             logger.error(f"Error during automatic backfill: {e}")
 

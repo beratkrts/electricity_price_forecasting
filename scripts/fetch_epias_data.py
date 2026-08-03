@@ -260,7 +260,7 @@ def fetch_tomorrow_weather_forecast_in_memory() -> List[Dict[str, Any]]:
     return []
 
 
-def fetch_macro_in_memory(start_date: str = "2024-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
     """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts with retries and fallbacks."""
     try:
         if not end_date:

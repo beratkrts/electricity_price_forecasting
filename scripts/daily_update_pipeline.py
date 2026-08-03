@@ -91,8 +91,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         end_dt = pd.to_datetime(end_date_str)
         periods = [(start_dt, end_dt)]
     else:
-        # Default backfill range: monthly chunks from 2024-01-01 to today
-        monthly_starts = pd.date_range(start="2024-01-01", end=today_dt, freq="MS")
+        # Default backfill range: monthly chunks from 2023-01-01 to today
+        monthly_starts = pd.date_range(start="2023-01-01", end=today_dt, freq="MS")
         periods = [
             (m_start, min(m_start + pd.offsets.MonthEnd(1), today_dt))
             for m_start in monthly_starts
@@ -235,7 +235,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     # 14. Macro Financial Indicators (yfinance USD/TRY & Brent Oil)
     try:
         logger.info("\n📈 Ingesting Macro Financial Indicators (USD/TRY & Brent Oil)...")
-        macro_data = fetch_macro_in_memory(start_date="2024-01-01")
+        macro_data = fetch_macro_in_memory(start_date="2023-01-01")
         if macro_data:
             db.ingest_macro(macro_data, period_key="ALL")
     except Exception as e:
