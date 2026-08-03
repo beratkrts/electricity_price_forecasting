@@ -294,11 +294,22 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
 
         if df_dict:
             macro = pd.DataFrame(df_dict)
+            macro.index = pd.to_datetime(macro.index).strftime("%Y-%m-%d")
             macro = macro.reset_index()
-            date_col = "Date" if "Date" in macro.columns else macro.columns[0]
-            macro["Date"] = pd.to_datetime(macro[date_col]).dt.strftime("%Y-%m-%d")
+            date_col = macro.columns[0]
             macro = macro.ffill().bfill()
-            return macro.to_dict(orient="records")
+
+            records = []
+            for _, row in macro.iterrows():
+                dt_str = str(row[date_col]).split("T")[0].split(" ")[0]
+                usd_val = row.get("USDTRY=X") if "USDTRY=X" in row else 35.0
+                brent_val = row.get("BZ=F") if "BZ=F" in row else 75.0
+                records.append({
+                    "entry_date": dt_str,
+                    "usd_try": float(usd_val) if pd.notna(usd_val) else 35.0,
+                    "brent_oil_usd": float(brent_val) if pd.notna(brent_val) else 75.0,
+                })
+            return records
     except Exception as e:
         logger.error(f"Error fetching macro indicators: {e}")
     return []
