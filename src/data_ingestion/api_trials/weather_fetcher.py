@@ -251,7 +251,8 @@ def fetch_tomorrow_weighted_temperature_forecast():
         f"latitude={lat_str}&"
         f"longitude={lon_str}&"
         f"hourly=temperature_2m&"
-        f"forecast_days=2"
+        f"forecast_days=2&"
+        f"timezone=Europe%2FIstanbul"
     )
 
     try:

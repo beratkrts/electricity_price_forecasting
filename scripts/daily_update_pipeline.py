@@ -219,14 +219,11 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         except Exception as e:
             logger.warning(f"⚠️ [NATURAL_GAS] Step skipped due to fetch/ingest error: {e}")
 
-        # 13. Weather Data (Open-Meteo Archive & Forecast)
+        # 13. Weather Data (Open-Meteo Archive)
         try:
             if should_fetch("weather", period_key, start_dt):
                 weather_data = fetch_weather_in_memory(start_str, end_str)
                 db.ingest_weather(weather_data, period_key)
-                weather_fc_data = fetch_tomorrow_weather_forecast_in_memory()
-                if weather_fc_data:
-                    db.ingest_weather_forecast(weather_fc_data)
         except Exception as e:
             logger.warning(f"⚠️ [WEATHER] Step skipped due to fetch/ingest error: {e}")
 
@@ -241,10 +238,19 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     except Exception as e:
         logger.warning(f"⚠️ [MACRO] Step skipped due to yfinance error: {e}")
 
+    # 15. Live Weather Forecast (Open-Meteo Tomorrow Forecast)
+    try:
+        logger.info("\n🌤️ Ingesting Tomorrow's Live Weather Forecast...")
+        weather_fc_data = fetch_tomorrow_weather_forecast_in_memory()
+        if weather_fc_data:
+            db.ingest_weather_forecast(weather_fc_data)
+    except Exception as e:
+        logger.warning(f"⚠️ [WEATHER_FORECAST] Step skipped due to error: {e}")
+
     logger.info("🎉 In-Memory Direct Database Pipeline completed successfully!")
 
-    # 15. LightGBM Daily Prediction Execution & DB Ingestion
-    logger.info("\n🔮 Step 15: Executing LightGBM Daily Prediction & Gold Ingestion...")
+    # 16. LightGBM Daily Prediction Execution & DB Ingestion
+    logger.info("\n🔮 Step 16: Executing LightGBM Daily Prediction & Gold Ingestion...")
     try:
         run_daily_prediction(force=force_prediction)
     except Exception as e:
