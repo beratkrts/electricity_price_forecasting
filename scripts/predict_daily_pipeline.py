@@ -203,6 +203,24 @@ def run_daily_prediction(force: bool = False):
     if 'natural_gas_grf_lag_48' in df_model.columns:
         future_df['natural_gas_grf_lag_48'] = df_model['natural_gas_grf_lag_48'].tail(24).values
 
+    # 🌡️ Open-Meteo Forecast API üzerinden yarının canlı sıcaklık tahminini çek ve türevlerini hesapla!
+    try:
+        from src.data_ingestion.api_trials.weather_fetcher import fetch_tomorrow_weighted_temperature_forecast
+        weather_fc = fetch_tomorrow_weighted_temperature_forecast()
+        tomorrow_temps = weather_fc['temp_c']
+        if len(tomorrow_temps) == 24:
+            future_df['temp_forecast_lag0'] = tomorrow_temps
+        else:
+            future_df['temp_forecast_lag0'] = df_model['temperature_c'].tail(24).values
+    except Exception as e:
+        logger.warning(f"Could not fetch live weather forecast: {e}, falling back to tail(24)")
+        future_df['temp_forecast_lag0'] = df_model['temperature_c'].tail(24).values
+
+    future_df['cdh_cooling_load'] = np.maximum(future_df['temp_forecast_lag0'] - 18.0, 0.0)
+    future_df['hdh_heating_load'] = np.maximum(18.0 - future_df['temp_forecast_lag0'], 0.0)
+    if 'temperature_lag_48' in future_df.columns:
+        future_df['temp_diff_from_yesterday'] = future_df['temp_forecast_lag0'] - future_df['temperature_lag_48']
+
     from src.features.holidays import add_holiday_features
     future_df = add_holiday_features(future_df)
 

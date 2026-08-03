@@ -234,6 +234,57 @@ def fetch_turkey_weighted_temperature(start_date_str: str, end_date_str: str, ba
     return df_result
 
 
+def fetch_tomorrow_weighted_temperature_forecast():
+    """
+    Fetches consumption-weighted hourly temperature forecast for Turkey for the next 24-48 hours from Open-Meteo Forecast API.
+    Returns a dict with 'time' list and 'temp_c' list.
+    """
+    city_map = load_city_weights_and_coords()
+    cities = list(city_map.keys())
+    total_weight = sum(city_map[c]["weight"] for c in cities)
+
+    lat_str = ",".join([str(city_map[c]["lat"]) for c in cities])
+    lon_str = ",".join([str(city_map[c]["lon"]) for c in cities])
+
+    url = (
+        f"https://api.open-meteo.com/v1/forecast?"
+        f"latitude={lat_str}&"
+        f"longitude={lon_str}&"
+        f"hourly=temperature_2m&"
+        f"forecast_days=2"
+    )
+
+    try:
+        res = requests.get(url, timeout=30)
+        res.raise_for_status()
+        data = res.json()
+        locations = data if isinstance(data, list) else [data]
+
+        time_series = locations[0]["hourly"]["time"]
+        weighted_temps = [0.0] * len(time_series)
+
+        for city, loc in zip(cities, locations):
+            temps = loc["hourly"]["temperature_2m"]
+            w = city_map[city]["weight"]
+            for i in range(min(len(time_series), len(temps))):
+                weighted_temps[i] += (temps[i] if temps[i] is not None else 0.0) * w
+
+        final_temps = [round(t / total_weight, 2) for t in weighted_temps]
+        
+        # Return last 24 hours (tomorrow's 24h forecast)
+        return {
+            "time": time_series[-24:],
+            "temp_c": final_temps[-24:]
+        }
+    except Exception as e:
+        print(f"   [!] Error fetching weather forecast: {e}")
+        # Fallback to default summer forecast
+        return {
+            "time": [],
+            "temp_c": [28.0] * 24
+        }
+
+
 # --- 4. MAIN EXECUTION ---
 if __name__ == "__main__":
     # Test fetch for 2024-01-01 to 2024-01-10

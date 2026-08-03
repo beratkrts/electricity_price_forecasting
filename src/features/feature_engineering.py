@@ -140,6 +140,16 @@ def build_robust_features(df):
     if 'natural_gas_grf_try' in df_feat.columns and 'usd_try' in df_feat.columns:
         df_feat['natural_gas_grf_lag_48'] = (df_feat['natural_gas_grf_try'] / df_feat['usd_try']).shift(48)
 
+    # 🌡️ Target-Day Temperature Forecast Features (Lag 0) & Degree-Hour Cooling/Heating Loads
+    # If temperature_forecast_c column exists (from forecast API), use it; otherwise use temperature_c (historical actual)
+    temp_col = 'temperature_forecast_c' if 'temperature_forecast_c' in df_feat.columns else 'temperature_c'
+    if temp_col in df_feat.columns:
+        df_feat['temp_forecast_lag0'] = df_feat[temp_col]
+        df_feat['cdh_cooling_load'] = np.maximum(df_feat['temp_forecast_lag0'] - 18.0, 0.0)
+        df_feat['hdh_heating_load'] = np.maximum(18.0 - df_feat['temp_forecast_lag0'], 0.0)
+        if 'temperature_lag_48' in df_feat.columns:
+            df_feat['temp_diff_from_yesterday'] = df_feat['temp_forecast_lag0'] - df_feat['temperature_lag_48']
+
     return df_feat
 
 
@@ -175,7 +185,8 @@ def get_feature_columns(set_name='full', df=None):
         'sin_hour', 'cos_hour', 'sin_dow', 'cos_dow', 'sin_month', 'cos_month', 'sin_doy', 'cos_doy',
         'hydro_pressure_ratio', 'renewable_pressure_ratio', 'solar_peak_pressure_ratio',
         'is_low_price_regime', 'is_zero_price_hour', 'price_volatility_24h',
-        'smp_usd_lag_48', 'temperature_lag_48', 'brent_oil_lag_48', 'natural_gas_grf_lag_48'
+        'smp_usd_lag_48', 'temperature_lag_48', 'brent_oil_lag_48', 'natural_gas_grf_lag_48',
+        'temp_forecast_lag0', 'cdh_cooling_load', 'hdh_heating_load', 'temp_diff_from_yesterday'
     ]
     
     set_map = {
