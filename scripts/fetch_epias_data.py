@@ -1,4 +1,5 @@
 import sys
+import time
 from pathlib import Path
 project_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(project_root))
@@ -34,23 +35,32 @@ NATURAL_GAS_PRICE_URL = (
 )
 
 
-def get_tgt_token(username: str, password: str) -> str:
-    """Retrieves CAS Ticket Granting Ticket (TGT) for EPİAŞ Transparency 2.0 API."""
+def get_tgt_token(username: str, password: str, max_retries: int = 3, retry_delay: float = 5.0, timeout: int = 60) -> str:
+    """Retrieves CAS Ticket Granting Ticket (TGT) for EPİAŞ Transparency 2.0 API with retries and timeout."""
     headers = {
         "Content-Type": "application/x-www-form-urlencoded",
         "Accept": "text/plain",
     }
-    response = requests.post(
-        CAS_TICKET_URL,
-        data={"username": username, "password": password},
-        headers=headers,
-        timeout=30,
-    )
-    response.raise_for_status()
-    tgt = response.text.strip()
-    if not tgt:
-        raise ValueError("EPİAŞ CAS authentication returned an empty TGT token.")
-    return tgt
+    last_exception = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.post(
+                CAS_TICKET_URL,
+                data={"username": username, "password": password},
+                headers=headers,
+                timeout=timeout,
+            )
+            response.raise_for_status()
+            tgt = response.text.strip()
+            if not tgt:
+                raise ValueError("EPİAŞ CAS authentication returned an empty TGT token.")
+            return tgt
+        except Exception as e:
+            last_exception = e
+            logger.warning(f"EPİAŞ TGT authentication attempt {attempt}/{max_retries} failed: {e}")
+            if attempt < max_retries:
+                time.sleep(retry_delay * attempt)
+    raise RuntimeError(f"Failed to acquire EPİAŞ TGT token after {max_retries} attempts: {last_exception}")
 
 
 def find_record_list(payload: Any) -> Optional[List[Dict[str, Any]]]:
@@ -79,112 +89,144 @@ def find_record_list(payload: Any) -> Optional[List[Dict[str, Any]]]:
 class EpiasFetcher:
     """In-memory fetcher for EPİAŞ Transparency API datasets using eptr2 library."""
 
-    def __init__(self, username: Optional[str] = None, password: Optional[str] = None, env_path: Optional[str] = None):
+    def __init__(self, username: Optional[str] = None, password: Optional[str] = None, env_path: Optional[str] = None, max_retries: int = 3):
         self.username = username
         self.password = password
+        self.env_path = env_path
+        self.max_retries = max_retries
+        self.eptr = None
+        self._tgt_token = None
+
         if username and password:
             kwargs = {"username": username, "password": password}
             if env_path:
                 kwargs["dotenv_path"] = str(env_path)
-            self.eptr = EPTR2(**kwargs)
+
+            for attempt in range(1, max_retries + 1):
+                try:
+                    self.eptr = EPTR2(**kwargs)
+                    logger.info("EPTR2 client initialized successfully.")
+                    break
+                except Exception as e:
+                    logger.warning(f"EPTR2 initialization attempt {attempt}/{max_retries} failed: {e}")
+                    if attempt < max_retries:
+                        time.sleep(5 * attempt)
         else:
             self.eptr = None
-        self._tgt_token = None
 
     def get_token(self) -> Optional[str]:
         """Lazy loads and caches the TGT authentication token."""
         if not self._tgt_token and self.username and self.password:
             try:
-                self._tgt_token = get_tgt_token(self.username, self.password)
+                self._tgt_token = get_tgt_token(self.username, self.password, max_retries=self.max_retries)
                 logger.info("EPİAŞ TGT authentication token acquired successfully.")
             except Exception as e:
                 logger.error(f"Failed to acquire EPİAŞ TGT token: {e}")
         return self._tgt_token
 
     def fetch_eptr2_service(self, service_name: str, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
-        """Fetches standard EPİAŞ service data via eptr2 library in memory."""
-        try:
-            if not self.eptr:
-                raise ValueError("eptr2 client is not initialized.")
-            logger.info(f"Calling eptr2 service: '{service_name}' ({start_iso} to {end_iso})...")
-            res = self.eptr.call(service_name, start_date=start_iso, end_date=end_iso)
-            if isinstance(res, pd.DataFrame):
-                return res.to_dict(orient="records")
-            elif isinstance(res, list):
-                return res
-            elif isinstance(res, dict):
-                return find_record_list(res) or []
+        """Fetches standard EPİAŞ service data via eptr2 library in memory with retries."""
+        if not self.eptr:
+            logger.error("eptr2 client is not initialized.")
             return []
-        except Exception as e:
-            logger.error(f"Error fetching eptr2 service '{service_name}': {e}")
-            return []
+
+        logger.info(f"Calling eptr2 service: '{service_name}' ({start_iso} to {end_iso})...")
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                res = self.eptr.call(service_name, start_date=start_iso, end_date=end_iso)
+                if isinstance(res, pd.DataFrame):
+                    return res.to_dict(orient="records")
+                elif isinstance(res, list):
+                    return res
+                elif isinstance(res, dict):
+                    return find_record_list(res) or []
+                return []
+            except Exception as e:
+                logger.warning(f"Error fetching eptr2 service '{service_name}' (attempt {attempt}/{self.max_retries}): {e}")
+                if attempt < self.max_retries:
+                    time.sleep(3 * attempt)
+        return []
 
     def fetch_installed_capacity(self, period_iso: str) -> List[Dict[str, Any]]:
-        """Fetches renewable installed capacity data via eptr2 'ren-capacity' into memory."""
-        try:
-            if not self.eptr:
-                raise ValueError("eptr2 client is not initialized.")
-            logger.info(f"Calling eptr2 service: 'ren-capacity' for period {period_iso}...")
-            res = self.eptr.call("ren-capacity", period=period_iso)
-            if isinstance(res, pd.DataFrame):
-                return res.to_dict(orient="records")
-            elif isinstance(res, list):
-                return res
-            elif isinstance(res, dict):
-                return find_record_list(res) or []
-            return []
-        except Exception as e:
-            logger.error(f"Error fetching installed capacity for period '{period_iso}': {e}")
+        """Fetches renewable installed capacity data via eptr2 'ren-capacity' into memory with retries."""
+        if not self.eptr:
+            logger.error("eptr2 client is not initialized.")
             return []
 
+        logger.info(f"Calling eptr2 service: 'ren-capacity' for period {period_iso}...")
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                res = self.eptr.call("ren-capacity", period=period_iso)
+                if isinstance(res, pd.DataFrame):
+                    return res.to_dict(orient="records")
+                elif isinstance(res, list):
+                    return res
+                elif isinstance(res, dict):
+                    return find_record_list(res) or []
+                return []
+            except Exception as e:
+                logger.warning(f"Error fetching installed capacity for period '{period_iso}' (attempt {attempt}/{self.max_retries}): {e}")
+                if attempt < self.max_retries:
+                    time.sleep(3 * attempt)
+        return []
+
     def fetch_active_fullness(self, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
-        """Fetches dam active fullness percentages into memory."""
+        """Fetches dam active fullness percentages into memory with retries."""
         token = self.get_token()
         if not token:
             return []
         headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
         payload = {"startDate": start_iso, "endDate": end_iso}
-        try:
-            res = requests.post(ACTIVE_FULLNESS_URL, headers=headers, json=payload, timeout=60)
-            res.raise_for_status()
-            return find_record_list(res.json()) or []
-        except Exception as e:
-            logger.error(f"Error fetching active fullness: {e}")
-            return []
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                res = requests.post(ACTIVE_FULLNESS_URL, headers=headers, json=payload, timeout=60)
+                res.raise_for_status()
+                return find_record_list(res.json()) or []
+            except Exception as e:
+                logger.warning(f"Error fetching active fullness (attempt {attempt}/{self.max_retries}): {e}")
+                if attempt < self.max_retries:
+                    time.sleep(3 * attempt)
+        return []
 
     def fetch_water_energy_provision(self, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
-        """Fetches dam water energy provision in memory."""
+        """Fetches dam water energy provision in memory with retries."""
         token = self.get_token()
         if not token:
             return []
         headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
         payload = {"startDate": start_iso, "endDate": end_iso, "exportType": "CSV"}
-        try:
-            res = requests.post(WATER_ENERGY_PROVISION_URL, headers=headers, json=payload, timeout=60)
-            res.raise_for_status()
-            if "text/csv" in res.headers.get("Content-Type", "") or res.text.startswith("Tarih"):
-                res.encoding = "utf-8-sig"
-                df = pd.read_csv(io.StringIO(res.text), sep=";")
-                return df.to_dict(orient="records")
-            return find_record_list(res.json()) or []
-        except Exception as e:
-            logger.error(f"Error fetching water energy provision: {e}")
-            return []
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                res = requests.post(WATER_ENERGY_PROVISION_URL, headers=headers, json=payload, timeout=60)
+                res.raise_for_status()
+                if "text/csv" in res.headers.get("Content-Type", "") or res.text.startswith("Tarih"):
+                    res.encoding = "utf-8-sig"
+                    df = pd.read_csv(io.StringIO(res.text), sep=";")
+                    return df.to_dict(orient="records")
+                return find_record_list(res.json()) or []
+            except Exception as e:
+                logger.warning(f"Error fetching water energy provision (attempt {attempt}/{self.max_retries}): {e}")
+                if attempt < self.max_retries:
+                    time.sleep(3 * attempt)
+        return []
 
     def fetch_natural_gas_daily_price(self, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
-        """Fetches natural gas daily reference price (GRF) into memory."""
+        """Fetches natural gas daily reference price (GRF) into memory with retries."""
         token = self.get_token()
         if not token:
             return []
         headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
         payload = {"startDate": start_iso, "endDate": end_iso}
-        try:
-            res = requests.post(NATURAL_GAS_PRICE_URL, headers=headers, json=payload, timeout=60)
-            res.raise_for_status()
-            return find_record_list(res.json()) or []
-        except Exception as e:
-            logger.error(f"Error fetching natural gas daily reference price: {e}")
-            return []
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                res = requests.post(NATURAL_GAS_PRICE_URL, headers=headers, json=payload, timeout=60)
+                res.raise_for_status()
+                return find_record_list(res.json()) or []
+            except Exception as e:
+                logger.warning(f"Error fetching natural gas daily reference price (attempt {attempt}/{self.max_retries}): {e}")
+                if attempt < self.max_retries:
+                    time.sleep(3 * attempt)
+        return []
 
 
 # --- AUXILIARY EXTERNAL FETCHERS ---
@@ -202,14 +244,28 @@ def fetch_weather_in_memory(start_str: str, end_str: str) -> List[Dict[str, Any]
 
 
 def fetch_macro_in_memory(start_date: str = "2024-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory as list of dicts."""
+    """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts."""
     try:
         if not end_date:
             end_date = (pd.Timestamp.now() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
-        
+
         logger.info(f"Fetching macro indicators from yfinance ({start_date} to {end_date})...")
-        macro = yf.download(["USDTRY=X", "BZ=F"], start=start_date, end=end_date, interval="1d", progress=False)["Close"]
-        if not macro.empty:
+
+        df_dict = {}
+        for ticker_symbol in ["USDTRY=X", "BZ=F"]:
+            try:
+                t_df = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1d", progress=False)
+                if not t_df.empty:
+                    if "Close" in t_df.columns:
+                        close_col = t_df["Close"]
+                        if isinstance(close_col, pd.DataFrame):
+                            close_col = close_col.iloc[:, 0]
+                        df_dict[ticker_symbol] = close_col
+            except Exception as e:
+                logger.warning(f"yfinance failed for ticker {ticker_symbol}: {e}")
+
+        if df_dict:
+            macro = pd.DataFrame(df_dict)
             macro = macro.reset_index()
             macro["Date"] = pd.to_datetime(macro["Date"]).dt.strftime("%Y-%m-%d")
             macro = macro.ffill().bfill()
@@ -217,3 +273,4 @@ def fetch_macro_in_memory(start_date: str = "2024-01-01", end_date: Optional[str
     except Exception as e:
         logger.error(f"Error fetching macro indicators: {e}")
     return []
+

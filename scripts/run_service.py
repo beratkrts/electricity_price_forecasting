@@ -60,11 +60,22 @@ def main() -> None:
         # If target 4:00 AM has arrived or was passed while computer was asleep
         if seconds_remaining <= 0:
             logger.info("⏰ 4:00 AM Scheduled Trigger (or missed run detected after sleep)! Running daily ETL pipeline...")
-            try:
-                run_daily_pipeline(force_prediction=True)
-            except Exception as e:
-                logger.error(f"Error during scheduled ETL execution: {e}")
+            max_attempts = 3
+            success = False
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    run_daily_pipeline(force_prediction=True)
+                    success = True
+                    break
+                except Exception as e:
+                    logger.error(f"Error during scheduled ETL execution (attempt {attempt}/{max_attempts}): {e}")
+                    if attempt < max_attempts:
+                        logger.info("⏳ Retrying ETL pipeline in 5 minutes...")
+                        time.sleep(300)
             
+            if not success:
+                logger.error("❌ Daily ETL execution failed after all retry attempts.")
+
             # Reset target to next 4:00 AM
             target_time = get_target_4am()
             now_istanbul = pd.Timestamp.now(tz="Europe/Istanbul").tz_localize(None)
