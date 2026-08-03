@@ -261,7 +261,7 @@ def fetch_tomorrow_weather_forecast_in_memory() -> List[Dict[str, Any]]:
 
 
 def fetch_macro_in_memory(start_date: str = "2024-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts."""
+    """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts with retries and fallbacks."""
     try:
         if not end_date:
             end_date = (pd.Timestamp.now() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
@@ -269,22 +269,34 @@ def fetch_macro_in_memory(start_date: str = "2024-01-01", end_date: Optional[str
         logger.info(f"Fetching macro indicators from yfinance ({start_date} to {end_date})...")
 
         df_dict = {}
-        for ticker_symbol in ["USDTRY=X", "BZ=F"]:
-            try:
-                t_df = yf.download(ticker_symbol, start=start_date, end=end_date, interval="1d", progress=False)
-                if not t_df.empty:
-                    if "Close" in t_df.columns:
+        tickers = {"USDTRY=X": 35.0, "BZ=F": 75.0}
+
+        for symbol, fallback_val in tickers.items():
+            fetched = False
+            for attempt in range(1, 4):
+                try:
+                    t_df = yf.download(symbol, start=start_date, end=end_date, interval="1d", progress=False, timeout=15)
+                    if not t_df.empty and "Close" in t_df.columns:
                         close_col = t_df["Close"]
                         if isinstance(close_col, pd.DataFrame):
                             close_col = close_col.iloc[:, 0]
-                        df_dict[ticker_symbol] = close_col
-            except Exception as e:
-                logger.warning(f"yfinance failed for ticker {ticker_symbol}: {e}")
+                        df_dict[symbol] = close_col
+                        fetched = True
+                        break
+                except Exception as e:
+                    logger.warning(f"yfinance attempt {attempt}/3 failed for symbol {symbol}: {e}")
+                    time.sleep(2 * attempt)
+
+            if not fetched:
+                logger.warning(f"⚠️ yfinance unavailable for {symbol}. Creating cautious fallback series with default value {fallback_val}.")
+                date_range = pd.date_range(start=start_date, end=end_date, freq="D")
+                df_dict[symbol] = pd.Series(fallback_val, index=date_range)
 
         if df_dict:
             macro = pd.DataFrame(df_dict)
             macro = macro.reset_index()
-            macro["Date"] = pd.to_datetime(macro["Date"]).dt.strftime("%Y-%m-%d")
+            date_col = "Date" if "Date" in macro.columns else macro.columns[0]
+            macro["Date"] = pd.to_datetime(macro[date_col]).dt.strftime("%Y-%m-%d")
             macro = macro.ffill().bfill()
             return macro.to_dict(orient="records")
     except Exception as e:

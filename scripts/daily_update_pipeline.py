@@ -123,80 +123,123 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         logger.info(f"\n⚡ --- PERIOD: {start_str} to {end_str} ---")
 
         # 1. Market Clearing Price (PTF / MCP)
-        if should_fetch("mcp", period_key, start_dt):
-            mcp_data = fetcher.fetch_eptr2_service("mcp", start_iso, end_iso)
-            db.ingest_mcp(mcp_data, period_key)
+        try:
+            if should_fetch("mcp", period_key, start_dt):
+                mcp_data = fetcher.fetch_eptr2_service("mcp", start_iso, end_iso)
+                db.ingest_mcp(mcp_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [MCP] Step skipped due to fetch/ingest error: {e}")
 
         # 2. System Marginal Price (SMF / SMP)
-        if should_fetch("smp", period_key, start_dt):
-            smp_data = fetcher.fetch_eptr2_service("smp", start_iso, end_iso)
-            db.ingest_smp(smp_data, period_key)
+        try:
+            if should_fetch("smp", period_key, start_dt):
+                smp_data = fetcher.fetch_eptr2_service("smp", start_iso, end_iso)
+                db.ingest_smp(smp_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [SMP] Step skipped due to fetch/ingest error: {e}")
 
         # 3. Load Forecast (LEP / Yük Tahmini)
-        if should_fetch("load_forecast", period_key, start_dt):
-            load_data = fetcher.fetch_eptr2_service("load-plan", start_iso, end_iso)
-            db.ingest_load_forecast(load_data, period_key)
+        try:
+            if should_fetch("load_forecast", period_key, start_dt):
+                load_data = fetcher.fetch_eptr2_service("load-plan", start_iso, end_iso)
+                db.ingest_load_forecast(load_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [LOAD_FORECAST] Step skipped due to fetch/ingest error: {e}")
 
         # 4. Final Day-Ahead Generation Plan (KGÜP)
-        if should_fetch("kgup", period_key, start_dt):
-            kgup_data = fetcher.fetch_eptr2_service("kgup", start_iso, end_iso)
-            db.ingest_kgup(kgup_data, period_key)
+        try:
+            if should_fetch("kgup", period_key, start_dt):
+                kgup_data = fetcher.fetch_eptr2_service("kgup", start_iso, end_iso)
+                db.ingest_kgup(kgup_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [KGUP] Step skipped due to fetch/ingest error: {e}")
 
         # 5. Real-Time Actual Generation (Gerçekleşen Üretim)
-        if should_fetch("actual_generation", period_key, start_dt):
-            rt_gen_data = fetcher.fetch_eptr2_service("rt-gen", start_iso, end_iso)
-            db.ingest_actual_generation(rt_gen_data, period_key)
+        try:
+            if should_fetch("actual_generation", period_key, start_dt):
+                rt_gen_data = fetcher.fetch_eptr2_service("rt-gen", start_iso, end_iso)
+                db.ingest_actual_generation(rt_gen_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [ACTUAL_GEN] Step skipped due to fetch/ingest error: {e}")
 
         # 6. Real-Time Actual Consumption (Gerçekleşen Tüketim)
-        if should_fetch("actual_consumption", period_key, start_dt):
-            rt_cons_data = fetcher.fetch_eptr2_service("rt-cons", start_iso, end_iso)
-            db.ingest_actual_consumption(rt_cons_data, period_key)
+        try:
+            if should_fetch("actual_consumption", period_key, start_dt):
+                rt_cons_data = fetcher.fetch_eptr2_service("rt-cons", start_iso, end_iso)
+                db.ingest_actual_consumption(rt_cons_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [ACTUAL_CONS] Step skipped due to fetch/ingest error: {e}")
 
         # 7. Day-Ahead Bids and Offers (dam-bid & dam-offer)
-        if should_fetch("bids_offers", period_key, start_dt):
-            bids_data = fetcher.fetch_eptr2_service("dam-bid", start_iso, end_iso)
-            offers_data = fetcher.fetch_eptr2_service("dam-offer", start_iso, end_iso)
-            db.ingest_bids_offers(bids_data, offers_data, period_key)
+        try:
+            if should_fetch("bids_offers", period_key, start_dt):
+                bids_data = fetcher.fetch_eptr2_service("dam-bid", start_iso, end_iso)
+                offers_data = fetcher.fetch_eptr2_service("dam-offer", start_iso, end_iso)
+                db.ingest_bids_offers(bids_data, offers_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [BIDS_OFFERS] Step skipped due to fetch/ingest error: {e}")
 
         # 8. Licensed Real-Time Generation (ren-rt-gen via eptr2)
-        if should_fetch("licensed_realtime_generation", period_key, start_dt):
-            licensed_gen_data = fetcher.fetch_eptr2_service("ren-rt-gen", start_iso, end_iso)
-            db.ingest_licensed_realtime_generation(licensed_gen_data, period_key)
+        try:
+            if should_fetch("licensed_realtime_generation", period_key, start_dt):
+                licensed_gen_data = fetcher.fetch_eptr2_service("ren-rt-gen", start_iso, end_iso)
+                db.ingest_licensed_realtime_generation(licensed_gen_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [LICENSED_GEN] Step skipped due to fetch/ingest error: {e}")
 
         # 9. Installed Capacity (ren-capacity via eptr2)
-        if should_fetch("installed_capacity", period_key, start_dt):
-            installed_cap_data = fetcher.fetch_installed_capacity(period_iso=f"{start_str}T00:00:00+03:00")
-            db.ingest_installed_capacity(installed_cap_data, period_key)
+        try:
+            if should_fetch("installed_capacity", period_key, start_dt):
+                installed_cap_data = fetcher.fetch_installed_capacity(period_iso=f"{start_str}T00:00:00+03:00")
+                db.ingest_installed_capacity(installed_cap_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [INSTALLED_CAP] Step skipped due to fetch/ingest error: {e}")
 
         # 10. Dam Active Fullness (Custom Endpoint)
-        if should_fetch("active_fullness", period_key, start_dt):
-            fullness_data = fetcher.fetch_active_fullness(start_iso, end_iso)
-            db.ingest_active_fullness(fullness_data, period_key)
+        try:
+            if should_fetch("active_fullness", period_key, start_dt):
+                fullness_data = fetcher.fetch_active_fullness(start_iso, end_iso)
+                db.ingest_active_fullness(fullness_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [ACTIVE_FULLNESS] Step skipped due to fetch/ingest error: {e}")
 
         # 11. Dam Water Energy Provision (Custom Endpoint)
-        if should_fetch("water_energy_provision", period_key, start_dt):
-            provision_data = fetcher.fetch_water_energy_provision(start_iso, end_iso)
-            db.ingest_water_energy_provision(provision_data, period_key)
+        try:
+            if should_fetch("water_energy_provision", period_key, start_dt):
+                provision_data = fetcher.fetch_water_energy_provision(start_iso, end_iso)
+                db.ingest_water_energy_provision(provision_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [WATER_PROVISION] Step skipped due to fetch/ingest error: {e}")
 
         # 12. Natural Gas Daily Reference Price (GRF)
-        if should_fetch("natural_gas_daily", period_key, start_dt):
-            gas_price_data = fetcher.fetch_natural_gas_daily_price(start_iso, end_iso)
-            db.ingest_natural_gas_daily(gas_price_data, period_key)
+        try:
+            if should_fetch("natural_gas_daily", period_key, start_dt):
+                gas_price_data = fetcher.fetch_natural_gas_daily_price(start_iso, end_iso)
+                db.ingest_natural_gas_daily(gas_price_data, period_key)
+        except Exception as e:
+            logger.warning(f"⚠️ [NATURAL_GAS] Step skipped due to fetch/ingest error: {e}")
 
-        # 13. Weather Data (Open-Meteo)
-        if should_fetch("weather", period_key, start_dt):
-            weather_data = fetch_weather_in_memory(start_str, end_str)
-            db.ingest_weather(weather_data, period_key)
-            weather_fc_data = fetch_tomorrow_weather_forecast_in_memory()
-            if weather_fc_data:
-                db.ingest_weather_forecast(weather_fc_data)
+        # 13. Weather Data (Open-Meteo Archive & Forecast)
+        try:
+            if should_fetch("weather", period_key, start_dt):
+                weather_data = fetch_weather_in_memory(start_str, end_str)
+                db.ingest_weather(weather_data, period_key)
+                weather_fc_data = fetch_tomorrow_weather_forecast_in_memory()
+                if weather_fc_data:
+                    db.ingest_weather_forecast(weather_fc_data)
+        except Exception as e:
+            logger.warning(f"⚠️ [WEATHER] Step skipped due to fetch/ingest error: {e}")
 
         time.sleep(0.5)
 
     # 14. Macro Financial Indicators (yfinance USD/TRY & Brent Oil)
-    logger.info("\n📈 Ingesting Macro Financial Indicators (USD/TRY & Brent Oil)...")
-    macro_data = fetch_macro_in_memory(start_date="2024-01-01")
-    db.ingest_macro(macro_data, period_key="ALL")
+    try:
+        logger.info("\n📈 Ingesting Macro Financial Indicators (USD/TRY & Brent Oil)...")
+        macro_data = fetch_macro_in_memory(start_date="2024-01-01")
+        if macro_data:
+            db.ingest_macro(macro_data, period_key="ALL")
+    except Exception as e:
+        logger.warning(f"⚠️ [MACRO] Step skipped due to yfinance error: {e}")
 
     logger.info("🎉 In-Memory Direct Database Pipeline completed successfully!")
 
