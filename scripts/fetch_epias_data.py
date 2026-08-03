@@ -296,8 +296,28 @@ def fetch_historical_usdtry_frankfurter(start_date: str = "2023-01-01", end_date
     return pd.Series(dtype=float)
 
 
+def fetch_historical_brent_oil_fred(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> pd.Series:
+    """Fetches official historical Brent Oil prices from FRED (Federal Reserve Bank of St. Louis API)."""
+    try:
+        if not end_date:
+            end_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+        url = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DCOILBRENTEU"
+        df = pd.read_csv(url)
+        if not df.empty and "observation_date" in df.columns and "DCOILBRENTEU" in df.columns:
+            df["observation_date"] = pd.to_datetime(df["observation_date"])
+            df["DCOILBRENTEU"] = pd.to_numeric(df["DCOILBRENTEU"], errors="coerce")
+            df = df.set_index("observation_date").sort_index()
+            df = df.loc[start_date:]
+            full_idx = pd.date_range(start=start_date, end=end_date, freq="D")
+            s = df["DCOILBRENTEU"].reindex(full_idx).ffill().bfill()
+            return s
+    except Exception as e:
+        logger.warning(f"Could not fetch historical Brent Oil from FRED API: {e}")
+    return pd.Series(dtype=float)
+
+
 def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts with retries and fallbacks."""
+    """Fetches macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts with retries and fallbacks."""
     try:
         if not end_date:
             end_date = (pd.Timestamp.now() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
@@ -315,6 +335,15 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
                 logger.info(f"✅ Ingested {len(usd_series)} official historical USD/TRY exchange rates from Frankfurter API.")
         except Exception as e:
             logger.warning(f"Frankfurter historical FX fetch error: {e}")
+
+        # 2. Try official FRED API for historical Brent Oil prices first
+        try:
+            brent_series = fetch_historical_brent_oil_fred(start_date, end_date)
+            if not brent_series.empty:
+                df_dict["BZ=F"] = brent_series
+                logger.info(f"✅ Ingested {len(brent_series)} official historical Brent Oil prices from FRED API.")
+        except Exception as e:
+            logger.warning(f"FRED historical Brent Oil fetch error: {e}")
 
         for symbol, fallback_val in tickers.items():
             if symbol in df_dict:
