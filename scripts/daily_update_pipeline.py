@@ -19,8 +19,12 @@ from typing import Optional
 import pandas as pd
 from dotenv import load_dotenv
 
-from db.ingest_epias import EpiasDBIngestor
-from fetch_epias_data import EpiasFetcher, fetch_weather_in_memory, fetch_macro_in_memory
+from fetch_epias_data import (
+    EpiasFetcher,
+    fetch_weather_in_memory,
+    fetch_tomorrow_weather_forecast_in_memory,
+    fetch_macro_in_memory,
+)
 from predict_daily_pipeline import run_daily_prediction
 
 # --- LOGGING SETUP ---
@@ -182,6 +186,9 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         if should_fetch("weather", period_key, start_dt):
             weather_data = fetch_weather_in_memory(start_str, end_str)
             db.ingest_weather(weather_data, period_key)
+            weather_fc_data = fetch_tomorrow_weather_forecast_in_memory()
+            if weather_fc_data:
+                db.ingest_weather(weather_fc_data, "forecast_tomorrow")
 
         time.sleep(0.5)
 

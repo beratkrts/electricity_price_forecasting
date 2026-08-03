@@ -243,6 +243,23 @@ def fetch_weather_in_memory(start_str: str, end_str: str) -> List[Dict[str, Any]
     return []
 
 
+def fetch_tomorrow_weather_forecast_in_memory() -> List[Dict[str, Any]]:
+    """Fetches live Open-Meteo Turkey-weighted temperature forecast for tomorrow into memory as list of dicts."""
+    try:
+        from src.data_ingestion.api_trials.weather_fetcher import fetch_tomorrow_weighted_temperature_forecast
+        res = fetch_tomorrow_weighted_temperature_forecast()
+        records = []
+        for t, temp in zip(res.get("time", []), res.get("temp_c", [])):
+            records.append({
+                "date_time": t,
+                "turkey_weighted_temperature_c": temp
+            })
+        return records
+    except Exception as e:
+        logger.error(f"Error fetching weather forecast data: {e}")
+    return []
+
+
 def fetch_macro_in_memory(start_date: str = "2024-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
     """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts."""
     try:
