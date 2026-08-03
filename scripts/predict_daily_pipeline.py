@@ -178,6 +178,22 @@ def run_daily_prediction(force: bool = False):
     future_df['is_weekend'] = (future_df.index.dayofweek >= 5).astype(int)
     future_df['is_peak_hour'] = future_df['hour'].isin([17, 18, 19, 20, 21]).astype(int)
 
+    # 🚀 Gelecek 24 saatin 24h lag özniteliklerini en son bilinen 24 saatlik gerçek değerlerle güncelle!
+    if 'mcp_price_usd' in df_model.columns:
+        future_df['mcp_usd_lag_24'] = df_model['mcp_price_usd'].tail(24).values
+    if 'load_forecast_mw' in df_model.columns:
+        future_df['load_lag_24'] = df_model['load_forecast_mw'].tail(24).values
+    if 'kgup_total_mw' in df_model.columns:
+        future_df['kgup_lag_24'] = df_model['kgup_total_mw'].tail(24).values
+    if 'kgup_wind_mw' in df_model.columns:
+        future_df['kgup_wind_lag_24'] = df_model['kgup_wind_mw'].tail(24).values
+    if 'kgup_solar_mw' in df_model.columns:
+        future_df['kgup_solar_lag_24'] = df_model['kgup_solar_mw'].tail(24).values
+    if 'kgup_hydro_mw' in df_model.columns:
+        future_df['kgup_hydro_lag_24'] = df_model['kgup_hydro_mw'].tail(24).values
+    if 'kgup_gas_mw' in df_model.columns:
+        future_df['kgup_gas_lag_24'] = df_model['kgup_gas_mw'].tail(24).values
+
     from src.features.holidays import add_holiday_features
     future_df = add_holiday_features(future_df)
 
