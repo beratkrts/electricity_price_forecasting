@@ -20,6 +20,7 @@ sys.path.insert(0, str(project_root))
 from db.connection import get_db_engine
 from sqlalchemy import text
 from src.features.feature_engineering import build_robust_features, get_feature_columns
+from src.models.lightgbm_model import LightGBMForecaster
 from predict_daily_pipeline import create_gold_schema_if_not_exists, load_all_historical_data
 
 logger = logging.getLogger("GoldBackfill")
@@ -40,20 +41,6 @@ def backfill_365_days_predictions():
 
     df_model = df_feat.dropna(subset=feature_cols + [target_col]).copy()
     
-    lgbm_params = {
-        'n_estimators': 300,
-        'learning_rate': 0.03,
-        'max_depth': 8,
-        'num_leaves': 63,
-        'subsample': 0.8,
-        'colsample_bytree': 0.8,
-        'reg_alpha': 0.1,
-        'reg_lambda': 0.1,
-        'min_child_samples': 20,
-        'verbose': -1,
-        'random_state': 42
-    }
-
     max_days = 365
     max_ts = df_model.index.max()
     logger.info(f"⏳ Son {max_days} gün için walk-forward backfill başlatılıyor...")
@@ -71,15 +58,10 @@ def backfill_365_days_predictions():
         if len(tr_df) < 1000 or len(te_df) < 12:
             continue
 
-        X_tr = tr_df[feature_cols]
-        y_tr_log = np.log1p(np.maximum(tr_df[target_col].values, 0.0))
+        forecaster = LightGBMForecaster()
+        forecaster.fit(tr_df[feature_cols], tr_df[target_col].values)
 
-        lgbm = lgb.LGBMRegressor(**lgbm_params)
-        lgbm.fit(X_tr, y_tr_log)
-
-        X_te = te_df[feature_cols]
-        preds_log = lgbm.predict(X_te)
-        preds_usd = np.maximum(np.expm1(preds_log), 0.0)
+        preds_usd = forecaster.predict(te_df[feature_cols])
         
         latest_usd_try = float(tr_df['usd_try'].iloc[-1]) if 'usd_try' in tr_df.columns else 35.0
         preds_try = preds_usd * latest_usd_try
