@@ -24,8 +24,8 @@ RUN pip install --no-cache-dir -r requirements.txt --extra-index-url https://dow
 # Proje kodlarını kopyala
 COPY . .
 
-# Make startup script executable
-RUN chmod +x scripts/start.sh
+# Fix Windows CRLF (^M) line endings and make startup script executable
+RUN sed -i 's/\r$//' scripts/start.sh && chmod +x scripts/start.sh
 
 # Servis başlatma komutu (ETL Daemon + API Server)
 CMD ["bash", "scripts/start.sh"]

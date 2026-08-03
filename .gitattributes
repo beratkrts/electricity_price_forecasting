@@ -1,0 +1,6 @@
+# Enforce Unix LF line endings for shell scripts and Docker files to prevent Windows CRLF (^M) errors
+*.sh text eol=lf
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+*.py text eol=lf
+*.json text eol=lf
