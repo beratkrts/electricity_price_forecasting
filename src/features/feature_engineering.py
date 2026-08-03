@@ -141,14 +141,22 @@ def build_robust_features(df):
         df_feat['natural_gas_grf_lag_48'] = (df_feat['natural_gas_grf_try'] / df_feat['usd_try']).shift(48)
 
     # 🌡️ Target-Day Temperature Forecast Features (Lag 0) & Degree-Hour Cooling/Heating Loads
-    # If temperature_forecast_c column exists (from forecast API), use it; otherwise use temperature_c (historical actual)
-    temp_col = 'temperature_forecast_c' if 'temperature_forecast_c' in df_feat.columns else 'temperature_c'
-    if temp_col in df_feat.columns:
-        df_feat['temp_forecast_lag0'] = df_feat[temp_col]
-        df_feat['cdh_cooling_load'] = np.maximum(df_feat['temp_forecast_lag0'] - 18.0, 0.0)
-        df_feat['hdh_heating_load'] = np.maximum(18.0 - df_feat['temp_forecast_lag0'], 0.0)
+    # For future forecast rows, use temperature_forecast_c; for historical backfill rows, fill missing values with temperature_c
+    if 'temperature_forecast_c' in df_feat.columns and 'temperature_c' in df_feat.columns:
+        temp_target = df_feat['temperature_forecast_c'].fillna(df_feat['temperature_c'])
+    elif 'temperature_forecast_c' in df_feat.columns:
+        temp_target = df_feat['temperature_forecast_c']
+    elif 'temperature_c' in df_feat.columns:
+        temp_target = df_feat['temperature_c']
+    else:
+        temp_target = None
+
+    if temp_target is not None:
+        df_feat['temp_forecast_lag0'] = temp_target.astype(float)
+        df_feat['cdh_cooling_load'] = np.maximum(df_feat['temp_forecast_lag0'] - 18.0, 0.0).astype(float)
+        df_feat['hdh_heating_load'] = np.maximum(18.0 - df_feat['temp_forecast_lag0'], 0.0).astype(float)
         if 'temperature_lag_48' in df_feat.columns:
-            df_feat['temp_diff_from_yesterday'] = df_feat['temp_forecast_lag0'] - df_feat['temperature_lag_48']
+            df_feat['temp_diff_from_yesterday'] = (df_feat['temp_forecast_lag0'] - df_feat['temperature_lag_48'].astype(float)).astype(float)
 
     return df_feat
 

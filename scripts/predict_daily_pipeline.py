@@ -76,6 +76,7 @@ def load_all_historical_data():
             g.total_mw AS actual_gen_total_mw,
             c.consumption_mw AS actual_cons_mw,
             w.turkey_weighted_temperature_c AS temperature_c,
+            wf.turkey_weighted_temperature_forecast_c AS temperature_forecast_c,
             mc.usd_try,
             mc.brent_oil_usd,
             ng.gas_reference_price_try AS natural_gas_grf_try,
@@ -87,6 +88,7 @@ def load_all_historical_data():
         LEFT JOIN raw_actual_generation_hourly g ON m.ts = g.ts
         LEFT JOIN raw_actual_consumption_hourly c ON m.ts = c.ts
         LEFT JOIN raw_weather_hourly w ON m.ts = w.ts
+        LEFT JOIN raw_weather_forecast_hourly wf ON m.ts = wf.ts
         LEFT JOIN raw_macro_daily mc ON DATE(m.ts) = mc.entry_date
         LEFT JOIN raw_natural_gas_daily ng ON DATE(m.ts) = ng.entry_date
         LEFT JOIN (
@@ -203,12 +205,17 @@ def run_daily_prediction(force: bool = False):
     if 'natural_gas_grf_lag_48' in df_model.columns:
         future_df['natural_gas_grf_lag_48'] = df_model['natural_gas_grf_lag_48'].tail(24).values
 
-    # 🌡️ Open-Meteo Forecast API üzerinden yarının canlı sıcaklık tahminini çek ve türevlerini hesapla!
+    # 🌡️ Open-Meteo Forecast API üzerinden yarının canlı sıcaklık tahminini çek, dedicated veritabanı tablosuna kaydet ve future_df'e aktar!
     try:
         from src.data_ingestion.api_trials.weather_fetcher import fetch_tomorrow_weighted_temperature_forecast
+        from db.ingest_epias import EpiasDBIngestor
         weather_fc = fetch_tomorrow_weighted_temperature_forecast()
-        tomorrow_temps = weather_fc['temp_c']
+        tomorrow_temps = weather_fc.get('temp_c', [])
+        tomorrow_times = weather_fc.get('time', [])
+        
         if len(tomorrow_temps) == 24:
+            records_fc = [{'date_time': t, 'turkey_weighted_temperature_c': temp} for t, temp in zip(tomorrow_times, tomorrow_temps)]
+            EpiasDBIngestor().ingest_weather_forecast(records_fc)
             future_df['temp_forecast_lag0'] = tomorrow_temps
         else:
             future_df['temp_forecast_lag0'] = df_model['temperature_c'].tail(24).values
