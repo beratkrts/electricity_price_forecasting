@@ -95,10 +95,12 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
 
     logger.info(f"Processing {len(periods)} execution period(s)...")
 
-    def should_fetch(source_name: str, p_key: str) -> bool:
+    logger.info(f"Processing {len(periods)} execution period(s)...")
+
+    def should_fetch(source_name: str, p_key: str, s_dt: pd.Timestamp) -> bool:
         """Determines whether API call should be made or skipped."""
-        # Always fetch if it's the current active month (so new days are updated daily)
-        if p_key == current_month_key:
+        # Always fetch if period is part of the current active month (so new daily data is updated)
+        if s_dt.strftime("%Y-%m") == current_month_key:
             return True
         # For past completed months, skip API call if already in DB
         if db.is_period_ingested(source_name, p_key):
@@ -116,68 +118,68 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         logger.info(f"\n⚡ --- PERIOD: {start_str} to {end_str} ---")
 
         # 1. Market Clearing Price (PTF / MCP)
-        if should_fetch("mcp", period_key):
+        if should_fetch("mcp", period_key, start_dt):
             mcp_data = fetcher.fetch_eptr2_service("mcp", start_iso, end_iso)
             db.ingest_mcp(mcp_data, period_key)
 
         # 2. System Marginal Price (SMF / SMP)
-        if should_fetch("smp", period_key):
+        if should_fetch("smp", period_key, start_dt):
             smp_data = fetcher.fetch_eptr2_service("smp", start_iso, end_iso)
             db.ingest_smp(smp_data, period_key)
 
         # 3. Load Forecast (LEP / Yük Tahmini)
-        if should_fetch("load_forecast", period_key):
+        if should_fetch("load_forecast", period_key, start_dt):
             load_data = fetcher.fetch_eptr2_service("load-plan", start_iso, end_iso)
             db.ingest_load_forecast(load_data, period_key)
 
         # 4. Final Day-Ahead Generation Plan (KGÜP)
-        if should_fetch("kgup", period_key):
+        if should_fetch("kgup", period_key, start_dt):
             kgup_data = fetcher.fetch_eptr2_service("kgup", start_iso, end_iso)
             db.ingest_kgup(kgup_data, period_key)
 
         # 5. Real-Time Actual Generation (Gerçekleşen Üretim)
-        if should_fetch("actual_generation", period_key):
+        if should_fetch("actual_generation", period_key, start_dt):
             rt_gen_data = fetcher.fetch_eptr2_service("rt-gen", start_iso, end_iso)
             db.ingest_actual_generation(rt_gen_data, period_key)
 
         # 6. Real-Time Actual Consumption (Gerçekleşen Tüketim)
-        if should_fetch("actual_consumption", period_key):
+        if should_fetch("actual_consumption", period_key, start_dt):
             rt_cons_data = fetcher.fetch_eptr2_service("rt-cons", start_iso, end_iso)
             db.ingest_actual_consumption(rt_cons_data, period_key)
 
         # 7. Day-Ahead Bids and Offers (dam-bid & dam-offer)
-        if should_fetch("bids_offers", period_key):
+        if should_fetch("bids_offers", period_key, start_dt):
             bids_data = fetcher.fetch_eptr2_service("dam-bid", start_iso, end_iso)
             offers_data = fetcher.fetch_eptr2_service("dam-offer", start_iso, end_iso)
             db.ingest_bids_offers(bids_data, offers_data, period_key)
 
         # 8. Licensed Real-Time Generation (ren-rt-gen via eptr2)
-        if should_fetch("licensed_realtime_generation", period_key):
+        if should_fetch("licensed_realtime_generation", period_key, start_dt):
             licensed_gen_data = fetcher.fetch_eptr2_service("ren-rt-gen", start_iso, end_iso)
             db.ingest_licensed_realtime_generation(licensed_gen_data, period_key)
 
         # 9. Installed Capacity (ren-capacity via eptr2)
-        if should_fetch("installed_capacity", period_key):
+        if should_fetch("installed_capacity", period_key, start_dt):
             installed_cap_data = fetcher.fetch_installed_capacity(period_iso=f"{start_str}T00:00:00+03:00")
             db.ingest_installed_capacity(installed_cap_data, period_key)
 
         # 10. Dam Active Fullness (Custom Endpoint)
-        if should_fetch("active_fullness", period_key):
+        if should_fetch("active_fullness", period_key, start_dt):
             fullness_data = fetcher.fetch_active_fullness(start_iso, end_iso)
             db.ingest_active_fullness(fullness_data, period_key)
 
         # 11. Dam Water Energy Provision (Custom Endpoint)
-        if should_fetch("water_energy_provision", period_key):
+        if should_fetch("water_energy_provision", period_key, start_dt):
             provision_data = fetcher.fetch_water_energy_provision(start_iso, end_iso)
             db.ingest_water_energy_provision(provision_data, period_key)
 
         # 12. Natural Gas Daily Reference Price (GRF)
-        if should_fetch("natural_gas_daily", period_key):
+        if should_fetch("natural_gas_daily", period_key, start_dt):
             gas_price_data = fetcher.fetch_natural_gas_daily_price(start_iso, end_iso)
             db.ingest_natural_gas_daily(gas_price_data, period_key)
 
         # 13. Weather Data (Open-Meteo)
-        if should_fetch("weather", period_key):
+        if should_fetch("weather", period_key, start_dt):
             weather_data = fetch_weather_in_memory(start_str, end_str)
             db.ingest_weather(weather_data, period_key)
 
