@@ -274,18 +274,52 @@ def fetch_live_fx_fallback_rate() -> float:
     return 35.0
 
 
+def fetch_historical_usdtry_frankfurter(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> pd.Series:
+    """Fetches official historical USD/TRY exchange rates from Frankfurter (ECB API)."""
+    try:
+        import requests
+        if not end_date:
+            end_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+        url = f"https://api.frankfurter.app/{start_date}..{end_date}?from=USD&to=TRY"
+        res = requests.get(url, timeout=10)
+        if res.status_code == 200:
+            rates = res.json().get("rates", {})
+            if rates:
+                df = pd.DataFrame([{"Date": k, "usd_try": v.get("TRY")} for k, v in rates.items()])
+                df["Date"] = pd.to_datetime(df["Date"])
+                df = df.set_index("Date").sort_index()
+                full_idx = pd.date_range(start=start_date, end=end_date, freq="D")
+                s = df["usd_try"].reindex(full_idx).ffill().bfill()
+                return s
+    except Exception as e:
+        logger.warning(f"Could not fetch historical USD/TRY from Frankfurter API: {e}")
+    return pd.Series(dtype=float)
+
+
 def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
     """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts with retries and fallbacks."""
     try:
         if not end_date:
             end_date = (pd.Timestamp.now() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
 
-        logger.info(f"Fetching macro indicators from yfinance ({start_date} to {end_date})...")
+        logger.info(f"Fetching macro indicators ({start_date} to {end_date})...")
 
         df_dict = {}
         tickers = {"USDTRY=X": 35.0, "BZ=F": 75.0}
 
+        # 1. Try official Frankfurter API for historical USD/TRY exchange rates first
+        try:
+            usd_series = fetch_historical_usdtry_frankfurter(start_date, end_date)
+            if not usd_series.empty:
+                df_dict["USDTRY=X"] = usd_series
+                logger.info(f"✅ Ingested {len(usd_series)} official historical USD/TRY exchange rates from Frankfurter API.")
+        except Exception as e:
+            logger.warning(f"Frankfurter historical FX fetch error: {e}")
+
         for symbol, fallback_val in tickers.items():
+            if symbol in df_dict:
+                continue
+
             fetched = False
             for attempt in range(1, 4):
                 try:
