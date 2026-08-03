@@ -260,6 +260,20 @@ def fetch_tomorrow_weather_forecast_in_memory() -> List[Dict[str, Any]]:
     return []
 
 
+def fetch_live_fx_fallback_rate() -> float:
+    """Fetches real-time USD/TRY exchange rate from open ExchangeRate API as dynamic fallback."""
+    try:
+        import requests
+        r = requests.get("https://api.exchangerate-api.com/v4/latest/USD", timeout=5)
+        if r.status_code == 200:
+            val = r.json().get("rates", {}).get("TRY")
+            if val:
+                return float(val)
+    except Exception as e:
+        logger.warning(f"Could not fetch dynamic FX fallback rate: {e}")
+    return 35.0
+
+
 def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
     """Fetches yfinance macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts with retries and fallbacks."""
     try:
@@ -288,9 +302,15 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
                     time.sleep(2 * attempt)
 
             if not fetched:
-                logger.warning(f"⚠️ yfinance unavailable for {symbol}. Creating cautious fallback series with default value {fallback_val}.")
-                date_range = pd.date_range(start=start_date, end=end_date, freq="D")
-                df_dict[symbol] = pd.Series(fallback_val, index=date_range)
+                if symbol == "USDTRY=X":
+                    dynamic_val = fetch_live_fx_fallback_rate()
+                    logger.warning(f"⚠️ yfinance unavailable for {symbol}. Using dynamic ExchangeRate API fallback value: {dynamic_val}.")
+                    date_range = pd.date_range(start=start_date, end=end_date, freq="D")
+                    df_dict[symbol] = pd.Series(dynamic_val, index=date_range)
+                else:
+                    logger.warning(f"⚠️ yfinance unavailable for {symbol}. Creating cautious fallback series with default value {fallback_val}.")
+                    date_range = pd.date_range(start=start_date, end=end_date, freq="D")
+                    df_dict[symbol] = pd.Series(fallback_val, index=date_range)
 
         if df_dict:
             macro = pd.DataFrame(df_dict)
