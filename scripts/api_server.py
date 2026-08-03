@@ -209,8 +209,12 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
 
 
 @app.get("/api/fx")
-async def fx_rates():
-    """Fetches live USD/TRY and EUR/TRY exchange rates with multiple fallback APIs."""
+async def get_live_fx_rate():
+    """Fetches real-time USD/TRY and EUR/TRY exchange rates with 5-minute memory caching."""
+    now_ts = time.time()
+    if _FX_CACHE["response"] is not None and (now_ts - _FX_CACHE["timestamp"]) < 300:
+        return _FX_CACHE["response"]
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
@@ -225,7 +229,7 @@ async def fx_rates():
                 usd_result = usd_data["chart"]["result"][0]
                 eur_result = eur_data["chart"]["result"][0]
 
-                return JSONResponse(content={
+                res = JSONResponse(content={
                     "USD": {
                         "price": usd_result["meta"]["regularMarketPrice"],
                         "prevClose": usd_result["meta"].get("previousClose", usd_result["meta"]["regularMarketPrice"]),
@@ -235,6 +239,9 @@ async def fx_rates():
                         "prevClose": eur_result["meta"].get("previousClose", eur_result["meta"]["regularMarketPrice"]),
                     },
                 })
+                _FX_CACHE["timestamp"] = now_ts
+                _FX_CACHE["response"] = res
+                return res
     except Exception as e:
         logger.warning(f"Yahoo Finance fetch failed: {e}. Trying fallback API...")
 
@@ -247,10 +254,13 @@ async def fx_rates():
                 usd_try = rates.get("TRY", 33.15)
                 eur_val = rates.get("EUR", 0.92)
                 eur_try = usd_try / eur_val if eur_val else 36.10
-                return JSONResponse(content={
+                res = JSONResponse(content={
                     "USD": {"price": round(usd_try, 4), "prevClose": round(usd_try * 0.998, 4)},
                     "EUR": {"price": round(eur_try, 4), "prevClose": round(eur_try * 0.998, 4)},
                 })
+                _FX_CACHE["timestamp"] = now_ts
+                _FX_CACHE["response"] = res
+                return res
     except Exception as e:
         logger.error(f"Fallback FX fetch error: {e}")
 
