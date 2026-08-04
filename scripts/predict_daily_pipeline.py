@@ -163,9 +163,9 @@ def run_daily_prediction(force: bool = False):
     forecaster.fit(X_train, y_train)
     logger.info("🌲 LightGBM Model trained successfully on all historical data.")
 
-    # 5. Gelecek 24 Saat İçin Inference Verisi Hazırlama
-    last_ts = df_model.index.max()
-    next_24h_index = pd.date_range(start=last_ts + pd.Timedelta(hours=1), periods=24, freq='h')
+    # 5. Gelecek 24 Saat İçin Inference Verisi Hazırlama (GÖP Piyasasında Tahmin Hedefi HER ZAMAN Yarındır - T+1)
+    target_tomorrow = (pd.Timestamp.now(tz="Europe/Istanbul") + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    next_24h_index = pd.date_range(start=f"{target_tomorrow} 00:00:00+03:00", periods=24, freq="h")
     
     # Son mevcuttaki verileri future df olarak kopyala
     future_df = df_model.tail(24).copy()
