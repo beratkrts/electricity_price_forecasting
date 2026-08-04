@@ -46,9 +46,6 @@ def backfill_historical_predictions(num_days: int = 730):
     logger.info(f"⏳ Son {max_days} gün (2 yıl) için walk-forward backfill başlatılıyor...")
 
     all_records = []
-
-# Backward compatibility alias
-backfill_365_days_predictions = backfill_historical_predictions
     
     for day_idx in range(max_days - 1, -1, -1):
         test_end = max_ts - pd.Timedelta(days=day_idx)
@@ -101,7 +98,11 @@ backfill_365_days_predictions = backfill_historical_predictions
             conn.execute(insert_sql, chunk)
         conn.commit()
 
-    logger.info("🎉 Backfill completed successfully! Gold layer now has 1 year of historical model predictions.")
+    logger.info("🎉 Backfill completed successfully! Gold layer now has 2 years of historical model predictions.")
+
+
+# Backward compatibility alias
+backfill_365_days_predictions = backfill_historical_predictions
 
 
 if __name__ == "__main__":
