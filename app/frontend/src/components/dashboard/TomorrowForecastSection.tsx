@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { Cpu, Zap, Activity, TrendingUp, Layers, BarChart2 } from 'lucide-react';
 import { EnergyDataPoint, SeriesConfig, ChartTypeOption } from '../../types/energy';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatToDDMMYYYY } from '../../utils/formatters';
 
 interface TomorrowForecastSectionProps {
   data: EnergyDataPoint[];
@@ -21,6 +21,15 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
   dateSelectorNode,
   currencyMode = 'TRY'
 }) => {
+  const [isLightMode, setIsLightMode] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('etkb_theme') === 'light' : false);
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsLightMode(document.documentElement.getAttribute('data-theme') === 'light');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
   // Compute Tomorrow Averages
   const averages = useMemo(() => {
     if (!data || data.length === 0) return { lgb: 0 };
@@ -36,7 +45,7 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
 
   const targetDateStr = useMemo(() => {
     if (data && data.length > 0 && data[0].date) {
-      return data[0].date;
+      return formatToDDMMYYYY(data[0].date);
     }
     return 'Gelecek Gün';
   }, [data]);
@@ -48,32 +57,14 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
   const chartOption = useMemo(() => {
     if (!data || data.length === 0) return {};
 
+    const gridLineColor = isLightMode ? 'rgba(0, 0, 0, 0.14)' : 'rgba(255, 255, 255, 0.12)';
+    const axisLabelColor = isLightMode ? '#475569' : '#94a3b8';
+
     const xAxisLabels = data.map((d) => d.hour);
 
     const seriesList: any[] = [];
 
-    // Add %95 Confidence Interval
-    seriesList.push({
-      name: 'Güven Aralığı Alt',
-      type: 'line',
-      data: data.map((d) => d.lowerBound),
-      lineStyle: { opacity: 0 },
-      stack: 'confidence',
-      symbol: 'none',
-      silent: true
-    });
-    seriesList.push({
-      name: 'Güven Aralığı (%95)',
-      type: 'line',
-      data: data.map((d) => d.upperBound - d.lowerBound),
-      lineStyle: { opacity: 0 },
-      areaStyle: { color: 'rgba(148, 163, 184, 0.1)' },
-      stack: 'confidence',
-      symbol: 'none',
-      silent: true
-    });
-
-    // Add 3 AI Models
+    // Add AI Forecast Models
     seriesConfigs.forEach((sc) => {
       if (!sc.visible || sc.id === 'ptf') return; // Only show forecast models for tomorrow
 
@@ -87,23 +78,9 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
         symbol: 'circle',
         symbolSize: 6,
         showSymbol: false,
+        areaStyle: sc.chartType === 'area' ? { opacity: 0.3 } : undefined,
         itemStyle: { color: sc.color },
-        lineStyle: { width: 3, color: sc.color },
-        areaStyle: sc.chartType === 'area'
-          ? {
-              color: {
-                type: 'linear',
-                x: 0,
-                y: 0,
-                x2: 0,
-                y2: 1,
-                colorStops: [
-                  { offset: 0, color: sc.color + '35' },
-                  { offset: 1, color: sc.color + '05' }
-                ]
-              }
-            }
-          : undefined
+        lineStyle: { width: 3, color: sc.color, type: 'solid' }
       });
     });
 
@@ -112,9 +89,9 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
       animationDuration: 800,
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        borderColor: 'rgba(56, 189, 248, 0.3)',
-        textStyle: { color: '#fff', fontSize: 12 },
+        backgroundColor: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+        borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(56, 189, 248, 0.3)',
+        textStyle: { color: isLightMode ? '#0f172a' : '#fff', fontSize: 12 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
           let res = `<div style="font-weight:700;margin-bottom:6px;color:#fbbf24;">🕒 ${targetDateStr} Saat: ${params[0].name}</div>`;
@@ -132,58 +109,67 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
       legend: {
         top: '2%',
         right: '2%',
-        textStyle: { color: '#94a3b8', fontSize: 11 }
+        textStyle: { color: axisLabelColor, fontSize: 11 }
       },
-      grid: { top: '15%', left: '3%', right: '3%', bottom: '10%', containLabel: true },
+      grid: { top: '15%', left: '3%', right: '3%', bottom: '16%', containLabel: true },
       xAxis: {
         type: 'category',
         data: xAxisLabels,
-        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.15)' } },
-        axisLabel: { color: '#94a3b8', fontSize: 11 }
+        boundaryGap: seriesConfigs.some(s => s.visible && s.chartType === 'bar') ? true : false,
+        axisLine: { lineStyle: { color: isLightMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.15)' } },
+        axisLabel: { color: axisLabelColor, fontSize: 11 },
+        splitLine: { show: true, lineStyle: { color: gridLineColor } }
       },
       yAxis: {
         type: 'value',
         name: unitStr,
-        nameTextStyle: { color: '#94a3b8' },
-        axisLabel: { color: '#94a3b8', formatter: `{value} ${symbolStr}` },
-        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } },
+        nameTextStyle: { color: axisLabelColor },
+        axisLabel: { color: axisLabelColor, formatter: `{value} ${symbolStr}` },
+        splitLine: { lineStyle: { color: gridLineColor } },
         scale: true
       },
+      dataZoom: [{ type: 'inside' }, {
+        type: 'slider', bottom: '3%', height: 18,
+        borderColor: 'rgba(148, 163, 184, 0.24)',
+        fillerColor: 'rgba(56, 189, 248, 0.18)',
+        handleStyle: { color: '#38bdf8' },
+        textStyle: { color: '#94a3b8' }
+      }],
       series: seriesList
     };
-  }, [data, seriesConfigs, targetDateStr, symbolStr, unitStr]);
+  }, [data, seriesConfigs, targetDateStr, symbolStr, unitStr, isLightMode]);
 
-  const [perfMetric, setPerfMetric] = React.useState<{ mape: string; accuracy: string }>({
-    mape: '--',
+  const [perfMetric, setPerfMetric] = React.useState<{ wape: string; accuracy: string }>({
+    wape: '--',
     accuracy: '--'
   });
 
   React.useEffect(() => {
     let mounted = true;
-    const fetch1dPerf = async () => {
+    const fetchPerf = async () => {
       try {
         const res = await fetch('/api/db-data?date=1d&type=performance');
         if (!res.ok) return;
         const pData = await res.json();
-        if (mounted && Array.isArray(pData) && pData.length > 0 && pData[0].mape !== undefined && pData[0].mape !== null) {
-          const mapeVal = parseFloat(pData[0].mape);
-          const accVal = Math.max(0, 100 - mapeVal).toFixed(2);
+        if (mounted && Array.isArray(pData) && pData.length > 0 && pData[0].wape !== undefined && pData[0].wape !== null) {
+          const wapeVal = parseFloat(pData[0].wape);
+          const accVal = Math.max(0, 100 - wapeVal).toFixed(2);
           setPerfMetric({
-            mape: pData[0].mape.toString(),
+            wape: pData[0].wape.toString(),
             accuracy: accVal
           });
         }
       } catch (err) {
-        console.error('Failed to fetch 1d performance metric:', err);
+        console.error('Performance metric fetch error:', err);
       }
     };
-    fetch1dPerf();
+    fetchPerf();
     return () => { mounted = false; };
   }, []);
 
   return (
     <section style={{ marginBottom: '28px' }}>
-      
+
       {/* Section Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', marginBottom: '14px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -192,7 +178,7 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
           </div>
           <div>
             <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-              BÖLÜM 1: Gelecek PTF Fiyat Tahminleri ({targetDateStr})
+              Gelecek PTF Fiyat Tahminleri ({targetDateStr})
             </h2>
             <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
               Üretilen güncel PTF fiyat tahmin eğrileri ({targetDateStr})
@@ -209,15 +195,15 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '20px' }}>
-        
+
         {/* Sol Menü: Model Seçici */}
         <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
               <Cpu size={16} color="#fbbf24" />
-              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', margin: 0 }}>Yarınki Tahmin Modelleri</h3>
+              <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', margin: 0 }}>Modeller</h3>
             </div>
-            
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {seriesConfigs.filter(s => s.id !== 'ptf').map((s) => (
                 <div
@@ -256,7 +242,7 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
                       {s.visible ? 'Açık' : 'Kapalı'}
                     </button>
                   </div>
-                  
+
                   {/* Bottom row: Chart style selector */}
                   {s.visible && (
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -297,20 +283,27 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
 
         {/* Sağ Taraf: Metrik Kartları + Ana 1 Ağustos Tahmin Grafiği */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
+
           {/* Top Cards for Tomorrow (Active Model: LightGBM) */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-            
-            <div className="glass-panel" style={{ padding: '14px', border: '1px solid rgba(192, 132, 252, 0.4)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#c084fc', fontSize: '0.75rem', fontWeight: 600 }}>
-                <span>LightGBM Model Ort. Tahmin</span>
-                <Cpu size={16} />
-              </div>
-              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: '4px 0', fontFamily: 'Outfit' }}>
-                {formatCurrency(averages.lgb, symbolStr)}
-              </div>
-              <div style={{ fontSize: '0.7rem', color: '#c084fc' }}>Aktif Model (Gradient Boosting)</div>
-            </div>
+
+            {(() => {
+              const fcSeries = seriesConfigs?.find(s => s.id === 'lightgbmForecast' || s.isForecast);
+              const modelColor = fcSeries?.color || '#e11d48';
+
+              return (
+                <div className="glass-panel" style={{ padding: '14px', border: `1px solid ${modelColor}60` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: modelColor, fontSize: '0.75rem', fontWeight: 600 }}>
+                    <span>Yapay Zeka Fiyat Tahmini Ortalaması</span>
+                    <Cpu size={16} />
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: '4px 0', fontFamily: 'Outfit' }}>
+                    {formatCurrency(averages.lgb, symbolStr)}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: modelColor }}>Aktif Yapay Zeka Modeli</div>
+                </div>
+              );
+            })()}
 
             <div className="glass-panel" style={{ padding: '14px', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: '#10b981', fontSize: '0.75rem', fontWeight: 600 }}>
@@ -320,7 +313,7 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', margin: '4px 0', fontFamily: 'Outfit' }}>
                 %{perfMetric.accuracy} <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Doğruluk</span>
               </div>
-              <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ortalama MAPE %{perfMetric.mape}</div>
+              <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ortalama Hata Oranı %{perfMetric.wape}</div>
             </div>
 
           </div>
@@ -331,9 +324,6 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
               <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>
                 {targetDateStr} 24 Saatlik PTF Gelecek Fiyat Tahmin Grafiği
               </h3>
-              <span className="ping-badge">
-                🔮 D+1 Tahmini Yayında (EPİAŞ Öncesi)
-              </span>
             </div>
 
             <div style={{ width: '100%', height: '340px' }}>

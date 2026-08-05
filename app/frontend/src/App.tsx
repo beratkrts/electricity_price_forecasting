@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useLayoutEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { Header } from './components/layout/Header';
@@ -13,7 +13,7 @@ import { DateRangeState, EnergyDataPoint, SeriesConfig, ChartTypeOption, Currenc
 import { CurrencyRate } from './types/currency';
 
 import { INITIAL_CURRENCY_RATES, fetchMarketData } from './services/fxService';
-import { findSeriesIntersections } from './utils/intersectionDetector';
+
 import { fetchNextDayForecast, fetchLatestRealizedComparison } from './services/energyDataService';
 import { calculateDashboardMetrics } from './utils/mathHelpers';
 
@@ -25,18 +25,38 @@ export const App: React.FC = () => {
     endDate: '2026-08-01'
   });
 
-  const [showIntersections, setShowIntersections] = useState<boolean>(true);
+
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [nextDayData, setNextDayData] = useState<EnergyDataPoint[]>([]);
   const [comparisonData, setComparisonData] = useState<EnergyDataPoint[]>([]);
 
   const [seriesConfigs, setSeriesConfigs] = useState<SeriesConfig[]>([
-    { id: 'lightgbmForecast', name: 'LightGBM PTF Tahmini', color: '#c084fc', visible: true, chartType: 'smooth', unit: '₺/MWh', isForecast: true, modelType: 'lightgbm' },
-    { id: 'ptf', name: 'EPİAŞ PTF (Gerçekleşen)', color: '#38bdf8', visible: true, chartType: 'smooth', unit: '₺/MWh' }
+    { id: 'lightgbmForecast', name: 'Yapay Zeka Fiyat Tahmini', color: '#f43f5e', visible: true, chartType: 'smooth', unit: '₺/MWh', isForecast: true, modelType: 'lightgbm' },
+    { id: 'ptf', name: 'EPİAŞ Gerçekleşen PTF', color: '#38bdf8', visible: true, chartType: 'smooth', unit: '₺/MWh' }
   ]);
 
   const [currencyMode, setCurrencyMode] = useState<CurrencyMode>('USD');
   const [currencyRates, setCurrencyRates] = useState<CurrencyRate[]>(INITIAL_CURRENCY_RATES);
+
+  const [themeMode, setThemeMode] = useState<'dark' | 'light'>(() => {
+    return (localStorage.getItem('etkb_theme') as 'dark' | 'light') || 'dark';
+  });
+
+  const applyTheme = (mode: 'dark' | 'light') => {
+    document.documentElement.setAttribute('data-theme', mode);
+    document.body.className = mode === 'light' ? 'light-theme' : '';
+    localStorage.setItem('etkb_theme', mode);
+  };
+
+  useLayoutEffect(() => {
+    applyTheme(themeMode);
+  }, [themeMode]);
+
+  const toggleTheme = () => {
+    const nextTheme = themeMode === 'dark' ? 'light' : 'dark';
+    applyTheme(nextTheme);
+    setThemeMode(nextTheme);
+  };
 
   // Convert values based on selected currencyMode (TRY / USD)
   const usdRate = useMemo(() => {
@@ -99,14 +119,11 @@ export const App: React.FC = () => {
     };
   }, []);
 
-  const intersections = useMemo(() => {
-    if (!showIntersections) return [];
-    return findSeriesIntersections(comparisonData, seriesConfigs);
-  }, [comparisonData, seriesConfigs, showIntersections]);
+
 
   const metrics = useMemo(() => {
-    return calculateDashboardMetrics(comparisonData, intersections.length);
-  }, [comparisonData, intersections]);
+    return calculateDashboardMetrics(comparisonData, 0);
+  }, [comparisonData]);
 
   const toggleSeriesVisibility = (id: string) => {
     setSeriesConfigs((prev) =>
@@ -128,9 +145,11 @@ export const App: React.FC = () => {
         <Header
           onRefresh={loadData}
           onOpenExport={() => setIsExportOpen(true)}
-          intersectionCount={intersections.length}
+          intersectionCount={0}
           currencyMode={currencyMode}
           onCurrencyChange={(mode) => setCurrencyMode(mode)}
+          themeMode={themeMode}
+          onToggleTheme={toggleTheme}
         />
 
         {/* Page Content Area */}
@@ -159,9 +178,7 @@ export const App: React.FC = () => {
                   seriesConfigs={updatedSeriesConfigs}
                   toggleSeriesVisibility={toggleSeriesVisibility}
                   changeSeriesChartType={changeSeriesChartType}
-                  intersections={intersections}
-                  showIntersections={showIntersections}
-                  setShowIntersections={setShowIntersections}
+
                   metrics={metrics}
                   currencyMode={currencyMode}
                   usdRate={usdRate}
@@ -169,7 +186,7 @@ export const App: React.FC = () => {
               } 
             />
             
-            <Route path="/analysis" element={<Analysis />} />
+            <Route path="/analysis" element={<Analysis currencyMode={currencyMode} usdRate={usdRate} />} />
             
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -178,9 +195,9 @@ export const App: React.FC = () => {
 
         {/* Global Persistent Footer Ticker */}
         <CurrencyTicker rates={currencyRates} lastRefresh={lastRefreshTime} />
-
-        <ExportModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} />
       </div>
+
+      <ExportModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} themeMode={themeMode} />
     </BrowserRouter>
   );
 };

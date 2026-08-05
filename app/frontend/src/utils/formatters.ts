@@ -30,3 +30,23 @@ export function formatDateString(dateStr: string): string {
     year: 'numeric'
   }).format(date);
 }
+
+export function formatToDDMMYYYY(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length >= 3) {
+    const day = parts[2].substring(0, 2);
+    return `${day}.${parts[1]}.${parts[0]}`;
+  }
+  return dateStr;
+}
+
+export function formatTimestampToDDMMYYYY(ts: string): string {
+  if (!ts) return '';
+  const parts = ts.split(' ');
+  if (parts.length > 0) {
+    const datePart = formatToDDMMYYYY(parts[0]);
+    return parts.length > 1 ? `${datePart} ${parts[1]}` : datePart;
+  }
+  return ts;
+}

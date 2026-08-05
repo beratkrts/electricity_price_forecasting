@@ -11,9 +11,9 @@
   --text-muted: #64748b;
   
   --color-ptf: #38bdf8;
-  --color-smf: #fbbf24;
-  --color-lstm: #10b981;
-  --color-xgboost: #c084fc;
+  --color-smf: #f59e0b;
+  --color-lstm: #14b8a6;
+  --color-xgboost: #8b5cf6;
   --color-ping: #f43f5e;
 }
 
@@ -25,7 +25,8 @@
 
 body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background-color: var(--bg-dark);
+  background: radial-gradient(circle at 12% -10%, rgba(14, 165, 233, 0.14), transparent 34%),
+    radial-gradient(circle at 88% 0%, rgba(20, 184, 166, 0.09), transparent 28%), var(--bg-dark);
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
@@ -47,7 +48,7 @@ code, pre, .font-mono {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-color);
   border-radius: 16px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  box-shadow: 0 12px 36px 0 rgba(2, 6, 23, 0.28);
   transition: border-color 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
 }
 
@@ -76,17 +77,230 @@ code, pre, .font-mono {
   background: rgba(56, 189, 248, 0.5);
 }
 
-/* Grid & Layout Utilities */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 20px;
-  padding: 20px;
-  min-height: calc(100vh - 120px);
+/* Light Theme Complete Overrides */
+[data-theme="light"], body.light-theme {
+  --bg-dark: #f4f7fb;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --border-color: rgba(0, 0, 0, 0.08);
+  --border-highlight: rgba(2, 132, 199, 0.4);
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
 }
 
-@media (max-width: 1100px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
-  }
+[data-theme="light"] body,
+[data-theme="light"] #dashboard-export-root {
+  background: radial-gradient(circle at 12% -10%, rgba(14, 165, 233, 0.11), transparent 30%),
+    radial-gradient(circle at 88% 0%, rgba(20, 184, 166, 0.08), transparent 26%), #f4f7fb !important;
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .glass-panel {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 10px 28px 0 rgba(15, 23, 42, 0.07) !important;
+}
+
+[data-theme="light"] .glass-panel:hover {
+  border-color: #94a3b8 !important;
+}
+
+[data-theme="light"] h1, 
+[data-theme="light"] h2, 
+[data-theme="light"] h3, 
+[data-theme="light"] h4,
+[data-theme="light"] h5 {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] p,
+[data-theme="light"] span:not([class*="badge"]) {
+  color: #334155;
+}
+
+[data-theme="light"] header nav {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] header nav a {
+  color: #475569 !important;
+}
+
+[data-theme="light"] header nav a.active {
+  background: rgba(2, 132, 199, 0.12) !important;
+  color: #0284c7 !important;
+  border-color: rgba(2, 132, 199, 0.3) !important;
+}
+
+/* Light mode input & select styling */
+[data-theme="light"] input[type="date"],
+[data-theme="light"] input[type="month"],
+[data-theme="light"] select {
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  color-scheme: light !important;
+}
+
+[data-theme="light"] input[type="date"]:focus,
+[data-theme="light"] input[type="month"]:focus,
+[data-theme="light"] select:focus {
+  border-color: #0284c7 !important;
+}
+
+/* Light mode container boxes with dark inline background styles */
+[data-theme="light"] div[style*="background: rgba(15, 23, 42"],
+[data-theme="light"] div[style*="background: rgba(0,0,0"],
+[data-theme="light"] div[style*="background: rgba(0, 0, 0"] {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Light mode table overrides */
+[data-theme="light"] table {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] table th {
+  background: #e2e8f0 !important;
+  color: #0369a1 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+[data-theme="light"] table tr {
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+[data-theme="light"] table td {
+  color: #1e293b !important;
+}
+
+[data-theme="light"] table td div {
+  color: #0f172a !important;
+}
+
+/* Light mode card item & background overrides */
+[data-theme="light"] div[style*="background: rgba(255, 255, 255"],
+[data-theme="light"] div[style*="background: rgba(255,255,255"] {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] div[style*="background: rgba(0,0,0"],
+[data-theme="light"] div[style*="background: rgba(0, 0, 0"] {
+  background: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Light mode text contrast fixes */
+[data-theme="light"] strong[style*="color: #fff"],
+[data-theme="light"] strong[style*="color: #ffffff"],
+[data-theme="light"] span[style*="color: #fff"],
+[data-theme="light"] span[style*="color: #ffffff"],
+[data-theme="light"] div[style*="color: #fff"],
+[data-theme="light"] div[style*="color: #ffffff"] {
+  color: #0f172a !important;
+}
+
+/* React serializes inline hex colours as rgb(...); cover those nodes as well so
+   a live theme switch never leaves white text on a light surface. */
+[data-theme="light"] .glass-panel [style*="color: rgb(255, 255, 255)"],
+[data-theme="light"] .glass-panel [style*="color: rgb(248, 250, 252)"] {
+  color: #0f172a !important;
+}
+
+[data-theme="light"] .table-toggle-btn:not([style*="background: rgb(16, 185, 129)"]):not([style*="background: #10b981"]) {
+  color: #0f172a !important;
+  background: #e2e8f0 !important;
+  border-color: #cbd5e1 !important;
+}
+
+[data-theme="light"] .glass-panel [style*="color: rgb(148, 163, 184)"] {
+  color: #475569 !important;
+}
+
+[data-theme="light"] .glass-panel [style*="background: rgba(15, 23, 42"],
+[data-theme="light"] .glass-panel [style*="background: rgb(15, 23, 42)"] {
+  background: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* The live-market ticker deliberately keeps its dark market-terminal treatment
+   in both themes, so its timestamp remains visually stable. */
+.currency-ticker,
+[data-theme="light"] .currency-ticker {
+  background: rgba(7, 10, 18, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.currency-ticker-time,
+[data-theme="light"] .currency-ticker-time {
+  background: rgba(15, 23, 42, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] .currency-ticker-time span {
+  color: #94a3b8 !important;
+}
+
+[data-theme="light"] span[style*="color: #94a3b8"],
+[data-theme="light"] p[style*="color: #94a3b8"],
+[data-theme="light"] div[style*="color: #94a3b8"] {
+  color: #475569 !important;
+}
+
+[data-theme="light"] span[style*="color: #38bdf8"],
+[data-theme="light"] div[style*="color: #38bdf8"] {
+  color: #0284c7 !important;
+}
+
+[data-theme="light"] .ticker-badge,
+[data-theme="light"] .ticker-badge span {
+  color: #38bdf8 !important;
+}
+
+[data-theme="light"] span[style*="color: #cbd5e1"],
+[data-theme="light"] div[style*="color: #cbd5e1"] {
+  color: #334155 !important;
+}
+
+/* Light mode red accent text readability */
+[data-theme="light"] div[style*="color: #e11d48"],
+[data-theme="light"] span[style*="color: #e11d48"],
+[data-theme="light"] strong[style*="color: #e11d48"] {
+  color: #be123c !important;
+}
+
+/* Light mode button & card border fixes */
+[data-theme="light"] div[style*="border: 1px solid rgba(225, 29, 72"] {
+  border-color: rgba(225, 29, 72, 0.35) !important;
+  background: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(225, 29, 72, 0.05) !important;
+}
+
+.hide-on-screen { display: none; }
+body.is-exporting .hide-on-screen { display: block !important; }
+
+/* Export Modal fixed dark styling for all themes */
+.export-modal-overlay,
+[data-theme='light'] .export-modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+
+/* Fix CurrencyTicker sticking to viewport during tall PNG/PDF exports */
+body.is-exporting .currency-ticker-container {
+  display: none !important;
+}
+
+body.is-exporting .export-expandable-table {
+  max-height: none !important;
+  overflow-y: visible !important;
 }

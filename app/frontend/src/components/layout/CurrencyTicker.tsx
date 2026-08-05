@@ -12,13 +12,13 @@ export const CurrencyTicker: React.FC<CurrencyTickerProps> = ({ rates, lastRefre
   const displayRates = [...rates, ...rates, ...rates];
 
   return (
-    <div style={{
+    <div className="currency-ticker-container" style={{
       position: 'fixed',
       bottom: 0,
       left: 0,
       right: 0,
       height: '42px',
-      background: 'rgba(7, 10, 18, 0.95)',
+      background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
       backdropFilter: 'blur(12px)',
       borderTop: '1px solid rgba(255, 255, 255, 0.1)',
       display: 'flex',
@@ -27,11 +27,11 @@ export const CurrencyTicker: React.FC<CurrencyTickerProps> = ({ rates, lastRefre
       overflow: 'hidden'
     }}>
       {/* Ticker Header Tag */}
-      <div style={{
+      <div className="ticker-badge" style={{
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
-        background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+        background: 'transparent',
         padding: '0 16px',
         height: '100%',
         borderRight: '1px solid rgba(255, 255, 255, 0.1)',
@@ -89,20 +89,21 @@ export const CurrencyTicker: React.FC<CurrencyTickerProps> = ({ rates, lastRefre
       </div>
 
       {/* Live Timestamp right badge */}
-      <div style={{
+      <div className="ticker-badge" style={{
         display: 'flex',
         alignItems: 'center',
         gap: '6px',
+        background: 'transparent',
         padding: '0 16px',
         height: '100%',
-        background: 'rgba(15, 23, 42, 0.9)',
         borderLeft: '1px solid rgba(255, 255, 255, 0.1)',
-        fontSize: '0.72rem',
-        color: '#64748b',
+        fontSize: '0.78rem',
+        fontWeight: 700,
+        color: '#38bdf8',
         whiteSpace: 'nowrap',
         zIndex: 2
       }}>
-        <Clock size={12} />
+        <Clock size={14} />
         <span>Son Güncelleme: {lastRefresh}</span>
       </div>
     </div>

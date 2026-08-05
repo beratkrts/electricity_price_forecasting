@@ -1,21 +1,18 @@
 import React, { useState } from 'react';
 import { TodayBenchmarkSection } from '../components/dashboard/TodayBenchmarkSection';
 import { HistoricalPerformanceSection } from '../components/dashboard/HistoricalPerformanceSection';
-import { IntersectionList } from '../components/dashboard/IntersectionList';
-import { EnergyDataPoint, SeriesConfig, IntersectionPoint, DashboardMetrics, ChartTypeOption } from '../types/energy';
-import { Calendar, Table as TableIcon } from 'lucide-react';
+import { EnergyDataPoint, SeriesConfig, DashboardMetrics, ChartTypeOption } from '../types/energy';
+import { Calendar, Table as TableIcon, CheckCircle2 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 import { fetchLatestRealizedComparison } from '../services/energyDataService';
-import { findSeriesIntersections } from '../utils/intersectionDetector';
+
+
 
 interface ForecastProps {
   data: EnergyDataPoint[];
   seriesConfigs: SeriesConfig[];
   toggleSeriesVisibility: (id: string) => void;
   changeSeriesChartType: (id: string, chartType: ChartTypeOption) => void;
-  intersections: IntersectionPoint[];
-  showIntersections: boolean;
-  setShowIntersections: (show: boolean) => void;
   metrics: DashboardMetrics;
   currencyMode?: 'TRY' | 'USD';
   usdRate?: number;
@@ -26,21 +23,17 @@ export const Forecast: React.FC<ForecastProps> = ({
   seriesConfigs,
   toggleSeriesVisibility,
   changeSeriesChartType,
-  intersections: _propIntersections,
-  showIntersections,
-  setShowIntersections,
   metrics,
   currencyMode = 'USD',
   usdRate = 33.15
 }) => {
-  const [selectedIntersection, setSelectedIntersection] = useState<IntersectionPoint | null>(null);
-  
-
-
   const todayStr = React.useMemo(() => new Date().toISOString().split('T')[0], []);
-  const [activeQueryParam, setActiveQueryParam] = useState<string>('latest');
+  const [activeQueryParam, setActiveQueryParam] = useState<string>('1d');
   const [historyStartDate, setHistoryStartDate] = useState<string>(todayStr);
   const [historyEndDate, setHistoryEndDate] = useState<string>(todayStr);
+  const [compareMode, setCompareMode] = useState<'preset' | 'month' | 'year'>('preset');
+  const [selectedMonth, setSelectedMonth] = useState<string>('2026-08');
+  const [selectedYear, setSelectedYear] = useState<string>('2026');
   const [showTable, setShowTable] = useState<boolean>(false);
   const [rawChartData, setRawChartData] = useState<EnergyDataPoint[]>(initialData || []);
 
@@ -109,96 +102,175 @@ export const Forecast: React.FC<ForecastProps> = ({
     });
   }, [rawChartData, currencyMode, usdRate]);
 
-  const intersections = React.useMemo(() => {
-    if (!showIntersections || chartData.length > 24) return [];
-    return findSeriesIntersections(chartData, seriesConfigs);
-  }, [chartData, seriesConfigs, showIntersections]);
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    return `${parts[2]}.${parts[1]}.${parts[0]}`;
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      
+
+      {/* Section Header (Moved from TodayBenchmarkSection) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '-6px' }}>
+        <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8' }}>
+          <CheckCircle2 size={20} />
+        </div>
+        <div>
+          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', margin: 0 }}>
+            {chartData && chartData.length > 0 && chartData[0].date ? formatDate(chartData[0].date) : 'Seçilen Tarih'} Model Tahminimiz vs EPİAŞ Gerçekleşen PTF Kıyaslaması
+          </h2>
+          <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
+            EPİAŞ gerçekleşen PTF geldikten sonra model tahmini ile gerçek fiyatların karşılaştırılması ve hata payları ({chartData && chartData.length > 0 && chartData[0].date ? formatDate(chartData[0].date) : 'Seçilen Tarih'})
+          </p>
+        </div>
+      </div>
+
       {/* Forecast comparison page controls */}
-      <div className="glass-panel" style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Calendar size={18} color="#f43f5e" />
-          <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.9rem' }}>Kıyaslama Aralığı:</span>
-          
-          <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.6)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(255, 255, 255, 0.05)', marginRight: '8px' }}>
-            {[
-              { id: '1d', label: '1g' },
-              { id: '7d', label: '7g' },
-              { id: '1m', label: '1a' },
-              { id: '3m', label: '3a' },
-              { id: '6m', label: '6a' },
-              { id: '1y', label: '1y' }
-            ].map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => {
-                  setActiveQueryParam(preset.id);
-                }}
-                style={{
-                  padding: '4px 8px',
-                  borderRadius: '4px',
-                  border: 'none',
-                  fontSize: '0.75rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  background: activeQueryParam === preset.id ? '#38bdf8' : 'transparent',
-                  color: activeQueryParam === preset.id ? '#0f172a' : '#94a3b8'
-                }}
-              >
-                {preset.label}
-              </button>
-            ))}
+      <div className="glass-panel" style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: '8px', flexWrap: 'nowrap', overflowX: 'auto' }}>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'nowrap', flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0, marginRight: '0' }}>
+            <Calendar size={18} color="#f43f5e" />
+            <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.95rem', whiteSpace: 'nowrap' }}>Kıyaslama Aralığı:</span>
           </div>
 
-          <input
-            type="date"
-            value={historyStartDate}
-            onChange={(e) => {
-              const newStart = e.target.value;
-              setHistoryStartDate(newStart);
-              if (newStart && historyEndDate) {
-                setActiveQueryParam(newStart === historyEndDate ? newStart : `${newStart}_to_${historyEndDate}`);
-              }
-            }}
-            style={{
-              background: 'rgba(15, 23, 42, 0.9)',
-              border: '1px solid rgba(244, 63, 94, 0.4)',
-              color: '#fff',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              outline: 'none',
-              colorScheme: 'dark'
-            }}
-          />
-          <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>-</span>
-          <input
-            type="date"
-            value={historyEndDate}
-            onChange={(e) => {
-              const newEnd = e.target.value;
-              setHistoryEndDate(newEnd);
-              if (historyStartDate && newEnd) {
-                setActiveQueryParam(historyStartDate === newEnd ? newEnd : `${historyStartDate}_to_${newEnd}`);
-              }
-            }}
-            style={{
-              background: 'rgba(15, 23, 42, 0.9)',
-              border: '1px solid rgba(244, 63, 94, 0.4)',
-              color: '#fff',
-              padding: '6px 12px',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              outline: 'none',
-              colorScheme: 'dark'
-            }}
-          />
+          <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.6)', padding: '2px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', flexShrink: 0 }}>
+            <button
+              onClick={() => setCompareMode('preset')}
+              style={{ background: compareMode === 'preset' ? '#38bdf8' : 'transparent', color: compareMode === 'preset' ? '#0f172a' : '#94a3b8', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              Gün Bazlı Kıyaslama
+            </button>
+            <button
+              onClick={() => setCompareMode('month')}
+              style={{ background: compareMode === 'month' ? '#38bdf8' : 'transparent', color: compareMode === 'month' ? '#0f172a' : '#94a3b8', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              Ay Bazlı Kıyaslama
+            </button>
+            <button
+              onClick={() => setCompareMode('year')}
+              style={{ background: compareMode === 'year' ? '#38bdf8' : 'transparent', color: compareMode === 'year' ? '#0f172a' : '#94a3b8', border: 'none', padding: '4px 8px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+            >
+              Yıl Bazlı Kıyaslama
+            </button>
+          </div>
+
+          {compareMode === 'preset' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'nowrap' }}>
+              <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.6)', padding: '2px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                {[
+                  { id: '1d', label: '1g' },
+                  { id: '7d', label: '1h' },
+                  { id: '1m', label: '1a' },
+                  { id: '3m', label: '3a' },
+                  { id: '6m', label: '6a' },
+                  { id: '1y', label: '1y' },
+                  { id: '2y', label: '2y' }
+                ].map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => { setActiveQueryParam(preset.id); }}
+                    style={{ padding: '4px 6px', borderRadius: '4px', border: 'none', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', background: activeQueryParam === preset.id ? '#38bdf8' : 'transparent', color: activeQueryParam === preset.id ? '#0f172a' : '#94a3b8' }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(15, 23, 42, 0.6)', padding: '4px 8px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', flexShrink: 0 }}>
+                <input
+                  type="date"
+                  value={historyStartDate}
+                  onChange={(e) => setHistoryStartDate(e.target.value)}
+                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '0.85rem', outline: 'none', colorScheme: 'dark' }}
+                />
+                <span style={{ color: '#94a3b8', fontSize: '0.9rem' }}>-</span>
+                <input
+                  type="date"
+                  value={historyEndDate}
+                  onChange={(e) => setHistoryEndDate(e.target.value)}
+                  style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '0.85rem', outline: 'none', colorScheme: 'dark' }}
+                />
+                <button
+                  onClick={() => {
+                    if (historyStartDate && historyEndDate) {
+                      setActiveQueryParam(historyStartDate === historyEndDate ? historyStartDate : `${historyStartDate}_to_${historyEndDate}`);
+                    }
+                  }}
+                  style={{
+                    background: '#10b981', color: '#fff', padding: '4px 10px', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem', marginLeft: '4px'
+                  }}
+                >
+                  Göster
+                </button>
+              </div>
+            </div>
+          )}
+
+          {compareMode === 'month' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(15, 23, 42, 0.6)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', flexShrink: 0 }}>
+              <Calendar size={16} color="#38bdf8" />
+              <input
+                type="month"
+                value={selectedMonth}
+                min="2024-08"
+                max="2026-08"
+                onChange={(e) => {
+                  setSelectedMonth(e.target.value);
+                }}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '0.82rem', outline: 'none', colorScheme: 'dark' }}
+              />
+              <button
+                onClick={() => {
+                  if (selectedMonth) {
+                    const yyyy = selectedMonth.split('-')[0];
+                    const mm = selectedMonth.split('-')[1];
+                    const days = new Date(parseInt(yyyy), parseInt(mm), 0).getDate();
+                    setActiveQueryParam(`${selectedMonth}-01_to_${selectedMonth}-${days}`);
+                  }
+                }}
+                style={{
+                  background: '#10b981', color: '#fff', padding: '4px 10px', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem'
+                }}
+              >
+                Göster
+              </button>
+            </div>
+          )}
+
+          {compareMode === 'year' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(15, 23, 42, 0.6)', padding: '6px 12px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.1)', flexShrink: 0 }}>
+              <Calendar size={16} color="#fbbf24" />
+              <select
+                value={selectedYear}
+                onChange={(e) => {
+                  setSelectedYear(e.target.value);
+                }}
+                style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', borderRadius: '6px', padding: '4px 8px', fontSize: '0.82rem', outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
+                <option value="2024">2024</option>
+              </select>
+              <button
+                onClick={() => {
+                  if (selectedYear) {
+                    setActiveQueryParam(`${selectedYear}-01-01_to_${selectedYear}-12-31`);
+                  }
+                }}
+                style={{
+                  background: '#10b981', color: '#fff', padding: '4px 10px', borderRadius: '6px', border: 'none', fontWeight: 600, cursor: 'pointer', fontSize: '0.8rem'
+                }}
+              >
+                Göster
+              </button>
+            </div>
+          )}
         </div>
 
         <button
+          className="table-toggle-btn"
           onClick={() => setShowTable(!showTable)}
           style={{
             display: 'flex',
@@ -212,11 +284,12 @@ export const Forecast: React.FC<ForecastProps> = ({
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             background: showTable ? '#10b981' : 'rgba(255, 255, 255, 0.05)',
-            color: showTable ? '#ffffff' : '#f8fafc'
+            color: showTable ? '#ffffff' : '#f8fafc',
+            flexShrink: 0
           }}
         >
           <TableIcon size={16} />
-          {showTable ? 'Tablo Görünümünü Kapat' : 'Değerleri Tablo Olarak Gör'}
+          {showTable ? 'Tabloyu Gizle' : 'Tabloyu Göster'}
         </button>
       </div>
 
@@ -225,45 +298,27 @@ export const Forecast: React.FC<ForecastProps> = ({
         seriesConfigs={seriesConfigs}
         toggleSeriesVisibility={toggleSeriesVisibility}
         changeSeriesChartType={changeSeriesChartType}
-        intersections={intersections}
-        showIntersections={showIntersections}
-        setShowIntersections={setShowIntersections}
         metrics={metrics}
-        onIntersectionSelect={(it) => setSelectedIntersection(it)}
         currencyMode={currencyMode}
         backendMetrics={backendMetrics}
         usdRate={usdRate}
       />
 
-      <HistoricalPerformanceSection 
-        selectedRange={historyStartDate && historyEndDate ? `${historyStartDate}_to_${historyEndDate}` : '1y'} 
-        currencyMode={currencyMode}
-      />
-
-      {showIntersections && intersections.length > 0 && (
-        <IntersectionList
-          intersections={intersections}
-          selectedIntersection={selectedIntersection}
-          onSelectIntersection={(it) => setSelectedIntersection(it)}
-        />
-      )}
-
       {/* Conditional Data Table for Forecast vs Actuals */}
-      {showTable && (
-        <div className="glass-panel" style={{ padding: '20px', marginTop: '10px', boxSizing: 'border-box', maxWidth: '100%', overflow: 'hidden' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div className={`glass-panel ${!showTable ? 'hide-on-screen' : ''}`} style={{ padding: '20px', marginTop: '10px', boxSizing: 'border-box', maxWidth: '100%', overflow: 'hidden' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <TableIcon size={18} color="#10b981" />
             Tahmin vs Gerçekleşen Değerler Tablosu
           </h3>
-          <div style={{ overflowX: 'auto', maxHeight: '400px', width: '100%' }}>
+          <div className="export-expandable-table" style={{ overflowX: 'auto', maxHeight: '400px', width: '100%' }}>
             <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
               <thead>
                 <tr style={{ background: '#0f172a', color: '#38bdf8', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Tarih / Saat</th>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Gerçekleşen PTF</th>
-                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>LightGBM PTF Tahmini</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Yapay Zeka Fiyat Tahmini</th>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Fark (Hata)</th>
-                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>MAPE (%)</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Hata Oranı</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,7 +328,7 @@ export const Forecast: React.FC<ForecastProps> = ({
                   const diff = Math.abs(lgbVal - ptfVal);
                   const mape = ptfVal > 0 ? (diff / ptfVal) * 100 : 0;
                   const symbolStr = currencyMode === 'USD' ? '$' : '₺';
-                  
+
                   return (
                     <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
                       <td style={{ padding: '8px 12px', color: '#94a3b8', whiteSpace: 'nowrap' }}>{row.timestamp}</td>
@@ -288,7 +343,10 @@ export const Forecast: React.FC<ForecastProps> = ({
             </table>
           </div>
         </div>
-      )}
+      <HistoricalPerformanceSection
+        selectedRange={activeQueryParam}
+        currencyMode={currencyMode}
+      />
 
     </div>
   );

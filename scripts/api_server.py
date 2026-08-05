@@ -18,6 +18,7 @@ sys.path.insert(0, str(project_root))
 import json
 import time
 import logging
+from typing import Optional
 import httpx
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
@@ -42,7 +43,8 @@ app = FastAPI(title="Enerji Fiyat Tahmini API", lifespan=lifespan)
 
 @app.get("/api/db-data")
 async def db_data(date: str = Query(..., description="Date param or 'latest'"),
-                  type: str = Query(..., description="Query type")):
+                  type: str = Query(..., description="Query type"),
+                  group_by: Optional[str] = Query(None, description="Aggregation level: hour, day, month")):
     """Serves energy data from PostgreSQL, same logic as query_db.py."""
     try:
         engine = get_db_engine()
@@ -60,6 +62,21 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
             with engine.connect() as conn:
                 res = conn.execute(text(sql)).mappings().all()
                 data = [dict(r) for r in res]
+                return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+
+        elif type == "prediction_bounds":
+            # Only expose dates where both a prediction and a realised PTF exist;
+            # the UI uses this to prevent selections outside the model history.
+            sql = """
+                SELECT
+                    MIN(g.target_ts::date) AS first_date,
+                    MAX(g.target_ts::date) AS last_date
+                FROM gold.ptf_predictions_daily g
+                JOIN raw_mcp_hourly m ON m.ts = g.target_ts;
+            """
+            with engine.connect() as conn:
+                row = conn.execute(text(sql)).mappings().first()
+                data = dict(row) if row else {}
                 return JSONResponse(content=json.loads(json.dumps(data, default=str)))
 
         elif type == "performance":
@@ -85,47 +102,37 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     res = conn.execute(text(sql), {"start_dt": start_dt, "end_dt": end_dt}).mappings().all()
                     data = [dict(r) for r in res]
                     return JSONResponse(content=json.loads(json.dumps(data, default=str)))
-            else:
-                days_map = {"1d": 1, "7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
+        if type == "performance":
+            if date in ["latest", "today", "1d"]:
+                target_clause = "g.target_ts::date = (SELECT MAX(g2.target_ts::date) FROM gold.ptf_predictions_daily g2 JOIN raw_mcp_hourly m2 ON g2.target_ts = m2.ts)"
+                params = {}
+            elif date in ["7d", "1m", "3m", "6m", "1y", "2y"]:
+                days_map = {"7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365, "2y": 730}
                 days = days_map.get(date, 365)
-                if date == "1d":
-                    sql = """
-                        SELECT 
-                            COUNT(*) as total_hours,
-                            ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
-                            ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
-                            ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
-                            ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
-                            ROUND(AVG(m.price_try), 2) as avg_actual,
-                            ROUND(AVG(g.predicted_mcp_usd), 2) as avg_predicted_usd,
-                            ROUND(AVG(m.price_usd), 2) as avg_actual_usd,
-                            ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd
-                        FROM gold.ptf_predictions_daily g
-                        JOIN raw_mcp_hourly m ON g.target_ts = m.ts
-                        WHERE m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly);
-                    """
-                else:
-                    days_map = {"1d": 1, "7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
-                    days = days_map.get(date, 365)
-                    sql = """
-                        SELECT 
-                            COUNT(*) as total_hours,
-                            ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
-                            ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
-                            ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
-                            ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
-                            ROUND(AVG(m.price_try), 2) as avg_actual,
-                            ROUND(AVG(g.predicted_mcp_usd), 2) as avg_predicted_usd,
-                            ROUND(AVG(m.price_usd), 2) as avg_actual_usd,
-                            ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd
-                        FROM gold.ptf_predictions_daily g
-                        JOIN raw_mcp_hourly m ON g.target_ts = m.ts
-                        WHERE g.target_ts::date >= ((SELECT MAX(ts::date) FROM raw_mcp_hourly) - (:days || ' days')::INTERVAL);
-                    """.replace(":days", str(days))
-                with engine.connect() as conn:
-                    res = conn.execute(text(sql)).mappings().all()
-                    data = [dict(r) for r in res]
-                    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+                target_clause = f"g.target_ts::date >= ((SELECT MAX(g2.target_ts::date) FROM gold.ptf_predictions_daily g2 JOIN raw_mcp_hourly m2 ON g2.target_ts = m2.ts) - INTERVAL '{days} days')"
+                params = {}
+            else:
+                target_clause = "g.target_ts::date = :dt"
+                params = {"dt": date}
+
+            sql = f"""
+                SELECT 
+                    ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
+                    ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                    ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
+                    ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd,
+                    ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
+                    ROUND(AVG(m.price_try), 2) as avg_actual,
+                    ROUND(AVG(g.predicted_mcp_usd), 2) as avg_predicted_usd,
+                    ROUND(AVG(m.price_usd), 2) as avg_actual_usd,
+                    COUNT(*) as total_hours
+                FROM gold.ptf_predictions_daily g
+                JOIN raw_mcp_hourly m ON g.target_ts = m.ts
+                WHERE {target_clause};
+            """
+            with engine.connect() as conn:
+                res = conn.execute(text(sql), params).mappings().all()
+                return JSONResponse(content=json.loads(json.dumps([dict(r) for r in res], default=str)))
 
         elif type == "today_performance" or type == "range_performance":
             if "_to_" in date:
@@ -136,8 +143,8 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
             elif date in ["latest", "today", "1d"]:
                 target_clause = "m.ts::date = (SELECT MAX(ts::date) FROM raw_mcp_hourly WHERE price_try IS NOT NULL)"
                 params = {}
-            elif date in ["7d", "1m", "3m", "6m", "1y"]:
-                days_map = {"7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365}
+            elif date in ["7d", "1m", "3m", "6m", "1y", "2y"]:
+                days_map = {"7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365, "2y": 730}
                 days = days_map.get(date, 365)
                 target_clause = f"m.ts::date >= ((SELECT MAX(ts::date) FROM raw_mcp_hourly WHERE price_try IS NOT NULL) - INTERVAL '{days} days')"
                 params = {}
@@ -145,20 +152,53 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                 target_clause = "m.ts::date = :dt"
                 params = {"dt": date}
 
-            sql = f"""
-                SELECT 
-                    TO_CHAR(m.ts, 'YYYY-MM-DD HH24:00') as timestamp,
-                    TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
-                    TO_CHAR(m.ts, 'HH24:00') as hour,
-                    ROUND(m.price_try, 2) as ptf,
-                    ROUND(m.price_usd, 2) as ptf_usd,
-                    ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast,
-                    ROUND(g.predicted_mcp_usd, 2) as lightgbm_forecast_usd
-                FROM raw_mcp_hourly m
-                LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
-                WHERE {target_clause}
-                ORDER BY m.ts;
-            """
+            if group_by == 'day':
+                sql = f"""
+                    SELECT 
+                        TO_CHAR(m.ts, 'YYYY-MM-DD') as timestamp,
+                        TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
+                        TO_CHAR(m.ts, 'DD.MM.YYYY') as hour,
+                        ROUND(AVG(m.price_try), 2) as ptf,
+                        ROUND(AVG(m.price_usd), 2) as ptf_usd,
+                        ROUND(AVG(g.predicted_mcp_try), 2) as lightgbm_forecast,
+                        ROUND(AVG(g.predicted_mcp_usd), 2) as lightgbm_forecast_usd
+                    FROM raw_mcp_hourly m
+                    LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
+                    WHERE {target_clause}
+                    GROUP BY TO_CHAR(m.ts, 'YYYY-MM-DD'), TO_CHAR(m.ts, 'DD.MM.YYYY')
+                    ORDER BY timestamp;
+                """
+            elif group_by == 'month':
+                sql = f"""
+                    SELECT 
+                        TO_CHAR(m.ts, 'YYYY-MM') as timestamp,
+                        TO_CHAR(m.ts, 'YYYY-MM') as date,
+                        TO_CHAR(m.ts, 'YYYY-MM') as hour,
+                        ROUND(AVG(m.price_try), 2) as ptf,
+                        ROUND(AVG(m.price_usd), 2) as ptf_usd,
+                        ROUND(AVG(g.predicted_mcp_try), 2) as lightgbm_forecast,
+                        ROUND(AVG(g.predicted_mcp_usd), 2) as lightgbm_forecast_usd
+                    FROM raw_mcp_hourly m
+                    LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
+                    WHERE {target_clause}
+                    GROUP BY TO_CHAR(m.ts, 'YYYY-MM')
+                    ORDER BY timestamp;
+                """
+            else:
+                sql = f"""
+                    SELECT 
+                        TO_CHAR(m.ts, 'YYYY-MM-DD HH24:00') as timestamp,
+                        TO_CHAR(m.ts, 'YYYY-MM-DD') as date,
+                        TO_CHAR(m.ts, 'HH24:00') as hour,
+                        ROUND(m.price_try, 2) as ptf,
+                        ROUND(m.price_usd, 2) as ptf_usd,
+                        ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast,
+                        ROUND(g.predicted_mcp_usd, 2) as lightgbm_forecast_usd
+                    FROM raw_mcp_hourly m
+                    LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
+                    WHERE {target_clause}
+                    ORDER BY m.ts;
+                """
             metrics_sql = f"""
                 SELECT 
                     COUNT(*) as total_hours,
@@ -188,21 +228,64 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                 return JSONResponse(content=json.loads(json.dumps(payload, default=str)))
 
         else:
-            sql_map = {
-                "mcp": "SELECT TO_CHAR(ts, 'HH24:00') as hour, price_try as price FROM raw_mcp_hourly WHERE ts::date = :dt ORDER BY ts",
-                "smp": "SELECT TO_CHAR(ts, 'HH24:00') as hour, system_marginal_price_try as price FROM raw_smp_hourly WHERE ts::date = :dt ORDER BY ts",
-                "kgup": "SELECT TO_CHAR(ts, 'HH24:00') as hour, total_mw as toplam FROM raw_kgup_hourly WHERE ts::date = :dt ORDER BY ts",
-                "load_forecast": "SELECT TO_CHAR(ts, 'HH24:00') as hour, load_forecast_mw as lep FROM raw_load_forecast_hourly WHERE ts::date = :dt ORDER BY ts",
-                "actual_generation": "SELECT TO_CHAR(ts, 'HH24:00') as hour, total_mw as total FROM raw_actual_generation_hourly WHERE ts::date = :dt ORDER BY ts",
-                "lightgbm": "SELECT TO_CHAR(target_ts, 'HH24:00') as hour, predicted_mcp_try as price FROM gold.ptf_predictions_daily WHERE target_ts::date = :dt ORDER BY target_ts",
-            }
-            if type in sql_map:
-                with engine.connect() as conn:
-                    res = conn.execute(text(sql_map[type]), {"dt": date}).mappings().all()
-                    data = [dict(r) for r in res]
-                    return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+            if "_to_" in date:
+                parts = date.split("_to_")
+                start_dt, end_dt = parts[0], parts[1]
+
+                if group_by == 'day':
+                    # Group by day (1..31) for monthly comparison
+                    sql_map = {
+                        "mcp": "SELECT TO_CHAR(ts, 'DD') as label, TO_CHAR(ts, 'DD.MM.YYYY') as date_str, ROUND(AVG(price_try), 2) as price FROM raw_mcp_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'DD'), TO_CHAR(ts, 'DD.MM.YYYY') ORDER BY date_str",
+                        "smp": "SELECT TO_CHAR(ts, 'DD') as label, TO_CHAR(ts, 'DD.MM.YYYY') as date_str, ROUND(AVG(system_marginal_price_try), 2) as price FROM raw_smp_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'DD'), TO_CHAR(ts, 'DD.MM.YYYY') ORDER BY date_str",
+                        "kgup": "SELECT TO_CHAR(ts, 'DD') as label, TO_CHAR(ts, 'DD.MM.YYYY') as date_str, ROUND(AVG(total_mw), 2) as toplam FROM raw_kgup_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'DD'), TO_CHAR(ts, 'DD.MM.YYYY') ORDER BY date_str",
+                        "load_forecast": "SELECT TO_CHAR(ts, 'DD') as label, TO_CHAR(ts, 'DD.MM.YYYY') as date_str, ROUND(AVG(load_forecast_mw), 2) as lep FROM raw_load_forecast_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'DD'), TO_CHAR(ts, 'DD.MM.YYYY') ORDER BY date_str",
+                        "actual_generation": "SELECT TO_CHAR(ts, 'DD') as label, TO_CHAR(ts, 'DD.MM.YYYY') as date_str, ROUND(AVG(total_mw), 2) as total FROM raw_actual_generation_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'DD'), TO_CHAR(ts, 'DD.MM.YYYY') ORDER BY date_str",
+                        "lightgbm": "SELECT TO_CHAR(target_ts, 'DD') as label, TO_CHAR(target_ts, 'DD.MM.YYYY') as date_str, ROUND(AVG(predicted_mcp_try), 2) as price FROM gold.ptf_predictions_daily WHERE target_ts::date >= :start_dt AND target_ts::date <= :end_dt GROUP BY TO_CHAR(target_ts, 'DD'), TO_CHAR(target_ts, 'DD.MM.YYYY') ORDER BY date_str",
+                    }
+                elif group_by == 'month':
+                    # Group by month (01..12) for yearly comparison
+                    sql_map = {
+                        "mcp": "SELECT TO_CHAR(ts, 'MM') as label, ROUND(AVG(price_try), 2) as price FROM raw_mcp_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'MM') ORDER BY label",
+                        "smp": "SELECT TO_CHAR(ts, 'MM') as label, ROUND(AVG(system_marginal_price_try), 2) as price FROM raw_smp_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'MM') ORDER BY label",
+                        "kgup": "SELECT TO_CHAR(ts, 'MM') as label, ROUND(AVG(total_mw), 2) as toplam FROM raw_kgup_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'MM') ORDER BY label",
+                        "load_forecast": "SELECT TO_CHAR(ts, 'MM') as label, ROUND(AVG(load_forecast_mw), 2) as lep FROM raw_load_forecast_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'MM') ORDER BY label",
+                        "actual_generation": "SELECT TO_CHAR(ts, 'MM') as label, ROUND(AVG(total_mw), 2) as total FROM raw_actual_generation_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'MM') ORDER BY label",
+                        "lightgbm": "SELECT TO_CHAR(target_ts, 'MM') as label, ROUND(AVG(predicted_mcp_try), 2) as price FROM gold.ptf_predictions_daily WHERE target_ts::date >= :start_dt AND target_ts::date <= :end_dt GROUP BY TO_CHAR(target_ts, 'MM') ORDER BY label",
+                    }
+                else:
+                    # Default: 24-hour profile average across the range
+                    sql_map = {
+                        "mcp": "SELECT TO_CHAR(ts, 'HH24:00') as hour, ROUND(AVG(price_try), 2) as price FROM raw_mcp_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'HH24:00') ORDER BY hour",
+                        "smp": "SELECT TO_CHAR(ts, 'HH24:00') as hour, ROUND(AVG(system_marginal_price_try), 2) as price FROM raw_smp_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'HH24:00') ORDER BY hour",
+                        "kgup": "SELECT TO_CHAR(ts, 'HH24:00') as hour, ROUND(AVG(total_mw), 2) as toplam FROM raw_kgup_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'HH24:00') ORDER BY hour",
+                        "load_forecast": "SELECT TO_CHAR(ts, 'HH24:00') as hour, ROUND(AVG(load_forecast_mw), 2) as lep FROM raw_load_forecast_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'HH24:00') ORDER BY hour",
+                        "actual_generation": "SELECT TO_CHAR(ts, 'HH24:00') as hour, ROUND(AVG(total_mw), 2) as total FROM raw_actual_generation_hourly WHERE ts::date >= :start_dt AND ts::date <= :end_dt GROUP BY TO_CHAR(ts, 'HH24:00') ORDER BY hour",
+                        "lightgbm": "SELECT TO_CHAR(target_ts, 'HH24:00') as hour, ROUND(AVG(predicted_mcp_try), 2) as price FROM gold.ptf_predictions_daily WHERE target_ts::date >= :start_dt AND target_ts::date <= :end_dt GROUP BY TO_CHAR(target_ts, 'HH24:00') ORDER BY hour",
+                    }
+
+                if type in sql_map:
+                    with engine.connect() as conn:
+                        res = conn.execute(text(sql_map[type]), {"start_dt": start_dt, "end_dt": end_dt}).mappings().all()
+                        data = [dict(r) for r in res]
+                        return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+                else:
+                    return JSONResponse(content=[])
             else:
-                return JSONResponse(content=[])
+                sql_map = {
+                    "mcp": "SELECT TO_CHAR(ts, 'HH24:00') as hour, price_try as price FROM raw_mcp_hourly WHERE ts::date = :dt ORDER BY ts",
+                    "smp": "SELECT TO_CHAR(ts, 'HH24:00') as hour, system_marginal_price_try as price FROM raw_smp_hourly WHERE ts::date = :dt ORDER BY ts",
+                    "kgup": "SELECT TO_CHAR(ts, 'HH24:00') as hour, total_mw as toplam FROM raw_kgup_hourly WHERE ts::date = :dt ORDER BY ts",
+                    "load_forecast": "SELECT TO_CHAR(ts, 'HH24:00') as hour, load_forecast_mw as lep FROM raw_load_forecast_hourly WHERE ts::date = :dt ORDER BY ts",
+                    "actual_generation": "SELECT TO_CHAR(ts, 'HH24:00') as hour, total_mw as total FROM raw_actual_generation_hourly WHERE ts::date = :dt ORDER BY ts",
+                    "lightgbm": "SELECT TO_CHAR(target_ts, 'HH24:00') as hour, predicted_mcp_try as price FROM gold.ptf_predictions_daily WHERE target_ts::date = :dt ORDER BY target_ts",
+                }
+                if type in sql_map:
+                    with engine.connect() as conn:
+                        res = conn.execute(text(sql_map[type]), {"dt": date}).mappings().all()
+                        data = [dict(r) for r in res]
+                        return JSONResponse(content=json.loads(json.dumps(data, default=str)))
+                else:
+                    return JSONResponse(content=[])
 
     except Exception as e:
         logger.error(f"DB query error: {e}")

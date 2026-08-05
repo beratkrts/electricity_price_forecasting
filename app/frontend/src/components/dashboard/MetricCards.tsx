@@ -40,7 +40,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ metrics }) => {
           %{metrics.mapeEpnet}
         </div>
         <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
-          Ort. Tahmin: <strong>{formatCurrency(metrics.avgEpnetForecast, '₺')}</strong>
+          Ort. Fiyat Tahmini: <strong>{formatCurrency(metrics.avgEpnetForecast, '₺')}</strong>
         </div>
       </div>
 
@@ -48,15 +48,15 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ metrics }) => {
       <div className="glass-panel glass-panel-interactive" style={{ padding: '16px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>LightGBM MAPE</span>
-          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc' }}>
+          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(225, 29, 72, 0.15)', color: '#e11d48' }}>
             <Activity size={18} />
           </div>
         </div>
-        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#c084fc', fontFamily: 'Outfit' }}>
+        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#e11d48', fontFamily: 'Outfit' }}>
           %{metrics.mapeLightgbm}
         </div>
         <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
-          Ort. Tahmin: <strong>{formatCurrency(metrics.avgLightgbmForecast, '₺')}</strong>
+          Ort. Fiyat Tahmini: <strong>{formatCurrency(metrics.avgLightgbmForecast, '₺')}</strong>
         </div>
       </div>
 

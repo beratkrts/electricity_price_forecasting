@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { EnergyDataPoint, IntersectionPoint, SeriesConfig } from '../../types/energy';
 import { Crosshair } from 'lucide-react';
@@ -20,8 +20,21 @@ export const MainChart: React.FC<MainChartProps> = ({
   showConfidenceInterval,
   onIntersectionSelect
 }) => {
+  const [isLightMode, setIsLightMode] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('etkb_theme') === 'light' : false);
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsLightMode(document.documentElement.getAttribute('data-theme') === 'light');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
   const option = useMemo(() => {
     if (!data || data.length === 0) return {};
+
+    const isLight = isLightMode;
+    const gridLineColor = isLight ? 'rgba(0, 0, 0, 0.14)' : 'rgba(255, 255, 255, 0.12)';
+    const axisLabelColor = isLight ? '#475569' : '#94a3b8';
 
     const xAxisLabels = data.map((d) => `${d.date.slice(5)} ${d.hour}`);
 
@@ -96,46 +109,17 @@ export const MainChart: React.FC<MainChartProps> = ({
       });
     });
 
-    // Add Intersection Ping scatter series
-    if (showIntersections && intersections.length > 0) {
-      const pingData = intersections.map((it) => ({
-        name: `Kesişim: ${it.series1Name} & ${it.series2Name}`,
-        value: [it.xIndex, it.exactValue],
-        intersectionObj: it
-      }));
-
-      chartSeries.push({
-        name: 'Kesişim Pingleme',
-        type: 'effectScatter',
-        coordinateSystem: 'cartesian2d',
-        data: pingData,
-        symbolSize: 14,
-        showEffectOn: 'render',
-        rippleEffect: {
-          brushType: 'stroke',
-          scale: 4.5,
-          period: 2
-        },
-        itemStyle: {
-          color: '#f43f5e',
-          shadowBlur: 15,
-          shadowColor: '#f43f5e'
-        },
-        zlevel: 10
-      });
-    }
-
     return {
       backgroundColor: 'transparent',
       animation: true,
       animationDuration: 800,
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        borderColor: 'rgba(56, 189, 248, 0.3)',
+        backgroundColor: isLight ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+        borderColor: isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(56, 189, 248, 0.3)',
         borderWidth: 1,
         textStyle: {
-          color: '#f8fafc',
+          color: isLight ? '#0f172a' : '#f8fafc',
           fontSize: 12
         },
         axisPointer: {
@@ -147,11 +131,11 @@ export const MainChart: React.FC<MainChartProps> = ({
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
           const first = params[0];
-          let res = `<div style="font-weight:700;margin-bottom:6px;color:#38bdf8;">🕒 Saat: ${first.name}</div>`;
+          let res = `<div style="font-weight:700;margin-bottom:6px;color:${isLight ? '#0369a1' : '#38bdf8'};">🕒 Saat: ${first.name}</div>`;
           params.forEach((item: any) => {
             if (item.seriesName === 'Kesişim Pingleme' || item.seriesName.includes('Güven Aralığı Alt')) return;
             const val = typeof item.value === 'number' ? item.value.toLocaleString('tr-TR') : item.value;
-            res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;">
+            res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;color:${isLight ? '#0f172a' : '#f8fafc'};">
               <span>${item.marker} ${item.seriesName}:</span>
               <strong style="font-family:JetBrains Mono;">${val} ₺/MWh</strong>
             </div>`;
@@ -162,15 +146,15 @@ export const MainChart: React.FC<MainChartProps> = ({
       legend: {
         show: true,
         top: '2%',
-        right: '2%',
+        right: '4%',
         textStyle: {
-          color: '#94a3b8',
-          fontSize: 12
+          color: axisLabelColor,
+          fontSize: 11
         }
       },
       grid: {
         top: '12%',
-        left: '4%',
+        left: '3%',
         right: '4%',
         bottom: '15%',
         containLabel: true
@@ -180,37 +164,37 @@ export const MainChart: React.FC<MainChartProps> = ({
         data: xAxisLabels,
         boundaryGap: false,
         axisLine: {
-          lineStyle: { color: 'rgba(255, 255, 255, 0.15)' }
+          lineStyle: { color: isLight ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.15)' }
         },
         axisLabel: {
-          color: '#94a3b8',
+          color: axisLabelColor,
           fontSize: 11,
           rotate: data.length > 48 ? 45 : 0
         },
         splitLine: {
           show: true,
-          lineStyle: { color: 'rgba(255, 255, 255, 0.04)' }
+          lineStyle: { color: gridLineColor }
         }
       },
       yAxis: {
         type: 'value',
         name: '₺ / MWh',
         nameTextStyle: {
-          color: '#94a3b8',
+          color: axisLabelColor,
           fontSize: 12,
           padding: [0, 0, 0, 30]
         },
         axisLine: {
           show: true,
-          lineStyle: { color: 'rgba(255, 255, 255, 0.15)' }
+          lineStyle: { color: isLight ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.15)' }
         },
         axisLabel: {
-          color: '#94a3b8',
+          color: axisLabelColor,
           fontSize: 11,
           formatter: '{value} ₺'
         },
         splitLine: {
-          lineStyle: { color: 'rgba(255, 255, 255, 0.06)' }
+          lineStyle: { color: gridLineColor }
         }
       },
       dataZoom: [
@@ -236,7 +220,7 @@ export const MainChart: React.FC<MainChartProps> = ({
       ],
       series: chartSeries
     };
-  }, [data, seriesConfigs, intersections, showIntersections, showConfidenceInterval]);
+  }, [data, seriesConfigs, intersections, showIntersections, showConfidenceInterval, isLightMode]);
 
   const onChartClick = (params: any) => {
     if (params.seriesName === 'Kesişim Pingleme' && params.data?.intersectionObj && onIntersectionSelect) {

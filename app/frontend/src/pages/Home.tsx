@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { TomorrowForecastSection } from '../components/dashboard/TomorrowForecastSection';
+import { formatTimestampToDDMMYYYY } from '../utils/formatters';
 import { HistoricalPerformanceSection } from '../components/dashboard/HistoricalPerformanceSection';
 import { EnergyDataPoint, SeriesConfig, DateRangeState, TimeRangePreset, ChartTypeOption } from '../types/energy';
 import { TableIcon } from 'lucide-react';
@@ -81,11 +82,12 @@ export const Home: React.FC<HomeProps> = ({
             fontWeight: 600,
             cursor: 'pointer',
             transition: 'all 0.2s ease',
-            background: showTable ? '#10b981' : 'rgba(255, 255, 255, 0.05)',
-            color: showTable ? '#ffffff' : '#f8fafc'
+            background: showTable ? '#10b981' : 'rgba(255, 255, 255, 0.08)',
+            color: showTable ? '#ffffff' : 'var(--text-primary, #f8fafc)'
           }}
+          className="table-toggle-btn"
         >
-          {showTable ? 'Tabloyu Gizle' : 'Tablo Görünümü'}
+          {showTable ? 'Tabloyu Gizle' : 'Tabloyu Göster'}
         </button>
       </div>
     );
@@ -103,32 +105,31 @@ export const Home: React.FC<HomeProps> = ({
       />
 
       {/* Conditional Data Table for Future Forecasts */}
-      {showTable && (
-        <div className="glass-panel" style={{ padding: '20px', marginTop: '10px', boxSizing: 'border-box', maxWidth: '100%', overflow: 'hidden' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+      {/* Conditional Data Table for Future Forecasts */}
+      <div className={`glass-panel ${!showTable ? 'hide-on-screen' : ''}`} style={{ padding: '20px', marginTop: '10px', boxSizing: 'border-box', maxWidth: '100%', overflow: 'hidden' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <TableIcon size={18} color="#10b981" />
             Saatlik Gelecek Gün Tahminleri
           </h3>
-          <div style={{ overflowX: 'auto', maxHeight: '400px', width: '100%' }}>
+          <div className="export-expandable-table" style={{ overflowX: 'auto', maxHeight: '400px', width: '100%' }}>
             <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: '0.85rem', textAlign: 'left' }}>
               <thead>
-                <tr style={{ background: '#0f172a', color: '#c084fc', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
+                <tr style={{ background: '#0f172a', color: '#38bdf8', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Tarih / Saat</th>
-                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>LightGBM Tahmini (₺/MWh)</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Yapay Zeka Fiyat Tahmini ({currencyMode === 'USD' ? '$/MWh' : '₺/MWh'})</th>
                 </tr>
               </thead>
               <tbody>
                 {data.map((row, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{row.timestamp}</td>
-                    <td style={{ padding: '8px 12px', color: '#c084fc', fontWeight: 600 }}>{(row.lightgbmForecast).toLocaleString('tr-TR')} ₺</td>
+                    <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{formatTimestampToDDMMYYYY(row.timestamp)}</td>
+                    <td style={{ padding: '8px 12px', color: '#e11d48', fontWeight: 600 }}>{(row.lightgbmForecast).toLocaleString('tr-TR')} {currencyMode === 'USD' ? '$' : '₺'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
+      </div>
 
       {/* Independent Historical Performance Section */}
       <HistoricalPerformanceSection />
