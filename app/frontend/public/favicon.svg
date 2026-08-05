@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="etkbBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e11d48"/>
+      <stop offset="100%" stop-color="#9f1239"/>
+    </linearGradient>
+    <linearGradient id="etkbGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Red Circle Outer Badge -->
+  <circle cx="60" cy="60" r="56" fill="url(#etkbBg)" stroke="#fbbf24" stroke-width="3"/>
+  <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- Crescent and Star (Ay Yıldız Motif) -->
+  <path d="M 52,34 A 20,20 0 1,0 68,74 A 24,24 0 1,1 52,34 Z" fill="#ffffff"/>
+  
+  <!-- Star -->
+  <polygon points="76,46 79,53 86,54 81,59 82,66 76,62 70,66 71,59 66,54 73,53" fill="#ffffff"/>
+
+  <!-- Stylized Flame / Energy Drops (Enerji Motifi) -->
+  <path d="M 60,78 C 55,88 65,96 60,102 C 72,98 75,84 60,78 Z" fill="url(#etkbGold)"/>
+  <path d="M 46,84 C 42,91 50,97 46,101 C 55,98 57,88 46,84 Z" fill="#ffffff" opacity="0.9"/>
+</svg>

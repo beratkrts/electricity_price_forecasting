@@ -1,19 +1,15 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { CheckCircle2, Layers, TrendingUp, Activity, BarChart2 } from 'lucide-react';
-import { DashboardMetrics, EnergyDataPoint, IntersectionPoint, SeriesConfig, ChartTypeOption } from '../../types/energy';
-import { formatCurrency } from '../../utils/formatters';
+import { DashboardMetrics, EnergyDataPoint, SeriesConfig, ChartTypeOption } from '../../types/energy';
+import { formatCurrency, formatToDDMMYYYY } from '../../utils/formatters';
 
 interface TodayBenchmarkSectionProps {
   data: EnergyDataPoint[];
   seriesConfigs: SeriesConfig[];
   toggleSeriesVisibility: (id: string) => void;
   changeSeriesChartType: (id: string, chartType: ChartTypeOption) => void;
-  intersections: IntersectionPoint[];
-  showIntersections: boolean;
-  setShowIntersections: (show: boolean) => void;
   metrics: DashboardMetrics;
-  onIntersectionSelect?: (intersection: IntersectionPoint) => void;
   currencyMode?: 'TRY' | 'USD';
   backendMetrics?: any;
   usdRate?: number;
@@ -24,15 +20,19 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
   seriesConfigs,
   toggleSeriesVisibility,
   changeSeriesChartType,
-  intersections,
-  showIntersections,
-  setShowIntersections,
   metrics: _metrics,
-  onIntersectionSelect,
   currencyMode = 'TRY',
   backendMetrics,
   usdRate = 33.15
 }) => {
+  const [isLightMode, setIsLightMode] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('etkb_theme') === 'light' : false);
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsLightMode(document.documentElement.getAttribute('data-theme') === 'light');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
   const computedMetrics = useMemo(() => {
     if (!data || data.length === 0) {
       return {
@@ -104,6 +104,9 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
   const chartOption = useMemo(() => {
     if (!data || data.length === 0) return {};
 
+    const gridLineColor = isLightMode ? 'rgba(0, 0, 0, 0.14)' : 'rgba(255, 255, 255, 0.12)';
+    const axisLabelColor = isLightMode ? '#475569' : '#94a3b8';
+
     const isMultiDay = data.length > 24;
     const xAxisLabels = data.map((d) => isMultiDay ? (d.timestamp || `${d.date} ${d.hour}`) : d.hour);
     const seriesList: any[] = [];
@@ -132,46 +135,25 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
         lineStyle: {
           width: isRealized ? 3.5 : 2.5,
           color: sc.color,
-          type: isRealized ? 'solid' : 'dashed'
+          type: 'solid'
         }
       });
     });
-
-    // Add Intersection Pings Scatter if enabled (Only for single-day charts)
-    if (!isMultiDay && showIntersections && intersections.length > 0) {
-      const pingData = intersections.map((it) => ({
-        name: `Kesişim: ${it.series1Name} & ${it.series2Name}`,
-        value: [it.xIndex, it.exactValue],
-        intersectionObj: it
-      }));
-
-      seriesList.push({
-        name: 'Kesişim Pingleme',
-        type: 'effectScatter',
-        coordinateSystem: 'cartesian2d',
-        data: pingData,
-        symbolSize: 14,
-        rippleEffect: { brushType: 'stroke', scale: 4.5, period: 2 },
-        itemStyle: { color: '#f43f5e', shadowBlur: 15, shadowColor: '#f43f5e' },
-        zlevel: 10
-      });
-    }
 
     return {
       backgroundColor: 'transparent',
       animationDuration: 800,
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'rgba(15, 23, 42, 0.95)',
-        borderColor: 'rgba(56, 189, 248, 0.3)',
-        textStyle: { color: '#fff', fontSize: 12 },
+        backgroundColor: isLightMode ? 'rgba(255, 255, 255, 0.95)' : 'rgba(15, 23, 42, 0.95)',
+        borderColor: isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(56, 189, 248, 0.3)',
+        textStyle: { color: isLightMode ? '#0f172a' : '#fff', fontSize: 12 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
-          let res = `<div style="font-weight:700;margin-bottom:6px;color:#38bdf8;">🕒 Saat: ${params[0].name}</div>`;
+          let res = `<div style="font-weight:700;margin-bottom:6px;color:${isLightMode ? '#0369a1' : '#38bdf8'};">🕒 Saat: ${params[0].name}</div>`;
           params.forEach((item: any) => {
-            if (item.seriesName === 'Kesişim Pingleme') return;
             const val = typeof item.value === 'number' ? item.value.toLocaleString('tr-TR') : item.value;
-            res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;">
+            res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;color:${isLightMode ? '#0f172a' : '#f8fafc'};">
               <span>${item.marker} ${item.seriesName}:</span>
               <strong style="font-family:JetBrains Mono;">${val} ${unitStr}</strong>
             </div>`;
@@ -182,65 +164,52 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
       legend: {
         top: '2%',
         right: '2%',
-        textStyle: { color: '#94a3b8', fontSize: 11 }
+        textStyle: { color: axisLabelColor, fontSize: 11 }
       },
-      grid: { top: '15%', left: '3%', right: '3%', bottom: '10%', containLabel: true },
+      grid: { top: '15%', left: '3%', right: '3%', bottom: '16%', containLabel: true },
       xAxis: {
         type: 'category',
         data: xAxisLabels,
-        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.15)' } },
-        axisLabel: { color: '#94a3b8', fontSize: 11 }
+        boundaryGap: seriesConfigs.some(s => s.visible && s.chartType === 'bar') ? true : false,
+        axisLine: { lineStyle: { color: isLightMode ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.15)' } },
+        axisLabel: { color: axisLabelColor, fontSize: 11 },
+        splitLine: { show: true, lineStyle: { color: gridLineColor } }
       },
       yAxis: {
         type: 'value',
         name: unitStr,
-        nameTextStyle: { color: '#94a3b8' },
-        axisLabel: { color: '#94a3b8', formatter: `{value} ${symbolStr}` },
-        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } },
+        nameTextStyle: { color: axisLabelColor, padding: [0, 0, 0, 10] },
+        axisLabel: { color: axisLabelColor },
+        splitLine: { show: true, lineStyle: { color: gridLineColor } },
         scale: true
       },
+      dataZoom: [{ type: 'inside' }, {
+        type: 'slider', bottom: '3%', height: 18,
+        borderColor: 'rgba(148, 163, 184, 0.24)',
+        fillerColor: 'rgba(56, 189, 248, 0.18)',
+        handleStyle: { color: '#38bdf8' },
+        textStyle: { color: '#94a3b8' }
+      }],
       series: seriesList
     };
-  }, [data, seriesConfigs, intersections, showIntersections, symbolStr, unitStr]);
-
-  const onChartClick = (params: any) => {
-    if (params.seriesName === 'Kesişim Pingleme' && params.data?.intersectionObj && onIntersectionSelect) {
-      onIntersectionSelect(params.data.intersectionObj);
-    }
-  };
+  }, [data, seriesConfigs, symbolStr, unitStr, isLightMode]);
 
   const currentDateStr = useMemo(() => {
     if (data && data.length > 0 && data[0].date) {
-      return data[0].date;
+      return formatToDDMMYYYY(data[0].date);
     }
     return 'Seçilen Tarih';
   }, [data]);
 
   return (
     <section style={{ marginBottom: '28px' }}>
-      
-      {/* Section Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-        <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.2)', color: '#38bdf8' }}>
-          <CheckCircle2 size={20} />
-        </div>
-        <div>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-            BÖLÜM 2: {currentDateStr} Model Tahminimiz vs EPİAŞ Gerçekleşen PTF Kıyaslaması
-          </h2>
-          <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
-            EPİAŞ ilan bülteni geldikten sonra model tahmini ile gerçek fiyatların karşılaştırılması ve hata payları ({currentDateStr})
-          </p>
-        </div>
-      </div>
-
       <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: '20px' }}>
-        
+
         {/* Sol Menü: Model Seçimi & Pingleme Switcher */}
         <div className="glass-panel" style={{ padding: '18px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Layers size={16} color="#38bdf8" />
-            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', margin: 0 }}>Karşılaştırılacak Seriler</h3>
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, color: '#fff', margin: 0 }}>Karşılaştırılan Veriler</h3>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -281,7 +250,7 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
                     {s.visible ? 'Açık' : 'Kapalı'}
                   </button>
                 </div>
-                
+
                 {/* Bottom row: Chart style selector */}
                 {s.visible && (
                   <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -317,42 +286,14 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
               </div>
             ))}
           </div>
-
-          {/* Kesişim Noktaları Pingleme Toggle Switcher */}
-          <div style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '14px' }}>
-            <label style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '0.8rem',
-              color: '#cbd5e1',
-              cursor: 'pointer',
-              background: 'rgba(244, 63, 94, 0.08)',
-              padding: '10px',
-              borderRadius: '8px',
-              border: '1px solid rgba(244, 63, 94, 0.2)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <TrendingUp size={15} color="#f43f5e" />
-                <span style={{ fontWeight: 600 }}>Kesişim Pingleme Göster</span>
-              </div>
-              <input
-                type="checkbox"
-                checked={showIntersections}
-                onChange={(e) => setShowIntersections(e.target.checked)}
-                style={{ accentColor: '#f43f5e', width: '16px', height: '16px', cursor: 'pointer' }}
-              />
-            </label>
-          </div>
-
         </div>
 
         {/* Sağ Taraf: Metrik Kartları + Kıyaslama Grafiği */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          
+
           {/* Top Cards for Realized vs Forecast Models */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-            
+
             {/* PTF Card */}
             <div className="glass-panel" style={{ padding: '16px', borderTop: '3px solid #38bdf8' }}>
               <div style={{ fontSize: '0.9rem', color: '#38bdf8', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -361,28 +302,32 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
               <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#fff', margin: '8px 0', fontFamily: 'Outfit' }}>
                 {formatCurrency(displayMetrics.avgPtf, symbolStr)}
               </div>
-              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>EPİAŞ Bülteni Kesinleşti</div>
+              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>EPİAŞ Kesinleşen Fiyatların Ortalaması</div>
             </div>
 
-            {/* LightGBM Card */}
-            <div className="glass-panel" style={{ padding: '16px', borderTop: '3px solid #c084fc' }}>
-              <div style={{ fontSize: '0.9rem', color: '#c084fc', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>LightGBM</span>
-                {displayMetrics.bestModel.includes('LightGBM') && <CheckCircle2 size={16} />}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>MAPE:</span>
-                <strong style={{ fontSize: '0.9rem', color: '#fff' }}>%{displayMetrics.mapeLightgbm}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>WAPE:</span>
-                <strong style={{ fontSize: '0.9rem', color: '#fff' }}>%{displayMetrics.wapeLightgbm}</strong>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ort. Tahmin:</span>
-                <strong style={{ fontSize: '0.8rem', color: '#c084fc' }}>{formatCurrency(displayMetrics.avgLightgbmForecast, symbolStr)}</strong>
-              </div>
-            </div>
+            {/* AI Model Card */}
+            {(() => {
+              const forecastSeries = seriesConfigs.find(s => s.id === 'lightgbmForecast' || s.isForecast);
+              const modelName = forecastSeries?.name || 'Yapay Zeka Fiyat Tahmini';
+              const modelColor = forecastSeries?.color || '#e11d48';
+
+              return (
+                <div className="glass-panel" style={{ padding: '16px', borderTop: `3px solid ${modelColor}` }}>
+                  <div style={{ fontSize: '0.9rem', color: modelColor, fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>{modelName}</span>
+                    <CheckCircle2 size={16} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Ortalama Hata Oranı (WAPE):</span>
+                    <strong style={{ fontSize: '0.9rem', color: '#fff' }}>%{displayMetrics.wapeLightgbm}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ortalama Fiyat Tahmini:</span>
+                    <strong style={{ fontSize: '0.8rem', color: '#fff' }}>{formatCurrency(displayMetrics.avgLightgbmForecast, symbolStr)}</strong>
+                  </div>
+                </div>
+              );
+            })()}
 
           </div>
 
@@ -392,15 +337,10 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
               <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', margin: 0 }}>
                 {currentDateStr} Sabah Tahmini vs EPİAŞ Gerçekleşen PTF Kıyaslama Grafiği
               </h3>
-              {showIntersections && intersections.length > 0 && (
-                <span className="ping-badge">
-                  ⚡ {intersections.length} Çapraz Kesişim Pinglemesi Aktif
-                </span>
-              )}
             </div>
 
             <div style={{ width: '100%', height: '340px' }}>
-              <ReactECharts option={chartOption} style={{ height: '100%', width: '100%' }} onEvents={{ click: onChartClick }} notMerge={true} />
+              <ReactECharts option={chartOption} style={{ height: '100%', width: '100%' }} notMerge={true} />
             </div>
           </div>
 

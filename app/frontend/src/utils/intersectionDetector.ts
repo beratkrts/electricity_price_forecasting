@@ -33,8 +33,8 @@ export function findSeriesIntersections(
         const diff1 = y1_s1 - y1_s2;
         const diff2 = y2_s1 - y2_s2;
 
-        // Check if sign of difference changes (indicating a cross)
-        if (diff1 * diff2 <= 0 && (diff1 !== 0 || diff2 !== 0)) {
+        // Check if sign of difference changes (indicating a cross) or exact touch at segment start
+        if (diff1 * diff2 < 0 || diff1 === 0) {
           // Linear interpolation ratio t in [0, 1]
           const denom = Math.abs(diff1) + Math.abs(diff2);
           const t = denom === 0 ? 0 : Math.abs(diff1) / denom;

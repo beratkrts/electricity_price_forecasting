@@ -1,31 +1,27 @@
-import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { Activity, Download, RefreshCw, Zap, Info, Home as HomeIcon, TrendingUp, BarChart2 } from 'lucide-react';
+import React from 'react';
+import { NavLink } from 'react-router-dom';
+import { Download, Home as HomeIcon, TrendingUp, BarChart2, Sun, Moon } from 'lucide-react';
+
+type CurrencyMode = 'TRY' | 'USD';
+type ThemeMode = 'dark' | 'light';
 
 interface HeaderProps {
-  onRefresh: () => void;
+  onRefresh?: () => void;
   onOpenExport: () => void;
-  intersectionCount: number;
-  currencyMode?: 'TRY' | 'USD';
-  onCurrencyChange?: (mode: 'TRY' | 'USD') => void;
+  intersectionCount?: number;
+  currencyMode?: CurrencyMode;
+  onCurrencyChange?: (mode: CurrencyMode) => void;
+  themeMode?: ThemeMode;
+  onToggleTheme?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  onRefresh,
   onOpenExport,
-  intersectionCount,
   currencyMode = 'TRY',
-  onCurrencyChange
+  onCurrencyChange,
+  themeMode = 'dark',
+  onToggleTheme
 }) => {
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const location = useLocation();
-
-  const handleRefreshClick = () => {
-    setIsRefreshing(true);
-    onRefresh();
-    setTimeout(() => setIsRefreshing(false), 600);
-  };
-
   const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
     display: 'flex',
     alignItems: 'center',
@@ -44,37 +40,24 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="glass-panel" style={{ margin: '16px 20px 0 20px', padding: '12px 20px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-        
+
         {/* Logo & Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #38bdf8 0%, #10b981 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 0 16px rgba(56, 189, 248, 0.35)'
-          }}>
-            <Zap size={22} color="#070a12" />
-          </div>
+          <img
+            src="/etkb-logo.png"
+            alt="T.C. Enerji ve Tabii Kaynaklar Bakanlığı"
+            style={{
+              width: '44px',
+              height: '44px',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 2px 8px rgba(225, 29, 72, 0.4))'
+            }}
+          />
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <h1 style={{ fontSize: '1.2rem', fontWeight: 700, letterSpacing: '-0.02em', color: '#fff', margin: 0 }}>
-                EPİAŞ PTF Tahminleme
+                ETKB Elektrik Fiyat Tahminleme
               </h1>
-              {location.pathname === '/forecast' && (
-                <span className="ping-badge" style={{ animation: intersectionCount > 0 ? 'ping-glow 2s infinite' : 'none' }}>
-                  <Activity size={12} />
-                  {intersectionCount} Kesişim
-                </span>
-              )}
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-              <span style={{ fontSize: '0.68rem', color: '#fbbf24', background: 'rgba(251, 191, 36, 0.12)', padding: '1px 6px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                <Info size={10} /> Demo Modu Aktif
-              </span>
             </div>
           </div>
         </div>
@@ -97,14 +80,14 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Controls */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          
+
           {/* TRY / USD Currency Mode Switcher */}
           <div style={{ display: 'flex', background: 'rgba(15, 23, 42, 0.8)', padding: '3px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
             <button
               onClick={() => onCurrencyChange && onCurrencyChange('TRY')}
               style={{
                 background: currencyMode === 'TRY' ? 'linear-gradient(135deg, #38bdf8 0%, #0284c7 100%)' : 'transparent',
-                color: currencyMode === 'TRY' ? '#0f172a' : '#94a3b8',
+                color: currencyMode === 'TRY' ? '#ffffffff' : '#94a3b8',
                 border: 'none',
                 padding: '5px 12px',
                 borderRadius: '6px',
@@ -123,7 +106,7 @@ export const Header: React.FC<HeaderProps> = ({
               onClick={() => onCurrencyChange && onCurrencyChange('USD')}
               style={{
                 background: currencyMode === 'USD' ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)' : 'transparent',
-                color: currencyMode === 'USD' ? '#0f172a' : '#94a3b8',
+                color: currencyMode === 'USD' ? '#ffffffff' : '#94a3b8',
                 border: 'none',
                 padding: '5px 12px',
                 borderRadius: '6px',
@@ -140,26 +123,27 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </div>
 
-          {/* Refresh button */}
+          {/* Light / Dark Theme Switcher */}
           <button
-            onClick={handleRefreshClick}
+            onClick={onToggleTheme}
             style={{
-              display: 'inline-flex',
+              display: 'flex',
               alignItems: 'center',
-              gap: '4px',
-              padding: '8px 14px',
+              gap: '6px',
+              padding: '6px 12px',
               borderRadius: '8px',
-              background: isRefreshing ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+              background: themeMode === 'light' ? 'rgba(241, 245, 249, 0.9)' : 'rgba(15, 23, 42, 0.8)',
               border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: isRefreshing ? '#38bdf8' : '#f8fafc',
-              fontSize: '0.85rem',
-              fontWeight: 600,
+              color: themeMode === 'light' ? '#0f172a' : '#fbbf24',
               cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: '0.8rem',
               transition: 'all 0.2s ease'
             }}
+            title={themeMode === 'light' ? 'Koyu Temaya Geç' : 'Açık Temaya Geç'}
           >
-            <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
-            {isRefreshing ? 'Yenileniyor...' : 'Verileri Yenile'}
+            {themeMode === 'light' ? <Moon size={16} color="#0f172a" /> : <Sun size={16} color="#fbbf24" />}
+            <span>{themeMode === 'light' ? 'Koyu Mod' : 'Açık Mod'}</span>
           </button>
 
           {/* Download Export button */}
@@ -181,7 +165,7 @@ export const Header: React.FC<HeaderProps> = ({
             }}
           >
             <Download size={15} />
-            Rapor İndir
+            İndir
           </button>
 
         </div>

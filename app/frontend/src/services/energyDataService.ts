@@ -40,9 +40,10 @@ export async function fetchNextDayForecast(): Promise<EnergyDataPoint[]> {
 /**
  * Fetches LATEST REALIZED PTF DAY comparison (31 Temmuz 2026) for Page 2 (Forecast).
  */
-export async function fetchLatestRealizedComparison(dateStr: string = 'latest'): Promise<{ series: EnergyDataPoint[]; metrics: any }> {
+export async function fetchLatestRealizedComparison(dateStr: string = 'latest', groupBy?: string): Promise<{ series: EnergyDataPoint[]; metrics: any }> {
   try {
-    const res = await fetch(`/api/db-data?date=${dateStr}&type=today_performance`);
+    const url = groupBy ? `/api/db-data?date=${dateStr}&type=today_performance&group_by=${groupBy}` : `/api/db-data?date=${dateStr}&type=today_performance`;
+    const res = await fetch(url);
     const payload = res.ok ? await res.json() : {};
     
     const data = Array.isArray(payload) ? payload : (payload.series || []);

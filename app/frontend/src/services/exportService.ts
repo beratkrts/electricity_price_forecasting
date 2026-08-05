@@ -9,6 +9,11 @@ export async function exportElementToPNG(elementId: string, filename: string = '
       return false;
     }
 
+    document.body.classList.add('is-exporting');
+    
+    // Give browser a tick to apply display block
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     const canvas = await html2canvas(element, {
       scale: 2, // High resolution crisp rendering
       useCORS: true,
@@ -25,13 +30,15 @@ export async function exportElementToPNG(elementId: string, filename: string = '
   } catch (error) {
     console.error('PNG export failed:', error);
     return false;
+  } finally {
+    document.body.classList.remove('is-exporting');
   }
 }
 
 export async function exportElementToPDF(
   elementId: string,
   filename: string = 'enerji-tahmin-raporu.pdf',
-  reportTitle: string = 'EPİAŞ Enerji Fiyat Tahmin Raporu'
+  reportTitle: string = 'Enerji Fiyat Tahmin Raporu'
 ): Promise<boolean> {
   try {
     const element = document.getElementById(elementId);
@@ -39,6 +46,11 @@ export async function exportElementToPDF(
       console.error(`Export element #${elementId} not found`);
       return false;
     }
+
+    document.body.classList.add('is-exporting');
+    
+    // Give browser a tick to apply display block
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     const canvas = await html2canvas(element, {
       scale: 2,
@@ -48,50 +60,51 @@ export async function exportElementToPDF(
     });
 
     const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    
+    // Create PDF with exact canvas dimensions (plus header) for perfect aspect ratio
+    const headerHeight = Math.max(120, canvas.width * 0.06); // scale header height based on width
     const pdf = new jsPDF({
-      orientation: 'landscape',
-      unit: 'mm',
-      format: 'a4'
+      orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+      unit: 'px',
+      format: [canvas.width, canvas.height + headerHeight]
     });
 
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = pdf.internal.pageSize.getHeight();
 
-    // Dark PDF theme header background
+    // Dark PDF theme background
     pdf.setFillColor(11, 15, 25);
     pdf.rect(0, 0, pdfWidth, pdfHeight, 'F');
 
     // Header bar
     pdf.setFillColor(20, 27, 45);
-    pdf.rect(0, 0, pdfWidth, 18, 'F');
+    pdf.rect(0, 0, pdfWidth, headerHeight, 'F');
 
     // Report Title
+    const titleFontSize = Math.max(28, canvas.width * 0.018);
     pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(14);
-    pdf.text(reportTitle, 10, 12);
+    pdf.setFontSize(titleFontSize);
+    pdf.text(reportTitle, 60, headerHeight * 0.6);
 
     // Timestamp
-    pdf.setFontSize(9);
+    const timeFontSize = Math.max(16, canvas.width * 0.011);
+    pdf.setFontSize(timeFontSize);
     pdf.setTextColor(156, 163, 175);
     const timeStr = `Rapor Tarihi: ${new Date().toLocaleString('tr-TR')}`;
-    pdf.text(timeStr, pdfWidth - 60, 12);
+    
+    // Calculate exact width of timestamp string to align it properly to the right
+    const timeStrWidth = pdf.getStringUnitWidth(timeStr) * timeFontSize;
+    pdf.text(timeStr, pdfWidth - timeStrWidth - 60, headerHeight * 0.6);
 
-    // Calculate aspect ratio fit for canvas image
-    const margin = 10;
-    const availableWidth = pdfWidth - margin * 2;
-    const availableHeight = pdfHeight - 25 - margin;
-
-    const imgWidth = availableWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-    const finalHeight = Math.min(imgHeight, availableHeight);
-
-    pdf.addImage(imgData, 'JPEG', margin, 22, imgWidth, finalHeight);
+    // Add Image below header
+    pdf.addImage(imgData, 'JPEG', 0, headerHeight, canvas.width, canvas.height);
 
     pdf.save(filename);
     return true;
   } catch (error) {
     console.error('PDF export failed:', error);
     return false;
+  } finally {
+    document.body.classList.remove('is-exporting');
   }
 }

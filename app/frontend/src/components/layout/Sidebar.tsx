@@ -184,14 +184,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             border: '1px solid rgba(255, 255, 255, 0.06)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <BarChart2 size={16} color="#c084fc" />
+              <BarChart2 size={16} color="#e11d48" />
               <span>%95 Güven Aralığı Bantsı</span>
             </div>
             <input
               type="checkbox"
               checked={showConfidenceInterval}
               onChange={(e) => setShowConfidenceInterval(e.target.checked)}
-              style={{ accentColor: '#c084fc', width: '16px', height: '16px', cursor: 'pointer' }}
+              style={{ accentColor: '#e11d48', width: '16px', height: '16px', cursor: 'pointer' }}
             />
           </label>
 

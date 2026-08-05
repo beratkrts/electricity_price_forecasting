@@ -106,6 +106,10 @@ export const DatabaseExplorerSection: React.FC = () => {
   const chartOption = useMemo(() => {
     if (!mockTableData || mockTableData.length === 0 || !activeTableInfo) return {};
 
+    const isLight = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
+    const gridLineColor = isLight ? 'rgba(0, 0, 0, 0.14)' : 'rgba(255, 255, 255, 0.12)';
+    const axisLabelColor = isLight ? '#475569' : '#94a3b8';
+
     const xAxisLabels = mockTableData.map((d) => d.timestamp.slice(11));
     const numCols = activeTableInfo.columns;
     const colors = ['#38bdf8', '#10b981', '#fbbf24', '#c084fc', '#f43f5e'];
@@ -131,20 +135,28 @@ export const DatabaseExplorerSection: React.FC = () => {
       legend: {
         top: '2%',
         right: '2%',
-        textStyle: { color: '#94a3b8', fontSize: 11 }
+        textStyle: { color: axisLabelColor, fontSize: 11 }
       },
-      grid: { top: '15%', left: '3%', right: '3%', bottom: '10%', containLabel: true },
+      grid: { top: '15%', left: '3%', right: '3%', bottom: '16%', containLabel: true },
       xAxis: {
         type: 'category',
         data: xAxisLabels,
-        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.15)' } },
-        axisLabel: { color: '#94a3b8', fontSize: 11 }
+        axisLine: { lineStyle: { color: isLight ? 'rgba(0, 0, 0, 0.2)' : 'rgba(255, 255, 255, 0.15)' } },
+        axisLabel: { color: axisLabelColor, fontSize: 11 },
+        splitLine: { show: true, lineStyle: { color: gridLineColor } }
       },
       yAxis: {
         type: 'value',
-        axisLabel: { color: '#94a3b8' },
-        splitLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } }
+        axisLabel: { color: axisLabelColor },
+        splitLine: { lineStyle: { color: gridLineColor } }
       },
+      dataZoom: [{ type: 'inside' }, {
+        type: 'slider', bottom: '3%', height: 18,
+        borderColor: 'rgba(148, 163, 184, 0.24)',
+        fillerColor: 'rgba(56, 189, 248, 0.18)',
+        handleStyle: { color: '#38bdf8' },
+        textStyle: { color: '#94a3b8' }
+      }],
       series
     };
   }, [mockTableData, activeTableInfo, selectedTable]);
@@ -183,7 +195,7 @@ export const DatabaseExplorerSection: React.FC = () => {
           </div>
           <div>
             <h2 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', margin: 0 }}>
-              BÖLÜM 3: PostgreSQL Veritabanı Veri İnceleyici (Grafik & Tablo Çift Görünüm)
+              PostgreSQL Veritabanı Veri İnceleyici (Grafik & Tablo Çift Görünüm)
             </h2>
             <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
               İncelemek istediğiniz veritabanı tablosunu seçin; verileri hem Grafik hem de Tablo formatında sorgulayın
