@@ -17,6 +17,7 @@ export async function fetchNextDayForecast(): Promise<EnergyDataPoint[]> {
       const fItem = Array.isArray(forecastData) ? forecastData.find((x: any) => x.hour === hourStr) : null;
 
       const rawFcVal = fItem ? parseFloat(fItem.lightgbm_forecast || fItem.price) : 0;
+      const usdFcVal = fItem && fItem.lightgbm_forecast_usd !== undefined ? parseFloat(fItem.lightgbm_forecast_usd) : undefined;
 
       return {
         timestamp: `${targetDate} ${hourStr}`,
@@ -25,6 +26,7 @@ export async function fetchNextDayForecast(): Promise<EnergyDataPoint[]> {
         ptf: 0,
         epnetForecast: rawFcVal,
         lightgbmForecast: rawFcVal,
+        lightgbmForecastUsd: usdFcVal,
         hybridForecast: rawFcVal,
         upperBound: Math.round(rawFcVal * 1.05),
         lowerBound: Math.round(rawFcVal * 0.95),

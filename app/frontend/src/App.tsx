@@ -65,17 +65,39 @@ export const App: React.FC = () => {
   }, [currencyRates]);
 
   const convertDataCurrency = (dataPoints: EnergyDataPoint[]): EnergyDataPoint[] => {
-    if (currencyMode === 'TRY') return dataPoints;
-    return dataPoints.map(d => ({
-      ...d,
-      ptf: Number((d.ptf / usdRate).toFixed(2)),
-      epnetForecast: Number((d.epnetForecast / usdRate).toFixed(2)),
-      lightgbmForecast: Number((d.lightgbmForecast / usdRate).toFixed(2)),
-      hybridForecast: Number((d.hybridForecast / usdRate).toFixed(2)),
-      upperBound: Number((d.upperBound / usdRate).toFixed(2)),
-      lowerBound: Number((d.lowerBound / usdRate).toFixed(2)),
-      smf: d.smf ? Number((d.smf / usdRate).toFixed(2)) : undefined
-    }));
+    return dataPoints.map(d => {
+      // PTF (Actuals) values are historically fixed. NEVER apply live FX rate to them!
+      const ptfTry = d.ptf;
+      const ptfUsd = d.ptfUsd !== undefined ? d.ptfUsd : 0;
+      
+      // Forecasts (LightGBM) are predicted in USD. Apply live FX rate to get current TRY equivalent.
+      const lgbUsd = d.lightgbmForecastUsd !== undefined ? d.lightgbmForecastUsd : 0;
+      const lgbTry = d.lightgbmForecastUsd !== undefined ? Number((d.lightgbmForecastUsd * usdRate).toFixed(2)) : d.lightgbmForecast;
+
+      if (currencyMode === 'USD') {
+        return {
+          ...d,
+          ptf: ptfUsd,
+          epnetForecast: lgbUsd,
+          lightgbmForecast: lgbUsd,
+          hybridForecast: lgbUsd,
+          upperBound: Number((lgbUsd * 1.05).toFixed(2)),
+          lowerBound: Number((lgbUsd * 0.95).toFixed(2)),
+          smf: d.smf ? Number((d.smf / usdRate).toFixed(2)) : undefined
+        };
+      } else {
+        return {
+          ...d,
+          ptf: ptfTry,
+          epnetForecast: lgbTry,
+          lightgbmForecast: lgbTry,
+          hybridForecast: lgbTry,
+          upperBound: Number((lgbTry * 1.05).toFixed(2)),
+          lowerBound: Number((lgbTry * 0.95).toFixed(2)),
+          smf: d.smf
+        };
+      }
+    });
   };
 
   const displayNextDayData = useMemo(() => convertDataCurrency(nextDayData), [nextDayData, currencyMode, usdRate]);
