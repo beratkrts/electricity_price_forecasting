@@ -28,7 +28,9 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
   
   const [perfData, setPerfData] = useState<{
     wape: string;
+    wapeUsd: string;
     mape: string;
+    mapeUsd: string;
     mae: string;
     maeUsd: string;
     avgPredicted: string;
@@ -38,7 +40,9 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
     totalHours: number;
   }>({
     wape: '16.88',
+    wapeUsd: '16.92',
     mape: '18.42',
+    mapeUsd: '18.51',
     mae: '371.35',
     maeUsd: '11.20',
     avgPredicted: '2169.32',
@@ -59,7 +63,9 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
           const item = data[0];
           setPerfData({
             wape: item.wape || '16.88',
+            wapeUsd: item.wape_usd || '16.92',
             mape: item.mape || '18.42',
+            mapeUsd: item.mape_usd || '18.51',
             mae: item.mae || '371.35',
             maeUsd: item.mae_usd || '11.20',
             avgPredicted: item.avg_predicted || '2169.32',
@@ -90,6 +96,8 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
 
   const symbol = currencyMode === 'USD' ? '$' : '₺';
 
+  const wapeVal = currencyMode === 'USD' ? perfData.wapeUsd : perfData.wape;
+  const accuracyVal = (100 - parseFloat(wapeVal || '0')).toFixed(2);
   const maeVal = currencyMode === 'USD' ? perfData.maeUsd : perfData.mae;
   const avgPredVal = currencyMode === 'USD' ? perfData.avgPredictedUsd : perfData.avgPredicted;
   const avgActVal = currencyMode === 'USD' ? perfData.avgActualUsd : perfData.avgActual;
@@ -186,8 +194,8 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
-              <span style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '2px' }}>Ortalama Hata Oranı</span>
-              <strong style={{ color: '#10b981', fontSize: '1.2rem', fontFamily: 'Outfit' }}>%{perfData.wape}</strong>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>Model Doğruluğu (100 - WAPE)</span>
+                <strong style={{ color: '#10b981', fontSize: '1.2rem', fontFamily: 'Outfit' }}>%{accuracyVal}</strong>
             </div>
             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
               <span style={{ color: '#94a3b8', fontSize: '0.75rem', display: 'block', marginBottom: '2px' }}>Ortalama Mutlak Hata (MAE)</span>
@@ -222,8 +230,8 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
             <tbody>
               <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', background: 'transparent' }}>
                 <td style={{ padding: '12px', color: '#f43f5e', fontWeight: 600 }}>Yapay Zeka Fiyat Tahmin Modeli</td>
-                <td style={{ padding: '12px', color: '#fff' }}>{perfData.totalHours} Saat</td>
-                <td style={{ padding: '12px', color: '#10b981', fontWeight: 700 }}>%{perfData.wape}</td>
+                <td style={{ padding: '12px' }}>{formatNumber(Number(avgPredVal))} {symbol}</td>
+                <td style={{ padding: '12px', color: '#10b981', fontWeight: 700 }}>%{wapeVal}</td>
                 <td style={{ padding: '12px', color: '#38bdf8', fontWeight: 700 }}>{maeVal} {symbol}</td>
                 <td style={{ padding: '12px', color: '#fff', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(avgPredVal), 2)} {symbol}</td>
                 <td style={{ padding: '12px', color: '#fff', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(avgActVal), 2)} {symbol}</td>

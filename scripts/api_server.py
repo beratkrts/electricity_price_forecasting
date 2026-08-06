@@ -92,9 +92,11 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                         ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
                         ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
                         ROUND(AVG(m.price_try), 2) as avg_actual,
+                        ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd) / NULLIF(m.price_usd, 0) * 100), 2) as mape_usd,
+                        ROUND((SUM(ABS(g.predicted_mcp_usd - m.price_usd)) / NULLIF(SUM(m.price_usd), 0) * 100), 2) as wape_usd,
+                        ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd,
                         ROUND(AVG(g.predicted_mcp_usd), 2) as avg_predicted_usd,
-                        ROUND(AVG(m.price_usd), 2) as avg_actual_usd,
-                        ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd
+                        ROUND(AVG(m.price_usd), 2) as avg_actual_usd
                     FROM gold.ptf_predictions_daily g
                     JOIN raw_mcp_hourly m ON g.target_ts = m.ts
                     WHERE g.target_ts::date >= :start_dt AND g.target_ts::date <= :end_dt;
@@ -118,16 +120,19 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
 
             sql = f"""
                 SELECT 
+                    COUNT(*) as total_hours,
                     ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
                     ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
                     ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
-                    ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd,
                     ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
                     ROUND(AVG(m.price_try), 2) as avg_actual,
+                    ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd) / NULLIF(m.price_usd, 0) * 100), 2) as mape_usd,
+                    ROUND((SUM(ABS(g.predicted_mcp_usd - m.price_usd)) / NULLIF(SUM(m.price_usd), 0) * 100), 2) as wape_usd,
+                    ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd,
                     ROUND(AVG(g.predicted_mcp_usd), 2) as avg_predicted_usd,
-                    ROUND(AVG(m.price_usd), 2) as avg_actual_usd,
-                    COUNT(*) as total_hours
+                    ROUND(AVG(m.price_usd), 2) as avg_actual_usd
                 FROM gold.ptf_predictions_daily g
+
                 JOIN raw_mcp_hourly m ON g.target_ts = m.ts
                 WHERE {target_clause};
             """
