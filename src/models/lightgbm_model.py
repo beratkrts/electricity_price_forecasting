@@ -23,7 +23,9 @@ class LightGBMForecaster:
             'reg_lambda': 0.1,
             'min_child_samples': 20,
             'verbose': -1,
-            'random_state': 42
+            'random_state': 42,
+            'deterministic': True,
+            'force_col_wise': True,
         }
         self.model = None
         self.feature_columns = None

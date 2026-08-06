@@ -57,3 +57,8 @@ scratch/
 # Documentation folder
 docs/
 
+# Jupyter Notebooks & Heavy Docs
+*.ipynb
+*.pdf
+*.docx
+*.doc

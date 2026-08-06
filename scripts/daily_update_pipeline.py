@@ -91,8 +91,26 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         end_dt = pd.to_datetime(end_date_str)
         periods = [(start_dt, end_dt)]
     else:
-        # Default backfill range: monthly chunks from 2023-01-01 to today
-        monthly_starts = pd.date_range(start="2023-01-01", end=today_dt, freq="MS")
+        # Smart Auto-Detection: Check if database is empty for initial full backfill
+        db_has_data = False
+        try:
+            with db.engine.connect() as conn:
+                res = conn.execute(text("SELECT COUNT(*) FROM raw_mcp_hourly;")).scalar()
+                if res and res > 100:
+                    db_has_data = True
+        except Exception:
+            db_has_data = False
+
+        if db_has_data:
+            # Daily routine sync: check recent 2 months
+            sync_start = (today_dt - pd.DateOffset(months=2)).replace(day=1)
+            logger.info("ℹ️ Existing database detected. Running fast daily sync (recent 2 months)...")
+        else:
+            # Initial first-time run: full historical backfill from 2023-01-01
+            sync_start = pd.to_datetime("2023-01-01")
+            logger.info("📦 Empty database detected. Triggering initial full historical backfill from 2023-01-01...")
+
+        monthly_starts = pd.date_range(start=sync_start, end=today_dt, freq="MS")
         periods = [
             (m_start, min(m_start + pd.offsets.MonthEnd(1), today_dt))
             for m_start in monthly_starts
