@@ -1,76 +1,76 @@
-# Enerji-Fiyat-Tahimi
-# ⚡ EPİAŞ Elektrik Piyasası Fiyat Tahminleme - Veri Çekme Botu (ETL Extract Phase)
+# ⚡ EPİAŞ Enerji Fiyat Tahmini & Yapay Zeka Dashboard
+![Project Status](https://img.shields.io/badge/Status-Production_Ready-success)
+![Docker](https://img.shields.io/badge/Docker-Enabled-blue)
+![React](https://img.shields.io/badge/Frontend-React_Vite-cyan)
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-teal)
 
-Bu proje, Türkiye Elektrik Piyasası'nda (EPİAŞ) Piyasa Takas Fiyatı (PTF) tahmini yapacak makine öğrenmesi modellerini beslemek amacıyla geliştirilmiş uçtan uca bir veri mühendisliği projesinin **Veri Çıkarma (Extract)** katmanıdır. 
+Bu proje, Türkiye Elektrik Piyasası'nda (EPİAŞ) **Gün Öncesi Piyasası (GÖP) Piyasa Takas Fiyatını (PTF)** tahmin etmek için tasarlanmış, uçtan uca (End-to-End) bir **Yapay Zeka (AI) ve Veri Mühendisliği** platformudur. 
 
-Projenin temel amacı, elektrik piyasası fiyatlarını etkileyen saatlik takip parametrelerini (arz-talep dengesi, piyasa derinliği ve kaynak bazlı üretim) EPİAŞ Şeffaflık Platformu 2.0 API'si üzerinden otomatik olarak toplayıp, ETL veri boru hattına (pipeline) entegre etmektir.
+Proje; sadece veri çekmekle kalmaz, meteorolojik ve makroekonomik verilerle zenginleştirilmiş gelişmiş Makine Öğrenmesi (LightGBM) algoritmalarını eğitir, günlük olarak otomatik tahmin üretir ve sonuçları modern bir web arayüzünde (Dashboard) analiz eder.
 
-## 🚀 Proje Mimarisi
+---
 
-Sistem, profesyonel bir veri mimarisi standartlarına uygun olarak tasarlanmıştır:
+## 🚀 Proje Mimarisi ve Özellikler
 
-1. **Extract (Bu Repo):** Python ve `eptr2` kütüphanesi kullanılarak hedeflenen saatlik piyasa verileri JSON formatında çekilir.
-2. **Transform & Load (ETL):** Çekilen verilerdeki eksik saatler (NULL) doldurulur, tarih formatları eşitlenir ve "Zaman" (Timestamp) sütunu üzerinden birleştirilerek (JOIN) PostgreSQL veritabanına aktarılır.
-3. **Machine Learning (ML):** Veritabanından okunan yapılandırılmış veriler (XGBoost / LightGBM) algoritmalarıyla eğitilerek ertesi günün fiyat tahminlemesi yapılır.
+Sistem, profesyonel bir veri mimarisi standartlarına uygun olarak 4 temel ayaktan oluşur:
 
-## 📊 Çekilen "Altın" Özellikler (Features)
+### 1. 🔄 Veri Mühendisliği & Akıllı ETL Pipeline
+* **Çoklu Veri Kaynağı:** EPİAŞ Şeffaflık Platformu (Arz/Talep, Fiyatlar), Yahoo Finance (Canlı USD/TRY, Brent Petrol), ve Open-Meteo API (Saatlik Meteoroloji Tahminleri).
+* **Akıllı Backfill & Günlük Senkronizasyon:** Veritabanı ilk kez ayağa kalktığında otomatik olarak geçmiş 2 yıllık (730 gün) veriyi indirir ve modeli eğitir. Sonrasında günlük cron-job olarak sadece eksik günleri (son 2 ay) günceller.
+* **Medallion Mimarisi:** PostgreSQL üzerinde `raw` (ham veri) ve `gold` (tahmin sonuçları) tabloları şeklinde yapılandırılmıştır. T+1 mantığıyla hedefler daima tam "yarını" gösterecek şekilde hizalanır.
 
-Makine öğrenmesi modelinde Boyut Laneti'ne (Curse of Dimensionality) düşmemek için yalnızca fiyat korelasyonu en yüksek olan "Altın" saatlik veriler hedeflenmiştir:
+### 2. 🧠 Yapay Zeka (AI) Modellemesi
+* **LightGBM:** Geçmiş fiyat gecikmeleri (Lags), tatil günleri, döviz kurları, sıcaklık tahminleri ve arz-talep oranları gibi onlarca özelliği kullanan optimize edilmiş model.
+* **Hedef Dönüşümü (Target Transformation):** Fiyat volatilitesini (dalgalanmasını) yönetmek için Hareketli Ağırlıklı Ortalama (MWA - Residual Learning) ve baz modelleme stratejileri içerir.
+* **Sabitlik (Reproducibility):** Model, farklı ortamlarda milimetrik olarak aynı sonuçları üretecek şekilde deterministik olarak yapılandırılmıştır.
 
-*   **Fiyat Metrikleri:** PTF (Piyasa Takas Fiyatı) ve SMF (Sistem Marjinal Fiyatı)
-*   **Talep (Tüketim) Metrikleri:** Yük Tahmini (Load Plan) ve Gerçekleşen Tüketim
-*   **Arz (Üretim) Metrikleri:** Toplam KGÜP, Kaynak Bazlı KGÜP (Doğalgaz, Rüzgar, Kömür vb. kırılımlar) ve Gerçekleşen Üretim
-*   **Piyasa Derinliği:** Gün Öncesi Piyasası (GÖP) İşlem Hacmi
+### 3. ⚙️ FastAPI Backend Sunucusu
+* Modellerden çıkan tahminleri, tarihi gerçekleşen PTF verilerini ve gerçek zamanlı hata metriklerini (WAPE, MAPE, MAE) hesaplayıp Frontend'e REST API üzerinden sunar.
+* Dolar (USD) bazlı hataların anlık hesaplamasını yaparak yanıltıcı kur manipülasyonlarını engeller.
 
-## 🛠️ Kurulum ve Ön Gereksinimler
+### 4. 📊 Modern React Dashboard (Frontend)
+* **Glassmorphism Tasarım:** Son derece şık, kullanıcı deneyimi odaklı, karanlık mod (Dark Mode) destekli modern arayüz.
+* **Çift Para Birimi (TRY / USD):** Kullanıcı verileri TL veya Dolar cinsinden anlık olarak (canlı kura bölerek/çarparak) inceleyebilir. Geçmiş verilerin orijinal dolar değerlerini bozmadan en sağlıklı finansal dönüşümü yapar.
+* **Dinamik Performans Metrikleri:** Seçilen tarih aralıklarına (1 Ay, 3 Ay vb.) göre modelin ne kadar hata yaptığını (WAPE) anlık olarak veritabanından sorgulayıp grafiğe döker.
 
-Projeyi yerel ortamınızda çalıştırmak için aşağıdaki adımları izleyin:
+---
 
-**1. Gerekli Kütüphaneleri Yükleyin:**
-\`\`\`bash
-pip install eptr2 python-dotenv pandas
-\`\`\`
+## 🛠️ Hızlı Başlangıç (Docker ile Kurulum)
 
-**2. Çevre Değişkenlerini (Environment Variables) Ayarlayın:**
-Proje ana dizininde bir `.env` dosyası oluşturun ve EPİAŞ Şeffaflık Platformu giriş bilgilerinizi ekleyin:
-\`\`\`env
-EPIAS_USERNAME=sisteme_kayitli_mail_adresiniz@mail.com
+Projeyi yerel ortamınızda (veritabanı, backend, frontend ve günlük pipeline ile) ayağa kaldırmanın en kolay yolu Docker kullanmaktır.
+
+**1. Çevre Değişkenlerini Ayarlayın:**
+Ana dizinde bir `.env` dosyası oluşturun ve bilgilerinizi girin:
+```env
+EPIAS_USERNAME=mail_adresiniz@mail.com
 EPIAS_PASSWORD=sifreniz
-\`\`\`
-*(Not: Güvenlik sebebiyle `.env` dosyası `.gitignore` içine eklenmeli ve asla GitHub'a pushlanmamalıdır.)*
 
-## 🐳 Docker ile Hızlı Kurulum
+# Opsiyonel - Veritabanı ayarları
+POSTGRES_USER=myuser
+POSTGRES_PASSWORD=mypassword
+POSTGRES_DB=energy_db
+POSTGRES_HOST=postgres_db
+POSTGRES_PORT=5432
+```
 
-Projeyi veritabanı (PostgreSQL) ve 7/24 otomatik veri çekme daemon servisi ile birlikte tek komutla çalıştırmak için:
-
+**2. Docker Compose'u Çalıştırın:**
 ```bash
 docker compose up --build -d
 ```
 
-Kapsamlı Docker mimarisi ve komut rehberi için [docs/docker_guide.md](file:///Users/beratkaratasoglu/etkb_intern_project/enerji_fiyat_tahmini/docs/docker_guide.md) dokümanını inceleyebilirsiniz.
+Bu komut ile:
+* PostgreSQL veritabanı kurulacak.
+* Pipeline otomatik devreye girip geçmiş verileri indirecek ve ilk Yapay Zeka modelini eğitecek.
+* FastAPI backend `http://localhost:8000` adresinde yayına başlayacak.
+* React Dashboard `http://localhost:3000` adresinde kullanıma hazır olacak.
 
+---
 
-## 💻 Kullanım
+## 📂 Repoda Neler Var?
+* `app/frontend/`: React + Vite + TypeScript ile yazılmış modern Dashboard uygulaması.
+* `scripts/`: Günlük veri çekme, ETL, ve tahmin işlemlerini yürüten Python boru hatları (pipeline).
+* `src/`: Veritabanı (SQLAlchemy) bağlantıları ve Makine Öğrenmesi (LightGBM) sınıflarının çekirdek kodları.
+* `docs/`: Mimari planlar ve veri sözlüğü (Data Dictionary) gibi teknik dokümantasyonlar.
 
-Betik dosyası çalıştırıldığında belirtilen tarih aralığındaki tüm saatlik veriler `data/` klasörü içerisine ayrı JSON dosyaları olarak indirilir.
-
-\`\`\`bash
-python fetch_ml_features.py
-\`\`\`
-
-Örnek Konsol Çıktısı:
-\`\`\`text
-⚡ 2026-07-01 - 2026-07-02 Dönemi Saatlik ML Verileri Çekiliyor ⚡
-
--> [01_ptf] (mcp) servisi çağrılıyor...
-   [+] Başarılı! Dosya kaydedildi: data/01_ptf.json
--> [03_yuk_tahmini] (load-plan) servisi çağrılıyor...
-   [+] Başarılı! Dosya kaydedildi: data/03_yuk_tahmini.json
-...
-✅ Tüm işlemler tamamlandı. Veriler ETL ekibi için 'data' klasörüne dizildi.
-\`\`\`
-
-## 📌 Geliştirici Notları
-
-*   **eptr2 Entegrasyonu:** Toplam KGÜP ve Kaynak Bazlı KGÜP verileri, `eptr2` kütüphanesinin güncel yapısı gereği tek bir çağrıda (`kgup`) sütun kırılımlı olarak elde edilmektedir.
-*   **Hata Yönetimi:** Platformda verisi henüz girilmemiş saatler veya resmi tatil kaynaklı boşluklar sistem tarafından otomatik olarak "atlanacak" şekilde try-except bloklarıyla güvenceye alınmıştır.
+---
+*Not: Bu proje, T.C. Enerji ve Tabii Kaynaklar Bakanlığı (ETKB) staj projesi kapsamında geliştirilmiştir.*
