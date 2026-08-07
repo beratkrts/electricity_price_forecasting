@@ -99,7 +99,7 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                         ROUND(AVG(m.price_usd), 2) as avg_actual_usd
                     FROM gold.ptf_predictions_daily g
                     JOIN raw_mcp_hourly m ON g.target_ts = m.ts
-                    WHERE g.target_ts::date >= :start_dt AND g.target_ts::date <= :end_dt;
+                    WHERE DATE(g.target_ts AT TIME ZONE 'Europe/Istanbul') >= :start_dt AND DATE(g.target_ts AT TIME ZONE 'Europe/Istanbul') <= :end_dt;
                 """
                 with engine.connect() as conn:
                     res = conn.execute(text(sql), {"start_dt": start_dt, "end_dt": end_dt}).mappings().all()
@@ -107,15 +107,15 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     return JSONResponse(content=json.loads(json.dumps(data, default=str)))
         if type == "performance":
             if date in ["latest", "today", "1d"]:
-                target_clause = "g.target_ts::date = (SELECT MAX(g2.target_ts::date) FROM gold.ptf_predictions_daily g2 JOIN raw_mcp_hourly m2 ON g2.target_ts = m2.ts)"
+                target_clause = "DATE(g.target_ts AT TIME ZONE 'Europe/Istanbul') = (SELECT MAX(DATE(g2.target_ts AT TIME ZONE 'Europe/Istanbul')) FROM gold.ptf_predictions_daily g2 JOIN raw_mcp_hourly m2 ON g2.target_ts = m2.ts)"
                 params = {}
             elif date in ["7d", "1m", "3m", "6m", "1y", "2y"]:
                 days_map = {"7d": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365, "2y": 730}
                 days = days_map.get(date, 365)
-                target_clause = f"g.target_ts::date >= ((SELECT MAX(g2.target_ts::date) FROM gold.ptf_predictions_daily g2 JOIN raw_mcp_hourly m2 ON g2.target_ts = m2.ts) - INTERVAL '{days} days')"
+                target_clause = f"DATE(g.target_ts AT TIME ZONE 'Europe/Istanbul') >= ((SELECT MAX(DATE(g2.target_ts AT TIME ZONE 'Europe/Istanbul')) FROM gold.ptf_predictions_daily g2 JOIN raw_mcp_hourly m2 ON g2.target_ts = m2.ts) - INTERVAL '{days} days')"
                 params = {}
             else:
-                target_clause = "g.target_ts::date = :dt"
+                target_clause = "DATE(g.target_ts AT TIME ZONE 'Europe/Istanbul') = :dt"
                 params = {"dt": date}
 
             sql = f"""
