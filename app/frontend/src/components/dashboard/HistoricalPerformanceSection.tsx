@@ -5,9 +5,10 @@ import { formatNumber } from '../../utils/formatters';
 interface HistoricalPerformanceSectionProps {
   selectedRange?: string;
   currencyMode?: 'TRY' | 'USD';
+  usdRate?: number;
 }
 
-export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSectionProps> = ({ selectedRange, currencyMode = 'USD' }) => {
+export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSectionProps> = ({ selectedRange, currencyMode = 'USD', usdRate = 35.0 }) => {
   const [range, setRange] = useState<string>(selectedRange || '1d');
   const [viewType, setViewType] = useState<'cards' | 'table'>('cards');
   const [isLightMode, setIsLightMode] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('etkb_theme') === 'light' : false);
@@ -96,9 +97,16 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
 
   const symbol = currencyMode === 'USD' ? '$' : '₺';
 
-  const wapeVal = currencyMode === 'USD' ? perfData.wapeUsd : perfData.wape;
+  // Yüzdelik hata metrikleri (WAPE, MAPE) her zaman USD üzerinden hesaplanmalıdır.
+  // Çünkü geçmiş TRY verilerindeki kur dalgalanmaları veya veritabanındaki sabit kur 
+  // backfill işlemleri TRY hatalarını manipüle edebilir. Yüzde, para biriminden bağımsız gerçek başarıyı göstermelidir.
+  const wapeVal = perfData.wapeUsd;
   const accuracyVal = (100 - parseFloat(wapeVal || '0')).toFixed(2);
-  const maeVal = currencyMode === 'USD' ? perfData.maeUsd : perfData.mae;
+  
+  // MAE gibi mutlak hatalar (para birimli) güncel kur ile çarpılarak TRY'ye çevrilmeli.
+  const maeVal = currencyMode === 'USD' ? perfData.maeUsd : (parseFloat(perfData.maeUsd || '0') * usdRate).toFixed(2);
+
+  
   const avgPredVal = currencyMode === 'USD' ? perfData.avgPredictedUsd : perfData.avgPredicted;
   const avgActVal = currencyMode === 'USD' ? perfData.avgActualUsd : perfData.avgActual;
 
@@ -230,7 +238,7 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
             <tbody>
               <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)', background: 'transparent' }}>
                 <td style={{ padding: '12px', color: '#f43f5e', fontWeight: 600 }}>Yapay Zeka Fiyat Tahmin Modeli</td>
-                <td style={{ padding: '12px' }}>{formatNumber(Number(avgPredVal))} {symbol}</td>
+                <td style={{ padding: '12px' }}>{perfData.totalHours} Saat</td>
                 <td style={{ padding: '12px', color: '#10b981', fontWeight: 700 }}>%{wapeVal}</td>
                 <td style={{ padding: '12px', color: '#38bdf8', fontWeight: 700 }}>{maeVal} {symbol}</td>
                 <td style={{ padding: '12px', color: '#fff', fontFamily: 'JetBrains Mono' }}>{formatNumber(Number(avgPredVal), 2)} {symbol}</td>

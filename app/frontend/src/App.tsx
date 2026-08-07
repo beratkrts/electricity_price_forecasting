@@ -15,7 +15,7 @@ import { CurrencyRate } from './types/currency';
 import { INITIAL_CURRENCY_RATES, fetchMarketData } from './services/fxService';
 
 import { fetchNextDayForecast, fetchLatestRealizedComparison } from './services/energyDataService';
-import { calculateDashboardMetrics } from './utils/mathHelpers';
+import { formatDashboardMetrics } from './utils/mathHelpers';
 
 export const App: React.FC = () => {
   // Global Data State
@@ -110,11 +110,14 @@ export const App: React.FC = () => {
     new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   );
 
+  const [backendMetrics, setBackendMetrics] = useState<any>({});
+
   const loadData = async () => {
     const nextDay = await fetchNextDayForecast();
     const compResult = await fetchLatestRealizedComparison(dateRange.startDate || 'latest');
     setNextDayData(nextDay);
     setComparisonData(compResult.series || []);
+    setBackendMetrics(compResult.metrics || {});
   };
 
   useEffect(() => {
@@ -144,8 +147,8 @@ export const App: React.FC = () => {
 
 
   const metrics = useMemo(() => {
-    return calculateDashboardMetrics(comparisonData, 0);
-  }, [comparisonData]);
+    return formatDashboardMetrics(backendMetrics, currencyMode, usdRate);
+  }, [backendMetrics, currencyMode, usdRate]);
 
   const toggleSeriesVisibility = (id: string) => {
     setSeriesConfigs((prev) =>
@@ -188,6 +191,7 @@ export const App: React.FC = () => {
                   dateRange={dateRange}
                   setDateRange={setDateRange}
                   currencyMode={currencyMode}
+                  usdRate={usdRate}
                 />
               } 
             />

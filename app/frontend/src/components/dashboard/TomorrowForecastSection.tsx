@@ -39,7 +39,7 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
     });
     const n = data.length;
     return {
-      lgb: Math.round(sumL / n)
+      lgb: sumL / n
     };
   }, [data]);
 
@@ -151,13 +151,16 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
         const res = await fetch('/api/db-data?date=1d&type=performance');
         if (!res.ok) return;
         const pData = await res.json();
-        if (mounted && Array.isArray(pData) && pData.length > 0 && pData[0].wape !== undefined && pData[0].wape !== null) {
-          const wapeVal = parseFloat(pData[0].wape);
-          const accVal = Math.max(0, 100 - wapeVal).toFixed(2);
-          setPerfMetric({
-            wape: pData[0].wape.toString(),
-            accuracy: accVal
-          });
+        if (mounted && Array.isArray(pData) && pData.length > 0) {
+          const wapeStr = pData[0].wape_usd !== undefined ? pData[0].wape_usd : pData[0].wape;
+          if (wapeStr !== undefined && wapeStr !== null) {
+            const wapeVal = parseFloat(wapeStr);
+            const accVal = Math.max(0, 100 - wapeVal).toFixed(2);
+            setPerfMetric({
+              wape: wapeStr.toString(),
+              accuracy: accVal
+            });
+          }
         }
       } catch (err) {
         console.error('Performance metric fetch error:', err);

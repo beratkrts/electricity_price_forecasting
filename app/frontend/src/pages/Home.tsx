@@ -13,6 +13,7 @@ interface HomeProps {
   dateRange: DateRangeState;
   setDateRange: React.Dispatch<React.SetStateAction<DateRangeState>>;
   currencyMode?: 'TRY' | 'USD';
+  usdRate?: number;
 }
 
 export const Home: React.FC<HomeProps> = ({
@@ -22,7 +23,8 @@ export const Home: React.FC<HomeProps> = ({
   changeSeriesChartType,
   dateRange,
   setDateRange,
-  currencyMode = 'USD'
+  currencyMode = 'USD',
+  usdRate = 35.0
 }) => {
   const [showTable, setShowTable] = useState<boolean>(false);
 
@@ -132,7 +134,7 @@ export const Home: React.FC<HomeProps> = ({
       </div>
 
       {/* Independent Historical Performance Section */}
-      <HistoricalPerformanceSection />
+      <HistoricalPerformanceSection currencyMode={currencyMode} usdRate={usdRate} />
     </div>
   );
 };

@@ -1,7 +1,12 @@
-import { DashboardMetrics, EnergyDataPoint } from '../types/energy';
+import { DashboardMetrics } from '../types/energy';
 
-export function calculateDashboardMetrics(data: EnergyDataPoint[], totalIntersections: number): DashboardMetrics {
-  if (!data || data.length === 0) {
+export function formatDashboardMetrics(
+  backendMetrics: any,
+  currencyMode: 'TRY' | 'USD' = 'USD',
+  usdRate: number = 33.15
+): DashboardMetrics {
+  
+  if (!backendMetrics || Object.keys(backendMetrics).length === 0) {
     return {
       avgPtf: 0,
       avgEpnetForecast: 0,
@@ -13,7 +18,7 @@ export function calculateDashboardMetrics(data: EnergyDataPoint[], totalIntersec
       wapeEpnet: 0,
       wapeLightgbm: 0,
       wapeHybrid: 0,
-      bestModel: 'Hibrit Model',
+      bestModel: 'LightGBM',
       totalIntersections: 0,
       peakHour: '00:00',
       maxPrice: 0,
@@ -21,85 +26,43 @@ export function calculateDashboardMetrics(data: EnergyDataPoint[], totalIntersec
     };
   }
 
-  let sumPtf = 0;
-  let sumEpnet = 0;
-  let sumLgb = 0;
-  let sumHybrid = 0;
+  const isUsd = currencyMode === 'USD';
 
-  let sumAbsErrEpnet = 0;
-  let sumAbsErrLgb = 0;
-  let sumAbsErrHybrid = 0;
+  // Yüzdelik Hatalar (WAPE / MAPE)
+  // Kur oynamalarından (FX distortion) etkilenmemesi için her zaman USD bazlı metrikleri baz alırız.
+  const mapeLightgbm = backendMetrics.mape_usd !== undefined ? Number(backendMetrics.mape_usd) : Number(backendMetrics.mape || 0);
+  const wapeLightgbm = backendMetrics.wape_usd !== undefined ? Number(backendMetrics.wape_usd) : Number(backendMetrics.wape || 0);
 
-  let sumAbsDiffEpnet = 0;
-  let sumAbsDiffLgb = 0;
-  let sumAbsDiffHybrid = 0;
+  // Fiyat Ortalamaları
+  // Eğer kullanıcı TRY seçtiyse ve veritabanı "avg_actual" gönderdiyse onu kullanırız.
+  // Eğer USD seçtiyse ve veritabanı "avg_actual_usd" gönderdiyse onu kullanırız, yoksa güncel kur ile böleriz.
+  const avgPtf = isUsd && backendMetrics.avg_actual_usd !== undefined 
+    ? Number(backendMetrics.avg_actual_usd) 
+    : isUsd ? Number(backendMetrics.avg_actual || 0) / (usdRate || 1) : Number(backendMetrics.avg_actual || 0);
 
-  let maxPrice = -Infinity;
-  let minPrice = Infinity;
-  let peakHour = data[0].hour;
+  const avgLightgbmForecast = isUsd && backendMetrics.avg_predicted_usd !== undefined 
+    ? Number(backendMetrics.avg_predicted_usd) 
+    : isUsd ? Number(backendMetrics.avg_predicted || 0) / (usdRate || 1) : Number(backendMetrics.avg_predicted || 0);
 
-  data.forEach((pt) => {
-    sumPtf += pt.ptf;
-    sumEpnet += pt.epnetForecast;
-    sumLgb += pt.lightgbmForecast;
-    sumHybrid += pt.hybridForecast;
-
-    // MAPE vs Actual PTF
-    if (pt.ptf > 0) {
-      sumAbsErrEpnet += Math.abs((pt.ptf - pt.epnetForecast) / pt.ptf);
-      sumAbsErrLgb += Math.abs((pt.ptf - pt.lightgbmForecast) / pt.ptf);
-      sumAbsErrHybrid += Math.abs((pt.ptf - pt.hybridForecast) / pt.ptf);
-    }
-    
-    // For WAPE (Sum of Absolute Differences)
-    sumAbsDiffEpnet += Math.abs(pt.ptf - pt.epnetForecast);
-    sumAbsDiffLgb += Math.abs(pt.ptf - pt.lightgbmForecast);
-    sumAbsDiffHybrid += Math.abs(pt.ptf - pt.hybridForecast);
-
-    if (pt.ptf > maxPrice) {
-      maxPrice = pt.ptf;
-      peakHour = pt.hour;
-    }
-    if (pt.ptf < minPrice) {
-      minPrice = pt.ptf;
-    }
-  });
-
-  const n = data.length;
-  const avgPtf = sumPtf / n;
-  const avgEpnetForecast = sumEpnet / n;
-  const avgLightgbmForecast = sumLgb / n;
-  const avgHybridForecast = sumHybrid / n;
-
-  const mapeEpnet = parseFloat(((sumAbsErrEpnet / n) * 100).toFixed(2));
-  const mapeLightgbm = parseFloat(((sumAbsErrLgb / n) * 100).toFixed(2));
-  const mapeHybrid = parseFloat(((sumAbsErrHybrid / n) * 100).toFixed(2));
-
-  const wapeEpnet = sumPtf > 0 ? parseFloat(((sumAbsDiffEpnet / sumPtf) * 100).toFixed(2)) : 0;
-  const wapeLightgbm = sumPtf > 0 ? parseFloat(((sumAbsDiffLgb / sumPtf) * 100).toFixed(2)) : 0;
-  const wapeHybrid = sumPtf > 0 ? parseFloat(((sumAbsDiffHybrid / sumPtf) * 100).toFixed(2)) : 0;
-
-  // Determine best model by lowest MAPE
-  let bestModel = 'Hibrit Model (Ensemble)';
-  const minMape = Math.min(mapeEpnet, mapeLightgbm, mapeHybrid);
-  if (minMape === mapeEpnet) bestModel = 'EPNet (CNN+LSTM)';
-  else if (minMape === mapeLightgbm) bestModel = 'LightGBM';
 
   return {
-    avgPtf: parseFloat(avgPtf.toFixed(2)),
-    avgEpnetForecast: parseFloat(avgEpnetForecast.toFixed(2)),
-    avgLightgbmForecast: parseFloat(avgLightgbmForecast.toFixed(2)),
-    avgHybridForecast: parseFloat(avgHybridForecast.toFixed(2)),
-    mapeEpnet,
+    avgPtf,
+    avgEpnetForecast: avgLightgbmForecast, // Dummy fallback for missing models
+    avgLightgbmForecast,
+    avgHybridForecast: avgLightgbmForecast,
+    
+    mapeEpnet: mapeLightgbm,
     mapeLightgbm,
-    mapeHybrid,
-    wapeEpnet,
+    mapeHybrid: mapeLightgbm,
+    
+    wapeEpnet: wapeLightgbm,
     wapeLightgbm,
-    wapeHybrid,
-    bestModel,
-    totalIntersections,
-    peakHour,
-    maxPrice: parseFloat(maxPrice.toFixed(2)),
-    minPrice: parseFloat(minPrice.toFixed(2))
+    wapeHybrid: wapeLightgbm,
+    
+    bestModel: 'LightGBM',
+    totalIntersections: backendMetrics.total_hours || 0,
+    peakHour: '00:00',
+    maxPrice: 0,
+    minPrice: 0
   };
 }

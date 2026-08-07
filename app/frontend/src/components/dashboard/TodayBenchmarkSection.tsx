@@ -11,8 +11,6 @@ interface TodayBenchmarkSectionProps {
   changeSeriesChartType: (id: string, chartType: ChartTypeOption) => void;
   metrics: DashboardMetrics;
   currencyMode?: 'TRY' | 'USD';
-  backendMetrics?: any;
-  usdRate?: number;
 }
 
 export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
@@ -21,9 +19,7 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
   toggleSeriesVisibility,
   changeSeriesChartType,
   metrics: _metrics,
-  currencyMode = 'TRY',
-  backendMetrics,
-  usdRate = 33.15
+  currencyMode = 'TRY'
 }) => {
   const [isLightMode, setIsLightMode] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('etkb_theme') === 'light' : false);
   useEffect(() => {
@@ -34,66 +30,8 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
     return () => observer.disconnect();
   }, []);
   const computedMetrics = useMemo(() => {
-    if (!data || data.length === 0) {
-      return {
-        avgPtf: 0,
-        mapeLightgbm: '0.00',
-        wapeLightgbm: '0.00',
-        avgLightgbmForecast: 0,
-        bestModel: 'LightGBM'
-      };
-    }
-    if (backendMetrics && backendMetrics.mape !== undefined && backendMetrics.mape !== null) {
-      const isUsd = currencyMode === 'USD';
-      const avgPtfVal = isUsd && backendMetrics.avg_actual_usd !== undefined
-        ? Number(backendMetrics.avg_actual_usd)
-        : Number(backendMetrics.avg_actual || 0) / (isUsd && usdRate ? usdRate : 1);
-      const avgLgbVal = isUsd && backendMetrics.avg_predicted_usd !== undefined
-        ? Number(backendMetrics.avg_predicted_usd)
-        : Number(backendMetrics.avg_predicted || 0) / (isUsd && usdRate ? usdRate : 1);
-
-      return {
-        avgPtf: avgPtfVal,
-        mapeLightgbm: String(backendMetrics.mape),
-        wapeLightgbm: String(backendMetrics.wape),
-        avgLightgbmForecast: avgLgbVal,
-        bestModel: 'LightGBM'
-      };
-    }
-
-    let sumPtf = 0;
-    let sumLgb = 0;
-    let sumAbsDiff = 0;
-    let sumRelErr = 0;
-    let countPtf = 0;
-
-    data.forEach((d) => {
-      const ptfVal = d.ptf || 0;
-      const lgbVal = d.lightgbmForecast || d.epnetForecast || 0;
-      sumLgb += lgbVal;
-
-      if (ptfVal > 0) {
-        sumPtf += ptfVal;
-        countPtf += 1;
-        const absDiff = Math.abs(lgbVal - ptfVal);
-        sumAbsDiff += absDiff;
-        sumRelErr += absDiff / ptfVal;
-      }
-    });
-
-    const avgPtf = countPtf > 0 ? sumPtf / countPtf : (sumLgb / data.length);
-    const avgLightgbmForecast = sumLgb / data.length;
-    const mape = countPtf > 0 ? (sumRelErr / countPtf) * 100 : 0;
-    const wape = sumPtf > 0 ? (sumAbsDiff / sumPtf) * 100 : 0;
-
-    return {
-      avgPtf,
-      mapeLightgbm: mape.toFixed(2),
-      wapeLightgbm: wape.toFixed(2),
-      avgLightgbmForecast,
-      bestModel: 'LightGBM'
-    };
-  }, [data, backendMetrics]);
+    return _metrics;
+  }, [_metrics]);
 
   const displayMetrics = computedMetrics;
 

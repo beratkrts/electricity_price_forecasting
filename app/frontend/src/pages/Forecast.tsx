@@ -5,7 +5,7 @@ import { EnergyDataPoint, SeriesConfig, DashboardMetrics, ChartTypeOption } from
 import { Calendar, Table as TableIcon, CheckCircle2 } from 'lucide-react';
 import { formatCurrency } from '../utils/formatters';
 import { fetchLatestRealizedComparison } from '../services/energyDataService';
-
+import { formatDashboardMetrics } from '../utils/mathHelpers';
 
 
 interface ForecastProps {
@@ -23,7 +23,7 @@ export const Forecast: React.FC<ForecastProps> = ({
   seriesConfigs,
   toggleSeriesVisibility,
   changeSeriesChartType,
-  metrics,
+  metrics: initialMetrics,
   currencyMode = 'USD',
   usdRate = 33.15
 }) => {
@@ -101,6 +101,13 @@ export const Forecast: React.FC<ForecastProps> = ({
       };
     });
   }, [rawChartData, currencyMode, usdRate]);
+
+  const currentMetrics = React.useMemo(() => {
+    if (Object.keys(backendMetrics).length > 0) {
+      return formatDashboardMetrics(backendMetrics, currencyMode, usdRate);
+    }
+    return initialMetrics;
+  }, [backendMetrics, currencyMode, usdRate, initialMetrics]);
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -298,10 +305,8 @@ export const Forecast: React.FC<ForecastProps> = ({
         seriesConfigs={seriesConfigs}
         toggleSeriesVisibility={toggleSeriesVisibility}
         changeSeriesChartType={changeSeriesChartType}
-        metrics={metrics}
+        metrics={currentMetrics}
         currencyMode={currencyMode}
-        backendMetrics={backendMetrics}
-        usdRate={usdRate}
       />
 
       {/* Conditional Data Table for Forecast vs Actuals */}
@@ -326,7 +331,12 @@ export const Forecast: React.FC<ForecastProps> = ({
                   const ptfVal = row.ptf || 0;
                   const lgbVal = row.lightgbmForecast || 0;
                   const diff = Math.abs(lgbVal - ptfVal);
-                  const mape = ptfVal > 0 ? (diff / ptfVal) * 100 : 0;
+                  
+                  // Always use USD values for percentage error to prevent FX distortion
+                  const ptfUsd = row.ptfUsd && row.ptfUsd > 0 ? row.ptfUsd : ptfVal;
+                  const lgbUsd = row.lightgbmForecastUsd !== undefined ? row.lightgbmForecastUsd : lgbVal;
+                  const mape = ptfUsd > 0 ? (Math.abs(lgbUsd - ptfUsd) / ptfUsd) * 100 : 0;
+                  
                   const symbolStr = currencyMode === 'USD' ? '$' : '₺';
 
                   return (
@@ -346,6 +356,7 @@ export const Forecast: React.FC<ForecastProps> = ({
       <HistoricalPerformanceSection
         selectedRange={activeQueryParam}
         currencyMode={currencyMode}
+        usdRate={usdRate}
       />
 
     </div>
