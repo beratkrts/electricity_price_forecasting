@@ -167,6 +167,14 @@ def run_daily_prediction(force: bool = False):
     target_tomorrow = (pd.Timestamp.now(tz="Europe/Istanbul") + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
     next_24h_index = pd.date_range(start=f"{target_tomorrow} 00:00:00+03:00", periods=24, freq="h")
     
+    # CRITICAL FIX: Ensure df_model actually has data up to "today" (target_tomorrow - 1 day)
+    target_today_str = (pd.Timestamp.now(tz="Europe/Istanbul")).strftime("%Y-%m-%d")
+    last_available_date = df_model.index.max().strftime("%Y-%m-%d")
+    
+    if last_available_date != target_today_str:
+        logger.error(f"❌ Cannot generate prediction for {target_tomorrow}! The latest data in DB is from {last_available_date}, but we need data for {target_today_str} to predict tomorrow. Aborting.")
+        raise RuntimeError(f"Data gap detected. Latest data: {last_available_date}, Expected: {target_today_str}")
+
     # Son mevcuttaki verileri future df olarak kopyala
     future_df = df_model.tail(24).copy()
     future_df.index = next_24h_index

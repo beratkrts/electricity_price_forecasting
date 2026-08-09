@@ -65,13 +65,12 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     """Executes the in-memory ETL pipeline for the specified date range or defaults to historical sync."""
     logger.info("🚀 Starting In-Memory Direct Database Ingestion Pipeline...")
 
-    # Load environment variables
-    env_path = next(
-        (path / ".env" for path in [Path.cwd(), *Path.cwd().parents] if (path / ".env").exists()),
-        None,
-    )
-    if env_path:
+    # Load environment variables robustly from project_root
+    env_path = project_root / ".env"
+    if env_path.exists():
         load_dotenv(env_path)
+    else:
+        logger.warning(f"⚠️ .env file not found at {env_path}")
 
     username = os.getenv("EPIAS_USERNAME") or os.getenv("EPTR_USERNAME")
     password = os.getenv("EPIAS_PASSWORD") or os.getenv("EPTR_PASSWORD")
