@@ -50,8 +50,12 @@ def create_gold_schema_if_not_exists(run_backfill_if_empty: bool = True):
     # Connection kapandıktan sonra backfill gerekiyorsa çalıştır
     if run_backfill_if_empty and count < 1000:
         logger.info("⚡ First-time deployment detected or empty gold table! Automatically running 2-year (730-day) backfill for dashboard history...")
-        from backfill_gold_predictions import backfill_historical_predictions
+        from scripts.backfill_pre_forecasts import run_pre_forecasts_backfill
+        from scripts.backfill_gold_predictions import backfill_historical_predictions
         try:
+            logger.info("Step 1: Running Pre-Forecasts Backfill (Load, Solar, Wind)...")
+            run_pre_forecasts_backfill(num_days=730)
+            logger.info("Step 2: Running PTF Model Backfill...")
             backfill_historical_predictions(num_days=730)
         except Exception as e:
             logger.error(f"Error during automatic backfill: {e}")
@@ -80,7 +84,10 @@ def load_all_historical_data():
             mc.usd_try,
             mc.brent_oil_usd,
             ng.gas_reference_price_try AS natural_gas_grf_try,
-            wp.hydro_water_energy_mwh
+            wp.hydro_water_energy_mwh,
+            pf.predicted_load_lag0,
+            pf.predicted_solar_lag0,
+            pf.predicted_wind_lag0
         FROM raw_mcp_hourly m
         LEFT JOIN raw_smp_hourly s ON m.ts = s.ts
         LEFT JOIN raw_load_forecast_hourly l ON m.ts = l.ts
@@ -96,6 +103,7 @@ def load_all_historical_data():
             FROM raw_master_water_energy_provision
             GROUP BY DATE(date_time)
         ) wp ON DATE(m.ts) = wp.entry_date
+        LEFT JOIN gold.kgup_load_pre_forecasts pf ON m.ts = pf.target_ts
         ORDER BY m.ts ASC;
     """)
 
@@ -242,6 +250,52 @@ def run_daily_prediction(force: bool = False):
     future_df['sin_hour'] = np.sin(2 * np.pi * future_df['hour'] / 24.0)
     future_df['cos_hour'] = np.cos(2 * np.pi * future_df['hour'] / 24.0)
     future_df['sin_dow'] = np.sin(2 * np.pi * future_df['dayofweek'] / 7.0)
+
+    # 🔮 7. YARIN İÇİN ÖN-TAHMİNLERİ (Pre-Forecasts) ÜRET VE FUTURE_DF'E EKLE!
+    from src.features.pre_forecasters import fetch_openmeteo_wind_history, build_pre_forecast_features, train_and_predict_pre_forecasters
+    
+    # Rüzgar verisini çek
+    try:
+        min_date = df_raw.index.min().strftime('%Y-%m-%d')
+        max_date = df_raw.index.max().strftime('%Y-%m-%d')
+        df_wind = fetch_openmeteo_wind_history(min_date, max_date)
+        
+        # Pre-forecaster özellikleri
+        df_pre_feat = build_pre_forecast_features(df_raw, df_wind)
+        train_pre_df = df_pre_feat.copy()
+        
+        # future_df'i pre-forecaster formatına sok
+        future_pre_df = future_df.copy()
+        if df_wind is not None:
+            future_pre_df = future_pre_df.join(df_wind)
+        future_pre_df = build_pre_forecast_features(future_pre_df, df_wind)
+        
+        # Tahmin et
+        preds_df = train_and_predict_pre_forecasters(train_pre_df, future_pre_df)
+        
+        # future_df'e ekle
+        future_df['predicted_load_lag0'] = preds_df['predicted_load_lag0']
+        future_df['predicted_solar_lag0'] = preds_df['predicted_solar_lag0']
+        future_df['predicted_wind_lag0'] = preds_df['predicted_wind_lag0']
+        
+        # DB'ye kaydet (Opsiyonel ama Audit için iyi olur)
+        insert_pre_sql = text("""
+            INSERT INTO gold.kgup_load_pre_forecasts (target_ts, predicted_load_lag0, predicted_solar_lag0, predicted_wind_lag0)
+            VALUES (:target_ts, :predicted_load_lag0, :predicted_solar_lag0, :predicted_wind_lag0)
+            ON CONFLICT (target_ts) DO UPDATE SET 
+                predicted_load_lag0 = EXCLUDED.predicted_load_lag0,
+                predicted_solar_lag0 = EXCLUDED.predicted_solar_lag0,
+                predicted_wind_lag0 = EXCLUDED.predicted_wind_lag0;
+        """)
+        recs = preds_df.reset_index().rename(columns={'index': 'target_ts', 'ts': 'target_ts'}).to_dict('records')
+        with engine.connect() as conn:
+            conn.execute(insert_pre_sql, recs)
+            conn.commit()
+    except Exception as e:
+        logger.error(f"Pre-forecast generation failed: {e}")
+        future_df['predicted_load_lag0'] = df_model['load_forecast_mw'].tail(24).values
+        future_df['predicted_solar_lag0'] = df_model['kgup_solar_mw'].tail(24).values
+        future_df['predicted_wind_lag0'] = df_model['kgup_wind_mw'].tail(24).values
     future_df['cos_dow'] = np.cos(2 * np.pi * future_df['dayofweek'] / 7.0)
     future_df['sin_month'] = np.sin(2 * np.pi * future_df['month'] / 12.0)
     future_df['cos_month'] = np.cos(2 * np.pi * future_df['month'] / 12.0)

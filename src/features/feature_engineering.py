@@ -194,7 +194,8 @@ def get_feature_columns(set_name='full', df=None):
         'hydro_pressure_ratio', 'renewable_pressure_ratio', 'solar_peak_pressure_ratio',
         'is_low_price_regime', 'is_zero_price_hour', 'price_volatility_24h',
         'smp_usd_lag_48', 'temperature_lag_48', 'brent_oil_lag_48', 'natural_gas_grf_lag_48',
-        'temp_forecast_lag0', 'cdh_cooling_load', 'hdh_heating_load', 'temp_diff_from_yesterday'
+        'temp_forecast_lag0', 'cdh_cooling_load', 'hdh_heating_load', 'temp_diff_from_yesterday',
+        'predicted_load_lag0', 'predicted_solar_lag0', 'predicted_wind_lag0'
     ]
     
     set_map = {

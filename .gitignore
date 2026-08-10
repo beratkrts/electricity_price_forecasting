@@ -62,3 +62,6 @@ docs/
 *.pdf
 *.docx
 *.doc
+
+# Exploratory Data Analysis & Sandbox
+eda/
