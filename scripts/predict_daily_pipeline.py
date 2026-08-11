@@ -37,11 +37,20 @@ def create_gold_schema_if_not_exists(run_backfill_if_empty: bool = True):
                 target_ts TIMESTAMP WITH TIME ZONE,
                 predicted_mcp_usd NUMERIC(10, 4),
                 predicted_mcp_try NUMERIC(10, 4),
+                predicted_mcp_usd_p10 NUMERIC(10, 4),
+                predicted_mcp_try_p10 NUMERIC(10, 4),
+                predicted_mcp_usd_p90 NUMERIC(10, 4),
+                predicted_mcp_try_p90 NUMERIC(10, 4),
                 model_name VARCHAR(50) DEFAULT 'LightGBM_v1',
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (target_ts, model_name)
             );
         """))
+        # Sütunlar yoksa ekle (Geriye dönük uyumluluk)
+        conn.execute(text("ALTER TABLE gold.ptf_predictions_daily ADD COLUMN IF NOT EXISTS predicted_mcp_usd_p10 NUMERIC(10, 4);"))
+        conn.execute(text("ALTER TABLE gold.ptf_predictions_daily ADD COLUMN IF NOT EXISTS predicted_mcp_try_p10 NUMERIC(10, 4);"))
+        conn.execute(text("ALTER TABLE gold.ptf_predictions_daily ADD COLUMN IF NOT EXISTS predicted_mcp_usd_p90 NUMERIC(10, 4);"))
+        conn.execute(text("ALTER TABLE gold.ptf_predictions_daily ADD COLUMN IF NOT EXISTS predicted_mcp_try_p90 NUMERIC(10, 4);"))
         conn.commit()
         
         # Tablo verisini kontrol et
@@ -132,6 +141,11 @@ def run_daily_prediction(force: bool = False):
     # 1. DB tablosunu doğrula
     create_gold_schema_if_not_exists()
 
+    # 🚀 YENİ EKLENEN KRİTİK ADIM: Ana veri yüklenmeden önce son 3 günün Rüzgar/Güneş tahminlerini üret
+    from scripts.backfill_pre_forecasts import run_pre_forecasts_backfill
+    logger.info("🌤️ Generating daily Pre-Forecasts (Wind, Solar, Load) for the last 3 days...")
+    run_pre_forecasts_backfill(num_days=3)
+
     engine = get_db_engine()
 
     # 2. Eğer force=False ise veritabanında yarının (gelecek günün) tahminlerinin tam (24 saat) olup olmadığını kontrol et
@@ -163,13 +177,34 @@ def run_daily_prediction(force: bool = False):
     # Son bilinen dolar kuru
     latest_usd_try = float(df_raw['usd_try'].iloc[-1]) if 'usd_try' in df_raw.columns else 35.0
 
-    # 4. LightGBM Eğitimi (Tüm Geçmiş Veri İle)
+    # 4. LightGBM Eğitimi (Tüm Geçmiş Veri İle - 3 Başlı Quantile Regression)
     X_train = df_model[feature_cols]
     y_train = df_model[target_col].values
 
-    forecaster = LightGBMForecaster()
+    # P50 (Medyan - Klasik Nokta Tahmini)
+    forecaster = LightGBMForecaster(params={
+        'objective': 'quantile', 'alpha': 0.50,
+        'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63,
+        'verbose': -1, 'random_state': 42
+    })
     forecaster.fit(X_train, y_train)
-    logger.info("🌲 LightGBM Model trained successfully on all historical data.")
+
+    # P10 (Alt Sınır - %10 Güven)
+    forecaster_p10 = LightGBMForecaster(params={
+        'objective': 'quantile', 'alpha': 0.10,
+        'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63,
+        'verbose': -1, 'random_state': 42
+    })
+    forecaster_p10.fit(X_train, y_train)
+
+    # P90 (Üst Sınır - %90 Güven)
+    forecaster_p90 = LightGBMForecaster(params={
+        'objective': 'quantile', 'alpha': 0.90,
+        'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63,
+        'verbose': -1, 'random_state': 42
+    })
+    forecaster_p90.fit(X_train, y_train)
+    logger.info("🌲 3-Head LightGBM Quantile Models (P10, P50, P90) trained successfully.")
 
     # 5. Gelecek 24 Saat İçin Inference Verisi Hazırlama (GÖP Piyasasında Tahmin Hedefi HER ZAMAN Yarındır - T+1)
     target_tomorrow = (pd.Timestamp.now(tz="Europe/Istanbul") + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
@@ -267,6 +302,9 @@ def run_daily_prediction(force: bool = False):
         # future_df'i pre-forecaster formatına sok
         future_pre_df = future_df.copy()
         if df_wind is not None:
+            overlap_cols = [c for c in df_wind.columns if c in future_pre_df.columns]
+            if overlap_cols:
+                future_pre_df = future_pre_df.drop(columns=overlap_cols)
             future_pre_df = future_pre_df.join(df_wind)
         future_pre_df = build_pre_forecast_features(future_pre_df, df_wind)
         
@@ -302,26 +340,50 @@ def run_daily_prediction(force: bool = False):
     future_df['sin_doy'] = np.sin(2 * np.pi * future_df['dayofyear'] / 365.25)
     future_df['cos_doy'] = np.cos(2 * np.pi * future_df['dayofyear'] / 365.25)
 
-    # Tahmin Üret
+    # Tahmin Üret (3 Model)
     preds_usd = forecaster.predict(future_df[feature_cols])
     preds_try = preds_usd * latest_usd_try
+
+    preds_usd_p10 = forecaster_p10.predict(future_df[feature_cols])
+    preds_try_p10 = preds_usd_p10 * latest_usd_try
+
+    preds_usd_p90 = forecaster_p90.predict(future_df[feature_cols])
+    preds_try_p90 = preds_usd_p90 * latest_usd_try
 
     results_df = pd.DataFrame({
         'target_ts': next_24h_index,
         'predicted_mcp_usd': np.round(preds_usd, 4),
         'predicted_mcp_try': np.round(preds_try, 4),
+        'predicted_mcp_usd_p10': np.round(preds_usd_p10, 4),
+        'predicted_mcp_try_p10': np.round(preds_try_p10, 4),
+        'predicted_mcp_usd_p90': np.round(preds_usd_p90, 4),
+        'predicted_mcp_try_p90': np.round(preds_try_p90, 4),
         'model_name': 'LightGBM_v1'
     })
 
     # 6. Veritabanı gold.ptf_predictions_daily Tablosuna Kaydet (Upsert / Insert)
     engine = get_db_engine()
     insert_sql = text("""
-        INSERT INTO gold.ptf_predictions_daily (target_ts, predicted_mcp_usd, predicted_mcp_try, model_name)
-        VALUES (:target_ts, :predicted_mcp_usd, :predicted_mcp_try, :model_name)
+        INSERT INTO gold.ptf_predictions_daily (
+            target_ts, predicted_mcp_usd, predicted_mcp_try,
+            predicted_mcp_usd_p10, predicted_mcp_try_p10,
+            predicted_mcp_usd_p90, predicted_mcp_try_p90,
+            model_name
+        )
+        VALUES (
+            :target_ts, :predicted_mcp_usd, :predicted_mcp_try,
+            :predicted_mcp_usd_p10, :predicted_mcp_try_p10,
+            :predicted_mcp_usd_p90, :predicted_mcp_try_p90,
+            :model_name
+        )
         ON CONFLICT (target_ts, model_name) 
         DO UPDATE SET 
             predicted_mcp_usd = EXCLUDED.predicted_mcp_usd,
             predicted_mcp_try = EXCLUDED.predicted_mcp_try,
+            predicted_mcp_usd_p10 = EXCLUDED.predicted_mcp_usd_p10,
+            predicted_mcp_try_p10 = EXCLUDED.predicted_mcp_try_p10,
+            predicted_mcp_usd_p90 = EXCLUDED.predicted_mcp_usd_p90,
+            predicted_mcp_try_p90 = EXCLUDED.predicted_mcp_try_p90,
             created_at = CURRENT_TIMESTAMP;
     """)
 

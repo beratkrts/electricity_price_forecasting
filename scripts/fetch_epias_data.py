@@ -172,14 +172,18 @@ class EpiasFetcher:
 
     def fetch_active_fullness(self, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
         """Fetches dam active fullness percentages into memory with retries."""
-        token = self.get_token()
-        if not token:
-            return []
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
         payload = {"startDate": start_iso, "endDate": end_iso}
         for attempt in range(1, self.max_retries + 1):
+            token = self.get_token()
+            if not token:
+                return []
+            headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
             try:
                 res = requests.post(ACTIVE_FULLNESS_URL, headers=headers, json=payload, timeout=60)
+                if res.status_code == 401:
+                    logger.warning("EPİAŞ API returned 401 Unauthorized. Token expired. Refreshing...")
+                    self._tgt_token = None
+                    continue
                 res.raise_for_status()
                 return find_record_list(res.json()) or []
             except Exception as e:
@@ -190,14 +194,18 @@ class EpiasFetcher:
 
     def fetch_water_energy_provision(self, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
         """Fetches dam water energy provision in memory with retries."""
-        token = self.get_token()
-        if not token:
-            return []
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
         payload = {"startDate": start_iso, "endDate": end_iso, "exportType": "CSV"}
         for attempt in range(1, self.max_retries + 1):
+            token = self.get_token()
+            if not token:
+                return []
+            headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
             try:
                 res = requests.post(WATER_ENERGY_PROVISION_URL, headers=headers, json=payload, timeout=60)
+                if res.status_code == 401:
+                    logger.warning("EPİAŞ API returned 401 Unauthorized. Token expired. Refreshing...")
+                    self._tgt_token = None
+                    continue
                 res.raise_for_status()
                 if "text/csv" in res.headers.get("Content-Type", "") or res.text.startswith("Tarih"):
                     res.encoding = "utf-8-sig"
@@ -212,14 +220,18 @@ class EpiasFetcher:
 
     def fetch_natural_gas_daily_price(self, start_iso: str, end_iso: str) -> List[Dict[str, Any]]:
         """Fetches natural gas daily reference price (GRF) into memory with retries."""
-        token = self.get_token()
-        if not token:
-            return []
-        headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
         payload = {"startDate": start_iso, "endDate": end_iso}
         for attempt in range(1, self.max_retries + 1):
+            token = self.get_token()
+            if not token:
+                return []
+            headers = {"Content-Type": "application/json", "Accept": "application/json", "TGT": token}
             try:
                 res = requests.post(NATURAL_GAS_PRICE_URL, headers=headers, json=payload, timeout=60)
+                if res.status_code == 401:
+                    logger.warning("EPİAŞ API returned 401 Unauthorized. Token expired. Refreshing...")
+                    self._tgt_token = None
+                    continue
                 res.raise_for_status()
                 return find_record_list(res.json()) or []
             except Exception as e:
