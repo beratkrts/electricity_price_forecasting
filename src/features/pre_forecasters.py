@@ -80,6 +80,10 @@ def build_pre_forecast_features(df_raw, df_wind):
     if df_wind is not None:
         df = df.join(df_wind)
     
+    # Çapraz platform ve tz-aware uyumluluğu için DatetimeIndex garantisi
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index, utc=True).tz_convert('Europe/Istanbul')
+
     df['hour'] = df.index.hour
     df['dayofweek'] = df.index.dayofweek
     df['month'] = df.index.month

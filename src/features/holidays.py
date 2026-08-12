@@ -34,8 +34,9 @@ def add_holiday_features(df):
         "2026-05-26", "2026-05-27", "2026-05-28", "2026-05-29", "2026-05-30"  # Kurban
     ]
     
-    # Index üzerinde çalışıyorsak, date'e çevirip kontrol edelim
-    dates = pd.Series(df_feat.index.date)
+    # Index üzerinde çalışıyorsak, DatetimeIndex yapıp date'e çevirelim
+    idx_dt = pd.to_datetime(df_feat.index, utc=True).tz_convert('Europe/Istanbul')
+    dates = pd.Series(idx_dt.date)
     
     is_fixed = dates.apply(lambda x: (x.month, x.day) in fixed_holidays)
     is_movable = dates.isin([pd.to_datetime(d).date() for d in movable_holidays])

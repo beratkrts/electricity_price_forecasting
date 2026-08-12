@@ -8,6 +8,10 @@ def build_base_features(df):
     """
     df_feat = df.copy()
     
+    # Çapraz platform ve tz-aware uyumluluğu için DatetimeIndex garantisi
+    if not isinstance(df_feat.index, pd.DatetimeIndex):
+        df_feat.index = pd.to_datetime(df_feat.index, utc=True).tz_convert('Europe/Istanbul')
+    
     # Calendar features
     df_feat['hour'] = df_feat.index.hour
     df_feat['dayofweek'] = df_feat.index.dayofweek
