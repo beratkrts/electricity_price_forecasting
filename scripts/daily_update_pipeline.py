@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Optional
 import pandas as pd
 from dotenv import load_dotenv
+from sqlalchemy import text
 
 from db.ingest_epias import EpiasDBIngestor
 from fetch_epias_data import (
@@ -88,6 +89,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     if start_date_str and end_date_str:
         start_dt = pd.to_datetime(start_date_str)
         end_dt = pd.to_datetime(end_date_str)
+        sync_start = start_dt
         periods = [(start_dt, end_dt)]
     else:
         # Smart Auto-Detection: Check if database is empty for initial full backfill
@@ -114,8 +116,6 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
             (m_start, min(m_start + pd.offsets.MonthEnd(1), today_dt))
             for m_start in monthly_starts
         ]
-
-    logger.info(f"Processing {len(periods)} execution period(s)...")
 
     logger.info(f"Processing {len(periods)} execution period(s)...")
 
@@ -246,21 +246,34 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
 
         time.sleep(0.5)
 
-    # 14. Macro Financial Indicators (yfinance USD/TRY & Brent Oil)
+    # 14. Macro Financial Indicators (USD/TRY & Brent Oil)
     try:
         logger.info("\n📈 Ingesting Macro Financial Indicators (USD/TRY & Brent Oil)...")
-        macro_data = fetch_macro_in_memory(start_date="2023-01-01")
+        macro_start = sync_start.strftime("%Y-%m-%d")
+        logger.info(f"  fetching macro range: {macro_start} -> today")
+        macro_data = fetch_macro_in_memory(start_date=macro_start)
         if macro_data:
             db.ingest_macro(macro_data, period_key="ALL")
     except Exception as e:
-        logger.warning(f"⚠️ [MACRO] Step skipped due to yfinance error: {e}")
+        logger.warning(f"⚠️ [MACRO] Step skipped due to error: {e}")
 
-    # 15. Live Weather Forecast (Open-Meteo Tomorrow Forecast)
+    # 15. Live Weather Forecast & Historical Forecast Seeding
     try:
         logger.info("\n🌤️ Ingesting Tomorrow's Live Weather Forecast...")
         weather_fc_data = fetch_tomorrow_weather_forecast_in_memory()
         if weather_fc_data:
             db.ingest_weather_forecast(weather_fc_data)
+
+        # Seed raw_weather_forecast_hourly from raw_weather_hourly for past dates on initial/clean installs
+        with db.engine.connect() as conn:
+            conn.execute(text("""
+                INSERT INTO raw_weather_forecast_hourly (ts, turkey_weighted_temperature_forecast_c)
+                SELECT ts, turkey_weighted_temperature_c 
+                FROM raw_weather_hourly 
+                WHERE turkey_weighted_temperature_c IS NOT NULL
+                ON CONFLICT (ts) DO NOTHING;
+            """))
+            conn.commit()
     except Exception as e:
         logger.warning(f"⚠️ [WEATHER_FORECAST] Step skipped due to error: {e}")
 

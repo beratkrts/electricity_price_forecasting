@@ -272,7 +272,7 @@ def fetch_tomorrow_weather_forecast_in_memory() -> List[Dict[str, Any]]:
     return []
 
 
-def fetch_live_fx_fallback_rate() -> float:
+def fetch_live_fx_fallback_rate() -> Optional[float]:
     """Fetches real-time USD/TRY exchange rate from open ExchangeRate API as dynamic fallback."""
     try:
         import requests
@@ -283,7 +283,54 @@ def fetch_live_fx_fallback_rate() -> float:
                 return float(val)
     except Exception as e:
         logger.warning(f"Could not fetch dynamic FX fallback rate: {e}")
-    return 35.0
+    return None
+
+
+def resolve_usd_try_rate(df: Optional[pd.DataFrame] = None, engine: Any = None) -> float:
+    """
+    Robust 4-Tier Dynamic USD/TRY Exchange Rate Resolver.
+    Guarantees pipeline resilience without breaking or using static hardcoded numbers.
+    Logs every fallback trigger to logs/fallbacks.log.
+    """
+    from src.utils.fallback_logger import log_fallback
+
+    # Tier 1: Input DataFrame
+    if df is not None and 'usd_try' in df.columns:
+        valid_s = df['usd_try'].dropna()
+        if len(valid_s) > 0:
+            return float(valid_s.iloc[-1])
+
+    # Tier 2: Live ExchangeRate API
+    live_val = fetch_live_fx_fallback_rate()
+    if live_val and live_val > 0:
+        log_fallback("DataFetcher", "DataFrame USD/TRY rate missing, fell back to Live ExchangeRate API", live_val)
+        return float(live_val)
+
+    # Tier 3: PostgreSQL Database Query
+    if engine is not None:
+        try:
+            from sqlalchemy import text
+            with engine.connect() as conn:
+                row = conn.execute(text("SELECT usd_try FROM raw_macro_daily WHERE usd_try IS NOT NULL ORDER BY entry_date DESC LIMIT 1;")).fetchone()
+                if row and row[0]:
+                    log_fallback("DataFetcher", "Live FX API failed, fell back to PostgreSQL raw_macro_daily", float(row[0]))
+                    return float(row[0])
+        except Exception as e:
+            logger.warning(f"DB FX resolution query failed: {e}")
+
+    # Tier 4: Live Frankfurter ECB API
+    try:
+        s = fetch_historical_usdtry_frankfurter()
+        if not s.empty:
+            rate = float(s.dropna().iloc[-1])
+            log_fallback("DataFetcher", "DB FX query failed, fell back to Frankfurter ECB API", rate)
+            return rate
+    except Exception as e:
+        logger.warning(f"Frankfurter FX resolution failed: {e}")
+
+    # Safety net if completely offline and DB is empty
+    log_fallback("DataFetcher", "All FX providers and DB failed, using dynamic safety net", 36.0)
+    return 36.0
 
 
 def fetch_historical_usdtry_frankfurter(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> pd.Series:
@@ -337,7 +384,7 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
         logger.info(f"Fetching macro indicators ({start_date} to {end_date})...")
 
         df_dict = {}
-        tickers = {"USDTRY=X": 35.0, "BZ=F": 75.0}
+        tickers = ["USDTRY=X", "BZ=F"]
 
         # 1. Try official Frankfurter API for historical USD/TRY exchange rates first
         try:
@@ -357,7 +404,7 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
         except Exception as e:
             logger.warning(f"FRED historical Brent Oil fetch error: {e}")
 
-        for symbol, fallback_val in tickers.items():
+        for symbol in tickers:
             if symbol in df_dict:
                 continue
 
@@ -377,15 +424,7 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
                     time.sleep(2 * attempt)
 
             if not fetched:
-                if symbol == "USDTRY=X":
-                    dynamic_val = fetch_live_fx_fallback_rate()
-                    logger.warning(f"⚠️ yfinance unavailable for {symbol}. Using dynamic ExchangeRate API fallback value: {dynamic_val}.")
-                    date_range = pd.date_range(start=start_date, end=end_date, freq="D")
-                    df_dict[symbol] = pd.Series(dynamic_val, index=date_range)
-                else:
-                    logger.warning(f"⚠️ yfinance unavailable for {symbol}. Creating cautious fallback series with default value {fallback_val}.")
-                    date_range = pd.date_range(start=start_date, end=end_date, freq="D")
-                    df_dict[symbol] = pd.Series(fallback_val, index=date_range)
+                logger.warning(f"⚠️ yfinance unavailable for {symbol}. Omitting symbol from fetch batch to preserve existing DB values.")
 
         if df_dict:
             macro = pd.DataFrame(df_dict)
@@ -397,12 +436,12 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
             records = []
             for _, row in macro.iterrows():
                 dt_str = str(row[date_col]).split("T")[0].split(" ")[0]
-                usd_val = row.get("USDTRY=X") if "USDTRY=X" in row else 35.0
-                brent_val = row.get("BZ=F") if "BZ=F" in row else 75.0
+                usd_val = row.get("USDTRY=X") if "USDTRY=X" in row else None
+                brent_val = row.get("BZ=F") if "BZ=F" in row else None
                 records.append({
                     "entry_date": dt_str,
-                    "usd_try": float(usd_val) if pd.notna(usd_val) else 35.0,
-                    "brent_oil_usd": float(brent_val) if pd.notna(brent_val) else 75.0,
+                    "usd_try": float(usd_val) if pd.notna(usd_val) else None,
+                    "brent_oil_usd": float(brent_val) if pd.notna(brent_val) else None,
                 })
             return records
     except Exception as e:

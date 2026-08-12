@@ -18,6 +18,7 @@ export function formatDashboardMetrics(
       wapeEpnet: 0,
       wapeLightgbm: 0,
       wapeHybrid: 0,
+      wapeOob: 0,
       bestModel: 'LightGBM',
       totalIntersections: 0,
       peakHour: '00:00',
@@ -32,6 +33,7 @@ export function formatDashboardMetrics(
   // Kur oynamalarından (FX distortion) etkilenmemesi için her zaman USD bazlı metrikleri baz alırız.
   const mapeLightgbm = backendMetrics.mape_usd !== undefined ? Number(backendMetrics.mape_usd) : Number(backendMetrics.mape || 0);
   const wapeLightgbm = backendMetrics.wape_usd !== undefined ? Number(backendMetrics.wape_usd) : Number(backendMetrics.wape || 0);
+  const wapeOob = backendMetrics.wape_oob_usd !== undefined ? Number(backendMetrics.wape_oob_usd) : Number(backendMetrics.wape_oob || 0);
 
   // Fiyat Ortalamaları
   // Eğer kullanıcı TRY seçtiyse ve veritabanı "avg_actual" gönderdiyse onu kullanırız.
@@ -58,6 +60,7 @@ export function formatDashboardMetrics(
     wapeEpnet: wapeLightgbm,
     wapeLightgbm,
     wapeHybrid: wapeLightgbm,
+    wapeOob,
     
     bestModel: 'LightGBM',
     totalIntersections: backendMetrics.total_hours || 0,

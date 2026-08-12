@@ -10,29 +10,70 @@ from db.connection import get_db_engine
 logger = logging.getLogger("PreForecasters")
 
 def fetch_openmeteo_wind_history(start_date_str, end_date_str):
-    cities = {
-        'izmir': {'lat': 38.41, 'lon': 27.14},
-        'canakkale': {'lat': 40.15, 'lon': 26.40},
-        'balikesir': {'lat': 39.64, 'lon': 27.88}
-    }
-    df_weather = None
-    logger.info(f"Fetching Open-Meteo wind data from {start_date_str} to {end_date_str}...")
-    for city, coords in cities.items():
-        url = f"https://archive-api.open-meteo.com/v1/archive?latitude={coords['lat']}&longitude={coords['lon']}&start_date={start_date_str}&end_date={end_date_str}&hourly=wind_speed_100m&timezone=Europe%2FIstanbul"
-        try:
-            resp = httpx.get(url, timeout=30.0)
-            data = resp.json()
-            if 'hourly' not in data:
-                logger.error(f"Failed to fetch {city}: {data}")
-                continue
-            times = pd.to_datetime(data['hourly']['time']).tz_localize('Europe/Istanbul', ambiguous='infer', nonexistent='shift_forward')
-            speeds = data['hourly']['wind_speed_100m']
-            temp_df = pd.DataFrame({'ts': times, f'wind_{city}': speeds}).set_index('ts')
-            if df_weather is None: df_weather = temp_df
-            else: df_weather = df_weather.join(temp_df)
-        except Exception as e:
-            logger.error(f"Error fetching wind for {city}: {e}")
-    return df_weather
+    engine = get_db_engine()
+    with engine.connect() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS raw_wind_history_hourly (
+                ts TIMESTAMP WITH TIME ZONE PRIMARY KEY,
+                wind_izmir NUMERIC,
+                wind_canakkale NUMERIC,
+                wind_balikesir NUMERIC
+            );
+        """))
+        conn.commit()
+        max_ts = conn.execute(text("SELECT MAX(ts) FROM raw_wind_history_hourly")).scalar()
+
+    if max_ts is not None:
+        fetch_start_date = max_ts.strftime('%Y-%m-%d')
+    else:
+        fetch_start_date = start_date_str
+
+    if fetch_start_date < end_date_str:
+        logger.info(f"Fetching missing Open-Meteo wind data from {fetch_start_date} to {end_date_str}...")
+        cities = {
+            'izmir': {'lat': 38.41, 'lon': 27.14},
+            'canakkale': {'lat': 40.15, 'lon': 26.40},
+            'balikesir': {'lat': 39.64, 'lon': 27.88}
+        }
+        df_weather = None
+        for city, coords in cities.items():
+            url = f"https://archive-api.open-meteo.com/v1/archive?latitude={coords['lat']}&longitude={coords['lon']}&start_date={fetch_start_date}&end_date={end_date_str}&hourly=wind_speed_100m&timezone=Europe%2FIstanbul"
+            try:
+                resp = httpx.get(url, timeout=30.0)
+                data = resp.json()
+                if 'hourly' not in data:
+                    continue
+                times = pd.to_datetime(data['hourly']['time']).tz_localize('Europe/Istanbul', ambiguous='infer', nonexistent='shift_forward')
+                speeds = data['hourly']['wind_speed_100m']
+                temp_df = pd.DataFrame({'ts': times, f'wind_{city}': speeds}).set_index('ts')
+                if df_weather is None: df_weather = temp_df
+                else: df_weather = df_weather.join(temp_df)
+            except Exception as e:
+                logger.error(f"Error fetching wind for {city}: {e}")
+
+        if df_weather is not None and not df_weather.empty:
+            recs = df_weather.reset_index().to_dict('records')
+            for rec in recs:
+                for k in rec.keys():
+                    if pd.isna(rec[k]): rec[k] = None
+            insert_sql = text("""
+                INSERT INTO raw_wind_history_hourly (ts, wind_izmir, wind_canakkale, wind_balikesir)
+                VALUES (:ts, :wind_izmir, :wind_canakkale, :wind_balikesir)
+                ON CONFLICT (ts) DO UPDATE SET 
+                    wind_izmir = EXCLUDED.wind_izmir,
+                    wind_canakkale = EXCLUDED.wind_canakkale,
+                    wind_balikesir = EXCLUDED.wind_balikesir;
+            """)
+            with engine.connect() as conn:
+                conn.execute(insert_sql, recs)
+                conn.commit()
+
+    df_all_wind = pd.read_sql("SELECT * FROM raw_wind_history_hourly ORDER BY ts", engine, index_col='ts')
+    if df_all_wind.index.tz is None:
+        df_all_wind.index = df_all_wind.index.tz_localize('Europe/Istanbul')
+    else:
+        df_all_wind.index = df_all_wind.index.tz_convert('Europe/Istanbul')
+    return df_all_wind
 
 def build_pre_forecast_features(df_raw, df_wind):
     df = df_raw.copy()
@@ -44,7 +85,13 @@ def build_pre_forecast_features(df_raw, df_wind):
     df['month'] = df.index.month
     df['is_weekend'] = (df.index.dayofweek >= 5).astype(int)
 
-    if 'temp_c' in df.columns:
+    temp_col = None
+    for c in ['temperature_c', 'temp_c', 'turkey_weighted_temperature_c']:
+        if c in df.columns:
+            temp_col = c
+            break
+    if temp_col:
+        df['temp_c'] = df[temp_col]
         df['cdh'] = np.maximum(df['temp_c'] - 18.0, 0.0)
         df['hdh'] = np.maximum(18.0 - df['temp_c'], 0.0)
 
@@ -52,11 +99,13 @@ def build_pre_forecast_features(df_raw, df_wind):
         if f'wind_{city}' in df.columns:
             df[f'wind_power_{city}'] = df[f'wind_{city}'] ** 3
 
-    targets = ['load_forecast_mw', 'kgup_wind', 'kgup_solar']
+    targets = ['load_forecast_mw', 'kgup_wind_mw', 'kgup_solar_mw', 'kgup_wind', 'kgup_solar']
     for t in targets:
         if t in df.columns:
+            prefix = t.replace('_mw', '')
             for i in range(1, 15):
                 df[f'{t}_lag_{i}d'] = df[t].shift(24 * i)
+                df[f'{prefix}_lag_{i}d'] = df[t].shift(24 * i)
                 
     return df
 

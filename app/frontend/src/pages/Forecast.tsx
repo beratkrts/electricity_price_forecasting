@@ -90,14 +90,16 @@ export const Forecast: React.FC<ForecastProps> = ({
     return rawChartData.map(d => {
       const ptfVal = d.ptfUsd !== undefined && d.ptfUsd !== null ? d.ptfUsd : Number((d.ptf / fallbackRate).toFixed(2));
       const lgbVal = d.lightgbmForecastUsd !== undefined && d.lightgbmForecastUsd !== null ? d.lightgbmForecastUsd : Number((d.lightgbmForecast / fallbackRate).toFixed(2));
+      const ubVal = d.upperBoundUsd !== undefined && d.upperBoundUsd !== null ? d.upperBoundUsd : Number((d.upperBound / fallbackRate).toFixed(2));
+      const lbVal = d.lowerBoundUsd !== undefined && d.lowerBoundUsd !== null ? d.lowerBoundUsd : Number((d.lowerBound / fallbackRate).toFixed(2));
       return {
         ...d,
         ptf: ptfVal,
         epnetForecast: lgbVal,
         lightgbmForecast: lgbVal,
         hybridForecast: lgbVal,
-        upperBound: Number((lgbVal * 1.05).toFixed(2)),
-        lowerBound: Number((lgbVal * 0.95).toFixed(2)),
+        upperBound: ubVal,
+        lowerBound: lbVal,
       };
     });
   }, [rawChartData, currencyMode, usdRate]);

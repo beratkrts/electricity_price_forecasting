@@ -35,7 +35,7 @@ def get_target_4am() -> pd.Timestamp:
     """Calculates target datetime for 4:00 AM Europe/Istanbul time."""
     now_istanbul = pd.Timestamp.now(tz="Europe/Istanbul").tz_localize(None)
     target = now_istanbul.replace(hour=4, minute=0, second=0, microsecond=0)
-    if now_istanbul >= target:
+    if now_istanbul > target:
         target += timedelta(days=1)
     return target
 

@@ -10,6 +10,7 @@ interface MainChartProps {
   showIntersections: boolean;
   showConfidenceInterval: boolean;
   onIntersectionSelect?: (intersection: IntersectionPoint) => void;
+  currencyMode?: 'TRY' | 'USD';
 }
 
 export const MainChart: React.FC<MainChartProps> = ({
@@ -18,7 +19,8 @@ export const MainChart: React.FC<MainChartProps> = ({
   intersections,
   showIntersections,
   showConfidenceInterval,
-  onIntersectionSelect
+  onIntersectionSelect,
+  currencyMode = 'TRY'
 }) => {
   const [isLightMode, setIsLightMode] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('etkb_theme') === 'light' : false);
   useEffect(() => {
@@ -36,6 +38,9 @@ export const MainChart: React.FC<MainChartProps> = ({
     const gridLineColor = isLight ? 'rgba(0, 0, 0, 0.14)' : 'rgba(255, 255, 255, 0.12)';
     const axisLabelColor = isLight ? '#475569' : '#94a3b8';
 
+    const symbolStr = currencyMode === 'USD' ? '$' : '₺';
+    const unitStr = currencyMode === 'USD' ? '$/MWh' : '₺/MWh';
+
     const xAxisLabels = data.map((d) => `${d.date.slice(5)} ${d.hour}`);
 
     // Build ECharts series array
@@ -47,16 +52,16 @@ export const MainChart: React.FC<MainChartProps> = ({
         name: 'Güven Aralığı Alt',
         type: 'line',
         data: data.map((d) => d.lowerBound),
-        lineStyle: { opacity: 0 },
+        lineStyle: { opacity: 0.5, type: 'dashed', width: 1, color: 'rgba(225, 29, 72, 0.4)' },
         stack: 'confidence',
         symbol: 'none',
         silent: true
       });
       chartSeries.push({
-        name: 'Güven Aralığı (%95)',
+        name: 'Güven Aralığı (%80)',
         type: 'line',
         data: data.map((d) => d.upperBound - d.lowerBound),
-        lineStyle: { opacity: 0 },
+        lineStyle: { opacity: 0.5, type: 'dashed', width: 1, color: 'rgba(225, 29, 72, 0.4)' },
         areaStyle: {
           color: 'rgba(148, 163, 184, 0.12)'
         },
@@ -131,15 +136,25 @@ export const MainChart: React.FC<MainChartProps> = ({
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
           const first = params[0];
+          const dataIndex = first.dataIndex;
+          const pointData = data[dataIndex];
+          
           let res = `<div style="font-weight:700;margin-bottom:6px;color:${isLight ? '#0369a1' : '#38bdf8'};">🕒 Saat: ${first.name}</div>`;
           params.forEach((item: any) => {
-            if (item.seriesName === 'Kesişim Pingleme' || item.seriesName.includes('Güven Aralığı Alt')) return;
+            if (item.seriesName === 'Kesişim Pingleme' || item.seriesName.includes('Güven Aralığı')) return;
             const val = typeof item.value === 'number' ? item.value.toLocaleString('tr-TR') : item.value;
             res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;color:${isLight ? '#0f172a' : '#f8fafc'};">
               <span>${item.marker} ${item.seriesName}:</span>
-              <strong style="font-family:JetBrains Mono;">${val} ₺/MWh</strong>
+              <strong style="font-family:JetBrains Mono;">${val} ${unitStr}</strong>
             </div>`;
           });
+
+          if (showConfidenceInterval && pointData && pointData.lowerBound && pointData.upperBound) {
+            res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;color:${isLight ? '#0f172a' : '#f8fafc'};">
+              <span style="font-size:0.9em;">◬ Güven Aralığı (%80):</span>
+              <strong style="font-family:JetBrains Mono;font-size:0.9em;color:#f87171;">[${pointData.lowerBound.toLocaleString('tr-TR')} - ${pointData.upperBound.toLocaleString('tr-TR')}] ${unitStr}</strong>
+            </div>`;
+          }
           return res;
         }
       },
@@ -178,7 +193,7 @@ export const MainChart: React.FC<MainChartProps> = ({
       },
       yAxis: {
         type: 'value',
-        name: '₺ / MWh',
+        name: unitStr,
         nameTextStyle: {
           color: axisLabelColor,
           fontSize: 12,
@@ -191,7 +206,7 @@ export const MainChart: React.FC<MainChartProps> = ({
         axisLabel: {
           color: axisLabelColor,
           fontSize: 11,
-          formatter: '{value} ₺'
+          formatter: `{value} ${symbolStr}`
         },
         splitLine: {
           lineStyle: { color: gridLineColor }

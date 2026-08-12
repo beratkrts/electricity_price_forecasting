@@ -84,6 +84,29 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
       });
     });
 
+    // Add confidence band for tomorrow's forecast
+    seriesList.push({
+      name: 'Güven Aralığı Alt',
+      type: 'line',
+      data: data.map((d) => d.lowerBound),
+      lineStyle: { opacity: 0.5, type: 'dashed', width: 1, color: 'rgba(225, 29, 72, 0.4)' },
+      stack: 'confidence',
+      symbol: 'none',
+      silent: true
+    });
+    seriesList.push({
+      name: 'Güven Aralığı (%80)',
+      type: 'line',
+      data: data.map((d) => d.upperBound - d.lowerBound),
+      lineStyle: { opacity: 0.5, type: 'dashed', width: 1, color: 'rgba(225, 29, 72, 0.4)' },
+      areaStyle: {
+        color: 'rgba(225, 29, 72, 0.15)'
+      },
+      stack: 'confidence',
+      symbol: 'none',
+      silent: true
+    });
+
     return {
       backgroundColor: 'transparent',
       animationDuration: 800,
@@ -94,6 +117,8 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
         textStyle: { color: isLightMode ? '#0f172a' : '#fff', fontSize: 12 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
+          const dataIndex = params[0].dataIndex;
+          const pointData = data[dataIndex];
           let res = `<div style="font-weight:700;margin-bottom:6px;color:#fbbf24;">🕒 ${targetDateStr} Saat: ${params[0].name}</div>`;
           params.forEach((item: any) => {
             if (item.seriesName.includes('Güven Aralığı')) return;
@@ -103,6 +128,13 @@ export const TomorrowForecastSection: React.FC<TomorrowForecastSectionProps> = (
               <strong style="font-family:JetBrains Mono;">${val} ${unitStr}</strong>
             </div>`;
           });
+          
+          if (pointData && pointData.lowerBound && pointData.upperBound) {
+            res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;">
+              <span style="color:#94a3b8;font-size:0.9em;">◬ Güven Aralığı (%80):</span>
+              <strong style="font-family:JetBrains Mono;font-size:0.9em;color:#f87171;">[${pointData.lowerBound.toLocaleString('tr-TR')} - ${pointData.upperBound.toLocaleString('tr-TR')}] ${unitStr}</strong>
+            </div>`;
+          }
           return res;
         }
       },

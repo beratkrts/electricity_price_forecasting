@@ -11,7 +11,7 @@ class LightGBMForecaster:
     LightGBM tabanlı enerji fiyat tahmin modeli.
     Log-transform (log1p / expm1) ile eğitilir ve tahmin verir.
     """
-    def __init__(self, params: Optional[Dict] = None):
+    def __init__(self, params: Optional[Dict] = None, use_log_transform: Optional[bool] = None):
         self.params = params or {
             'n_estimators': 300,
             'learning_rate': 0.03,
@@ -27,12 +27,18 @@ class LightGBMForecaster:
             'deterministic': True,
             'force_col_wise': True,
         }
+        # If use_log_transform not explicitly set: disable for quantile regression so high price spikes are captured accurately
+        if use_log_transform is not None:
+            self.use_log_transform = use_log_transform
+        else:
+            self.use_log_transform = (self.params.get('objective') != 'quantile')
+
         self.model = None
         self.feature_columns = None
 
     def fit(self, X: pd.DataFrame, y: Union[pd.Series, np.ndarray], feature_columns: Optional[List[str]] = None):
         """
-        Modeli eğitir. Hedef değişkene (y) log-transform uygular.
+        Modeli eğitir. Hedef değişkene (y) isteğe bağlı log-transform uygular.
         """
         if feature_columns:
             self.feature_columns = feature_columns
@@ -42,15 +48,18 @@ class LightGBMForecaster:
             X_train = X
 
         y_arr = np.array(y)
-        y_log = np.log1p(np.maximum(y_arr, 0.0))
+        if self.use_log_transform:
+            y_target = np.log1p(np.maximum(y_arr, 0.0))
+        else:
+            y_target = y_arr
 
         self.model = lgb.LGBMRegressor(**self.params)
-        self.model.fit(X_train, y_log)
+        self.model.fit(X_train, y_target)
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
-        Tahmin üretir ve log dönüşümünü tersine çevirir (expm1).
+        Tahmin üretir ve (eğer kullanıldıysa) log dönüşümünü tersine çevirir.
         """
         if self.model is None:
             raise ValueError("Model henüz eğitilmedi.")
@@ -60,8 +69,11 @@ class LightGBMForecaster:
         else:
             X_test = X
 
-        preds_log = self.model.predict(X_test)
-        preds = np.expm1(preds_log)
+        preds_raw = self.model.predict(X_test)
+        if self.use_log_transform:
+            preds = np.expm1(preds_raw)
+        else:
+            preds = preds_raw
         return np.maximum(preds, 0.0)
 
     def save(self, file_path: Union[str, Path]):

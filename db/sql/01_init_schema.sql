@@ -214,3 +214,32 @@ CREATE INDEX IF NOT EXISTS idx_kgup_ts ON raw_kgup_hourly(ts);
 CREATE INDEX IF NOT EXISTS idx_actual_gen_ts ON raw_actual_generation_hourly(ts);
 CREATE INDEX IF NOT EXISTS idx_actual_cons_ts ON raw_actual_consumption_hourly(ts);
 CREATE INDEX IF NOT EXISTS idx_weather_ts ON raw_weather_hourly(ts);
+
+-- -----------------------------------------------------------------------------
+-- 3. GOLD LAYER TABLES
+-- -----------------------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS gold;
+
+CREATE TABLE IF NOT EXISTS gold.ptf_predictions_daily (
+    target_ts TIMESTAMPTZ,
+    predicted_mcp_usd NUMERIC(10, 4),
+    predicted_mcp_try NUMERIC(10, 4),
+    predicted_mcp_usd_p10 NUMERIC(10, 4),
+    predicted_mcp_try_p10 NUMERIC(10, 4),
+    predicted_mcp_usd_p90 NUMERIC(10, 4),
+    predicted_mcp_try_p90 NUMERIC(10, 4),
+    model_name VARCHAR(50) DEFAULT 'LightGBM_v1',
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (target_ts, model_name)
+);
+
+CREATE TABLE IF NOT EXISTS gold.kgup_load_pre_forecasts (
+    target_ts TIMESTAMPTZ PRIMARY KEY,
+    predicted_load_lag0 NUMERIC(10, 4),
+    predicted_solar_lag0 NUMERIC(10, 4),
+    predicted_wind_lag0 NUMERIC(10, 4),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_gold_predictions_target_ts ON gold.ptf_predictions_daily(target_ts);
+

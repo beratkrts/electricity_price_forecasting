@@ -81,6 +81,7 @@ class EpiasDBIngestor:
         row_count: int,
         status: str = "SUCCESS",
         error_msg: Optional[str] = None,
+        conn: Optional[Any] = None,
     ) -> int:
         """Inserts or updates an audit record in the Bronze layer (ingestion_batches)."""
         query = text("""
@@ -93,16 +94,21 @@ class EpiasDBIngestor:
                 fetched_at = NOW()
             RETURNING id;
         """)
-        with self.engine.begin() as conn:
-            result = conn.execute(query, {
-                "source_name": source_name,
-                "period_key": period_key,
-                "checksum": checksum,
-                "row_count": row_count,
-                "status": status,
-                "error_msg": error_msg,
-            }).fetchone()
+        params = {
+            "source_name": source_name,
+            "period_key": period_key,
+            "checksum": checksum,
+            "row_count": row_count,
+            "status": status,
+            "error_msg": error_msg,
+        }
+        if conn is not None:
+            result = conn.execute(query, params).fetchone()
             return result[0]
+        else:
+            with self.engine.begin() as local_conn:
+                result = local_conn.execute(query, params).fetchone()
+                return result[0]
 
     # -------------------------------------------------------------------------
     # SILVER LAYER UPSERT METHODS
@@ -117,7 +123,6 @@ class EpiasDBIngestor:
             logger.info(f"[MCP] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
-        ingestion_id = self.record_ingestion_batch("mcp", period_key, checksum, len(records))
         insert_query = text("""
             INSERT INTO raw_mcp_hourly (ts, price_try, price_usd, price_eur, ingestion_id)
             VALUES (:ts, :price_try, :price_usd, :price_eur, :ingestion_id)
@@ -127,19 +132,20 @@ class EpiasDBIngestor:
                 price_eur = EXCLUDED.price_eur,
                 ingestion_id = EXCLUDED.ingestion_id;
         """)
-        data = [{
-            "ts": r.get("date") or r.get("ts"),
-            "price_try": r.get("price") if r.get("price") is not None else r.get("price_try"),
-            "price_usd": r.get("priceUsd") if r.get("priceUsd") is not None else r.get("price_usd"),
-            "price_eur": r.get("priceEur") if r.get("priceEur") is not None else r.get("price_eur"),
-            "ingestion_id": ingestion_id,
-        } for r in records if r.get("date") or r.get("ts")]
+        with self.engine.begin() as conn:
+            ingestion_id = self.record_ingestion_batch("mcp", period_key, checksum, len(records), conn=conn)
+            data = [{
+                "ts": r.get("date") or r.get("ts"),
+                "price_try": r.get("price") if r.get("price") is not None else r.get("price_try"),
+                "price_usd": r.get("priceUsd") if r.get("priceUsd") is not None else r.get("price_usd"),
+                "price_eur": r.get("priceEur") if r.get("priceEur") is not None else r.get("price_eur"),
+                "ingestion_id": ingestion_id,
+            } for r in records if r.get("date") or r.get("ts")]
 
-        if data:
-            with self.engine.begin() as conn:
+            if data:
                 conn.execute(insert_query, data)
-            logger.info(f"[MCP] Ingested {len(data)} records for {period_key}.")
-        return len(data)
+                logger.info(f"[MCP] Ingested {len(data)} records for {period_key}.")
+            return len(data)
 
     def ingest_smp(self, records: List[Dict[str, Any]], period_key: str) -> int:
         """Ingests System Marginal Price (SMF / SMP) records into raw_smp_hourly."""
@@ -150,7 +156,6 @@ class EpiasDBIngestor:
             logger.info(f"[SMP] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
-        ingestion_id = self.record_ingestion_batch("smp", period_key, checksum, len(records))
         insert_query = text("""
             INSERT INTO raw_smp_hourly (ts, system_marginal_price_try, ingestion_id)
             VALUES (:ts, :smp, :ingestion_id)
@@ -158,17 +163,18 @@ class EpiasDBIngestor:
                 system_marginal_price_try = EXCLUDED.system_marginal_price_try,
                 ingestion_id = EXCLUDED.ingestion_id;
         """)
-        data = [{
-            "ts": r.get("date") or r.get("ts"),
-            "smp": r.get("systemMarginalPrice") if r.get("systemMarginalPrice") is not None else (r.get("price") if r.get("price") is not None else r.get("system_marginal_price_try")),
-            "ingestion_id": ingestion_id,
-        } for r in records if r.get("date") or r.get("ts")]
+        with self.engine.begin() as conn:
+            ingestion_id = self.record_ingestion_batch("smp", period_key, checksum, len(records), conn=conn)
+            data = [{
+                "ts": r.get("date") or r.get("ts"),
+                "smp": r.get("systemMarginalPrice") if r.get("systemMarginalPrice") is not None else (r.get("price") if r.get("price") is not None else r.get("system_marginal_price_try")),
+                "ingestion_id": ingestion_id,
+            } for r in records if r.get("date") or r.get("ts")]
 
-        if data:
-            with self.engine.begin() as conn:
+            if data:
                 conn.execute(insert_query, data)
-            logger.info(f"[SMP] Ingested {len(data)} records for {period_key}.")
-        return len(data)
+                logger.info(f"[SMP] Ingested {len(data)} records for {period_key}.")
+            return len(data)
 
     def ingest_load_forecast(self, records: List[Dict[str, Any]], period_key: str) -> int:
         """Ingests Load Forecast (Yük Tahmini) records into raw_load_forecast_hourly."""
@@ -179,7 +185,6 @@ class EpiasDBIngestor:
             logger.info(f"[LOAD_FORECAST] Period {period_key} checksum matches existing batch. Skipping insert.")
             return 0
 
-        ingestion_id = self.record_ingestion_batch("load_forecast", period_key, checksum, len(records))
         insert_query = text("""
             INSERT INTO raw_load_forecast_hourly (ts, load_forecast_mw, ingestion_id)
             VALUES (:ts, :lep, :ingestion_id)
@@ -187,17 +192,18 @@ class EpiasDBIngestor:
                 load_forecast_mw = EXCLUDED.load_forecast_mw,
                 ingestion_id = EXCLUDED.ingestion_id;
         """)
-        data = [{
-            "ts": r.get("date") or r.get("time") or r.get("ts"),
-            "lep": r.get("lep") if r.get("lep") is not None else r.get("load_forecast_mw"),
-            "ingestion_id": ingestion_id,
-        } for r in records if r.get("date") or r.get("time") or r.get("ts")]
+        with self.engine.begin() as conn:
+            ingestion_id = self.record_ingestion_batch("load_forecast", period_key, checksum, len(records), conn=conn)
+            data = [{
+                "ts": r.get("date") or r.get("time") or r.get("ts"),
+                "lep": r.get("lep") if r.get("lep") is not None else r.get("load_forecast_mw"),
+                "ingestion_id": ingestion_id,
+            } for r in records if r.get("date") or r.get("time") or r.get("ts")]
 
-        if data:
-            with self.engine.begin() as conn:
+            if data:
                 conn.execute(insert_query, data)
-            logger.info(f"[LOAD_FORECAST] Ingested {len(data)} records for {period_key}.")
-        return len(data)
+                logger.info(f"[LOAD_FORECAST] Ingested {len(data)} records for {period_key}.")
+            return len(data)
 
     def ingest_kgup(self, records: List[Dict[str, Any]], period_key: str) -> int:
         """Ingests Final Day-Ahead Generation Plan (KGÜP) records into raw_kgup_hourly."""
@@ -411,8 +417,8 @@ class EpiasDBIngestor:
             INSERT INTO raw_macro_daily (entry_date, usd_try, brent_oil_usd, ingestion_id)
             VALUES (:entry_date, :usd_try, :brent_oil_usd, :ingestion_id)
             ON CONFLICT (entry_date) DO UPDATE SET
-                usd_try = EXCLUDED.usd_try,
-                brent_oil_usd = EXCLUDED.brent_oil_usd,
+                usd_try = COALESCE(EXCLUDED.usd_try, raw_macro_daily.usd_try),
+                brent_oil_usd = COALESCE(EXCLUDED.brent_oil_usd, raw_macro_daily.brent_oil_usd),
                 ingestion_id = EXCLUDED.ingestion_id;
         """)
         data = [{

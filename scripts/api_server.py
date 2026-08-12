@@ -88,12 +88,12 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     SELECT 
                         COUNT(*) as total_hours,
                         ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
-                        ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                        ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(ABS(m.price_try)), 0) * 100), 2) as wape,
                         ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
                         ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
                         ROUND(AVG(m.price_try), 2) as avg_actual,
                         ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd) / NULLIF(m.price_usd, 0) * 100), 2) as mape_usd,
-                        ROUND((SUM(ABS(g.predicted_mcp_usd - m.price_usd)) / NULLIF(SUM(m.price_usd), 0) * 100), 2) as wape_usd,
+                        ROUND((SUM(ABS(g.predicted_mcp_usd - m.price_usd)) / NULLIF(SUM(ABS(m.price_usd)), 0) * 100), 2) as wape_usd,
                         ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd,
                         ROUND(AVG(g.predicted_mcp_usd), 2) as avg_predicted_usd,
                         ROUND(AVG(m.price_usd), 2) as avg_actual_usd
@@ -122,12 +122,12 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                 SELECT 
                     COUNT(*) as total_hours,
                     ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
-                    ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                    ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(ABS(m.price_try)), 0) * 100), 2) as wape,
                     ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
                     ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
                     ROUND(AVG(m.price_try), 2) as avg_actual,
                     ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd) / NULLIF(m.price_usd, 0) * 100), 2) as mape_usd,
-                    ROUND((SUM(ABS(g.predicted_mcp_usd - m.price_usd)) / NULLIF(SUM(m.price_usd), 0) * 100), 2) as wape_usd,
+                    ROUND((SUM(ABS(g.predicted_mcp_usd - m.price_usd)) / NULLIF(SUM(ABS(m.price_usd)), 0) * 100), 2) as wape_usd,
                     ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd,
                     ROUND(AVG(g.predicted_mcp_usd), 2) as avg_predicted_usd,
                     ROUND(AVG(m.price_usd), 2) as avg_actual_usd
@@ -167,7 +167,11 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                         ROUND(AVG(m.price_try), 2) as ptf,
                         ROUND(AVG(m.price_usd), 2) as ptf_usd,
                         ROUND(AVG(g.predicted_mcp_try), 2) as lightgbm_forecast,
-                        ROUND(AVG(g.predicted_mcp_usd), 2) as lightgbm_forecast_usd
+                        ROUND(AVG(g.predicted_mcp_usd), 2) as lightgbm_forecast_usd,
+                        ROUND(AVG(g.predicted_mcp_try_p10), 2) as lightgbm_forecast_p10,
+                        ROUND(AVG(g.predicted_mcp_try_p90), 2) as lightgbm_forecast_p90,
+                        ROUND(AVG(g.predicted_mcp_usd_p10), 2) as lightgbm_forecast_usd_p10,
+                        ROUND(AVG(g.predicted_mcp_usd_p90), 2) as lightgbm_forecast_usd_p90
                     FROM raw_mcp_hourly m
                     LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
                     WHERE {target_clause}
@@ -183,7 +187,11 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                         ROUND(AVG(m.price_try), 2) as ptf,
                         ROUND(AVG(m.price_usd), 2) as ptf_usd,
                         ROUND(AVG(g.predicted_mcp_try), 2) as lightgbm_forecast,
-                        ROUND(AVG(g.predicted_mcp_usd), 2) as lightgbm_forecast_usd
+                        ROUND(AVG(g.predicted_mcp_usd), 2) as lightgbm_forecast_usd,
+                        ROUND(AVG(g.predicted_mcp_try_p10), 2) as lightgbm_forecast_p10,
+                        ROUND(AVG(g.predicted_mcp_try_p90), 2) as lightgbm_forecast_p90,
+                        ROUND(AVG(g.predicted_mcp_usd_p10), 2) as lightgbm_forecast_usd_p10,
+                        ROUND(AVG(g.predicted_mcp_usd_p90), 2) as lightgbm_forecast_usd_p90
                     FROM raw_mcp_hourly m
                     LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
                     WHERE {target_clause}
@@ -199,7 +207,11 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                         ROUND(m.price_try, 2) as ptf,
                         ROUND(m.price_usd, 2) as ptf_usd,
                         ROUND(g.predicted_mcp_try, 2) as lightgbm_forecast,
-                        ROUND(g.predicted_mcp_usd, 2) as lightgbm_forecast_usd
+                        ROUND(g.predicted_mcp_usd, 2) as lightgbm_forecast_usd,
+                        ROUND(g.predicted_mcp_try_p10, 2) as lightgbm_forecast_p10,
+                        ROUND(g.predicted_mcp_try_p90, 2) as lightgbm_forecast_p90,
+                        ROUND(g.predicted_mcp_usd_p10, 2) as lightgbm_forecast_usd_p10,
+                        ROUND(g.predicted_mcp_usd_p90, 2) as lightgbm_forecast_usd_p90
                     FROM raw_mcp_hourly m
                     LEFT JOIN gold.ptf_predictions_daily g ON m.ts = g.target_ts
                     WHERE {target_clause}
@@ -209,12 +221,14 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                 SELECT 
                     COUNT(*) as total_hours,
                     ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try) / NULLIF(m.price_try, 0) * 100), 2) as mape,
-                    ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(m.price_try), 0) * 100), 2) as wape,
+                    ROUND((SUM(ABS(g.predicted_mcp_try - m.price_try)) / NULLIF(SUM(ABS(m.price_try)), 0) * 100), 2) as wape,
+                    ROUND((SUM(CASE WHEN m.price_try < g.predicted_mcp_try_p10 THEN g.predicted_mcp_try_p10 - m.price_try WHEN m.price_try > g.predicted_mcp_try_p90 THEN m.price_try - g.predicted_mcp_try_p90 ELSE 0 END) / NULLIF(SUM(ABS(m.price_try)), 0) * 100), 2) as wape_oob,
                     ROUND(AVG(ABS(g.predicted_mcp_try - m.price_try)), 2) as mae,
                     ROUND(AVG(g.predicted_mcp_try), 2) as avg_predicted,
                     ROUND(AVG(m.price_try), 2) as avg_actual,
                     ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd) / NULLIF(m.price_usd, 0) * 100), 2) as mape_usd,
-                    ROUND((SUM(ABS(g.predicted_mcp_usd - m.price_usd)) / NULLIF(SUM(m.price_usd), 0) * 100), 2) as wape_usd,
+                    ROUND((SUM(ABS(g.predicted_mcp_usd - m.price_usd)) / NULLIF(SUM(ABS(m.price_usd)), 0) * 100), 2) as wape_usd,
+                    ROUND((SUM(CASE WHEN m.price_usd < g.predicted_mcp_usd_p10 THEN g.predicted_mcp_usd_p10 - m.price_usd WHEN m.price_usd > g.predicted_mcp_usd_p90 THEN m.price_usd - g.predicted_mcp_usd_p90 ELSE 0 END) / NULLIF(SUM(ABS(m.price_usd)), 0) * 100), 2) as wape_oob_usd,
                     ROUND(AVG(ABS(g.predicted_mcp_usd - m.price_usd)), 2) as mae_usd,
                     ROUND(AVG(g.predicted_mcp_usd), 2) as avg_predicted_usd,
                     ROUND(AVG(m.price_usd), 2) as avg_actual_usd
@@ -285,7 +299,7 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     "kgup": "SELECT TO_CHAR(ts, 'HH24:00') as hour, total_mw as toplam FROM raw_kgup_hourly WHERE ts::date = :dt ORDER BY ts",
                     "load_forecast": "SELECT TO_CHAR(ts, 'HH24:00') as hour, load_forecast_mw as lep FROM raw_load_forecast_hourly WHERE ts::date = :dt ORDER BY ts",
                     "actual_generation": "SELECT TO_CHAR(ts, 'HH24:00') as hour, total_mw as total FROM raw_actual_generation_hourly WHERE ts::date = :dt ORDER BY ts",
-                    "lightgbm": "SELECT TO_CHAR(target_ts, 'HH24:00') as hour, predicted_mcp_try as price FROM gold.ptf_predictions_daily WHERE target_ts::date = :dt ORDER BY target_ts",
+                    "lightgbm": "SELECT TO_CHAR(target_ts, 'HH24:00') as hour, predicted_mcp_try as price, predicted_mcp_try_p10 as price_p10, predicted_mcp_try_p90 as price_p90 FROM gold.ptf_predictions_daily WHERE target_ts::date = :dt ORDER BY target_ts",
                 }
                 if type in sql_map:
                     with engine.connect() as conn:
@@ -317,9 +331,11 @@ async def get_live_fx_rate():
             resp = await client.get("https://api.exchangerate-api.com/v4/latest/USD")
             if resp.status_code == 200:
                 rates = resp.json().get("rates", {})
-                usd_try = rates.get("TRY", 35.0)
+                usd_try = rates.get("TRY")
+                if not usd_try:
+                    raise ValueError("TRY rate missing from ExchangeRate API")
                 eur_val = rates.get("EUR", 0.92)
-                eur_try = usd_try / eur_val if eur_val else 38.0
+                eur_try = usd_try / eur_val if eur_val else usd_try * 1.08
                 res = JSONResponse(content={
                     "USD": {"price": round(usd_try, 4), "prevClose": round(usd_try * 0.998, 4)},
                     "EUR": {"price": round(eur_try, 4), "prevClose": round(eur_try * 0.998, 4)},
@@ -361,14 +377,23 @@ async def get_live_fx_rate():
     except Exception as e:
         logger.error(f"Secondary FX fetch error: {e}")
 
-    # 3. Default Safety Fallback
-    res = JSONResponse(content={
-        "USD": {"price": 35.0, "prevClose": 34.95},
-        "EUR": {"price": 38.0, "prevClose": 37.95},
-    })
-    _FX_CACHE["timestamp"] = now_ts
-    _FX_CACHE["response"] = res
-    return res
+    # 3. DB Safety Fallback: fetch latest real ingested exchange rate from PostgreSQL
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text("SELECT usd_try FROM raw_macro_daily WHERE usd_try IS NOT NULL ORDER BY entry_date DESC LIMIT 1;")).fetchone()
+            if row and row[0]:
+                db_usd = float(row[0])
+                res = JSONResponse(content={
+                    "USD": {"price": round(db_usd, 4), "prevClose": round(db_usd * 0.998, 4)},
+                    "EUR": {"price": round(db_usd * 1.08, 4), "prevClose": round(db_usd * 1.08 * 0.998, 4)},
+                })
+                _FX_CACHE["timestamp"] = now_ts
+                _FX_CACHE["response"] = res
+                return res
+    except Exception as e_db:
+        logger.error(f"DB FX fallback query error: {e_db}")
+
+    return JSONResponse(status_code=503, content={"error": "Live FX rates unavailable from APIs and Database"})
 
 
 if __name__ == "__main__":

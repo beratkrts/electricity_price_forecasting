@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 import numpy as np
 import pandas as pd
+from typing import Optional
 from datetime import datetime
 
 project_root = Path(__file__).resolve().parent.parent
@@ -20,12 +21,13 @@ from scripts.predict_daily_pipeline import load_all_historical_data
 
 logger = logging.getLogger("PreForecastersBackfill")
 
-def run_pre_forecasts_backfill(num_days: int = 730):
+def run_pre_forecasts_backfill(num_days: int = 730, df_raw: Optional[pd.DataFrame] = None):
     logger.info("📦 Pre-Forecasters Backfill başlatılıyor...")
     create_pre_forecasts_schema_if_not_exists()
     
-    # Tüm veriyi çek (Mevcut Load, KGUP, Turkey Temp dahil)
-    df_raw = load_all_historical_data()
+    # Veri zaten yüklendiyse kullan, yoksa veritabanından çek
+    if df_raw is None:
+        df_raw = load_all_historical_data()
     
     # Open-Meteo rüzgar verisini çek
     min_date = df_raw.index.min().strftime('%Y-%m-%d')

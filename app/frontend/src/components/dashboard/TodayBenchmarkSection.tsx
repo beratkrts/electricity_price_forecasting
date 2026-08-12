@@ -78,6 +78,29 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
       });
     });
 
+    // Add confidence band for today's forecast
+    seriesList.push({
+      name: 'Güven Aralığı Alt',
+      type: 'line',
+      data: data.map((d: any) => d.lowerBound),
+      lineStyle: { opacity: 0.5, type: 'dashed', width: 1, color: 'rgba(225, 29, 72, 0.4)' },
+      stack: 'confidence',
+      symbol: 'none',
+      silent: true
+    });
+    seriesList.push({
+      name: 'Güven Aralığı (%80)',
+      type: 'line',
+      data: data.map((d: any) => d.upperBound - d.lowerBound),
+      lineStyle: { opacity: 0.5, type: 'dashed', width: 1, color: 'rgba(225, 29, 72, 0.4)' },
+      areaStyle: {
+        color: 'rgba(148, 163, 184, 0.12)'
+      },
+      stack: 'confidence',
+      symbol: 'none',
+      silent: true
+    });
+
     return {
       backgroundColor: 'transparent',
       animationDuration: 800,
@@ -88,14 +111,24 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
         textStyle: { color: isLightMode ? '#0f172a' : '#fff', fontSize: 12 },
         formatter: (params: any[]) => {
           if (!params || params.length === 0) return '';
+          const dataIndex = params[0].dataIndex;
+          const pointData = data[dataIndex];
           let res = `<div style="font-weight:700;margin-bottom:6px;color:${isLightMode ? '#0369a1' : '#38bdf8'};">🕒 Saat: ${params[0].name}</div>`;
           params.forEach((item: any) => {
+            if (item.seriesName.includes('Güven Aralığı')) return;
             const val = typeof item.value === 'number' ? item.value.toLocaleString('tr-TR') : item.value;
             res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;color:${isLightMode ? '#0f172a' : '#f8fafc'};">
               <span>${item.marker} ${item.seriesName}:</span>
               <strong style="font-family:JetBrains Mono;">${val} ${unitStr}</strong>
             </div>`;
           });
+          
+          if (pointData && pointData.lowerBound && pointData.upperBound) {
+            res += `<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin:3px 0;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;color:${isLightMode ? '#0f172a' : '#f8fafc'};">
+              <span style="font-size:0.9em;">◬ Güven Aralığı (%80):</span>
+              <strong style="font-family:JetBrains Mono;font-size:0.9em;color:#f87171;">[${pointData.lowerBound.toLocaleString('tr-TR')} - ${pointData.upperBound.toLocaleString('tr-TR')}] ${unitStr}</strong>
+            </div>`;
+          }
           return res;
         }
       },
@@ -258,6 +291,10 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Ortalama Hata Oranı (WAPE):</span>
                     <strong style={{ fontSize: '0.9rem', color: '#fff' }}>%{displayMetrics.wapeLightgbm}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Bant Dışı Hata Oranı (WAPE-OOB):</span>
+                    <strong style={{ fontSize: '0.9rem', color: '#10b981' }}>%{displayMetrics.wapeOob}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>Ortalama Fiyat Tahmini:</span>

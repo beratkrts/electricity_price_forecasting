@@ -119,15 +119,24 @@ export const Home: React.FC<HomeProps> = ({
                 <tr style={{ background: '#0f172a', color: '#38bdf8', position: 'sticky', top: 0, zIndex: 10, boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Tarih / Saat</th>
                   <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Yapay Zeka Fiyat Tahmini ({currencyMode === 'USD' ? '$/MWh' : '₺/MWh'})</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Güven Aralığı Alt (P10)</th>
+                  <th style={{ padding: '12px', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>Güven Aralığı Üst (P90)</th>
                 </tr>
               </thead>
               <tbody>
-                {data.map((row, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
-                    <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{formatTimestampToDDMMYYYY(row.timestamp)}</td>
-                    <td style={{ padding: '8px 12px', color: '#e11d48', fontWeight: 600 }}>{(row.lightgbmForecast).toLocaleString('tr-TR')} {currencyMode === 'USD' ? '$' : '₺'}</td>
-                  </tr>
-                ))}
+                {data.map((row, idx) => {
+                  const val = currencyMode === 'USD' && row.lightgbmForecastUsd !== undefined ? row.lightgbmForecastUsd : row.lightgbmForecast;
+                  const lb = currencyMode === 'USD' && row.lowerBoundUsd !== undefined ? row.lowerBoundUsd : row.lowerBound;
+                  const ub = currencyMode === 'USD' && row.upperBoundUsd !== undefined ? row.upperBoundUsd : row.upperBound;
+                  return (
+                    <tr key={idx} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.04)' }}>
+                      <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{formatTimestampToDDMMYYYY(row.timestamp)}</td>
+                      <td style={{ padding: '8px 12px', color: '#e11d48', fontWeight: 600 }}>{val.toLocaleString('tr-TR')} {currencyMode === 'USD' ? '$' : '₺'}</td>
+                      <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{lb.toLocaleString('tr-TR')} {currencyMode === 'USD' ? '$' : '₺'}</td>
+                      <td style={{ padding: '8px 12px', color: '#94a3b8' }}>{ub.toLocaleString('tr-TR')} {currencyMode === 'USD' ? '$' : '₺'}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

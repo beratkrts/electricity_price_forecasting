@@ -18,6 +18,10 @@ export async function fetchNextDayForecast(): Promise<EnergyDataPoint[]> {
 
       const rawFcVal = fItem ? parseFloat(fItem.lightgbm_forecast || fItem.price) : 0;
       const usdFcVal = fItem && fItem.lightgbm_forecast_usd !== undefined ? parseFloat(fItem.lightgbm_forecast_usd) : undefined;
+      const fcP10 = fItem && fItem.price_p10 !== undefined && fItem.price_p10 !== null ? parseFloat(fItem.price_p10) : Math.round(rawFcVal * 0.95);
+      const fcP90 = fItem && fItem.price_p90 !== undefined && fItem.price_p90 !== null ? parseFloat(fItem.price_p90) : Math.round(rawFcVal * 1.05);
+      const fcP10Usd = fItem && fItem.price_usd_p10 !== undefined && fItem.price_usd_p10 !== null ? parseFloat(fItem.price_usd_p10) : (usdFcVal !== undefined ? Number((usdFcVal * 0.95).toFixed(2)) : undefined);
+      const fcP90Usd = fItem && fItem.price_usd_p90 !== undefined && fItem.price_usd_p90 !== null ? parseFloat(fItem.price_usd_p90) : (usdFcVal !== undefined ? Number((usdFcVal * 1.05).toFixed(2)) : undefined);
 
       return {
         timestamp: `${targetDate} ${hourStr}`,
@@ -28,8 +32,10 @@ export async function fetchNextDayForecast(): Promise<EnergyDataPoint[]> {
         lightgbmForecast: rawFcVal,
         lightgbmForecastUsd: usdFcVal,
         hybridForecast: rawFcVal,
-        upperBound: Math.round(rawFcVal * 1.05),
-        lowerBound: Math.round(rawFcVal * 0.95),
+        upperBound: fcP90,
+        lowerBound: fcP10,
+        upperBoundUsd: fcP90Usd,
+        lowerBoundUsd: fcP10Usd,
         smf: 0
       };
     });
@@ -64,6 +70,12 @@ export async function fetchLatestRealizedComparison(dateStr: string = 'latest', 
 
       const ptfUsdVal = item && item.ptf_usd !== undefined && item.ptf_usd !== null ? parseFloat(item.ptf_usd) : 0;
       const lgbUsdVal = item && item.lightgbm_forecast_usd !== undefined && item.lightgbm_forecast_usd !== null ? parseFloat(item.lightgbm_forecast_usd) : ptfUsdVal;
+      
+      const p10Val = item && item.lightgbm_forecast_p10 !== undefined && item.lightgbm_forecast_p10 !== null ? parseFloat(item.lightgbm_forecast_p10) : Math.round(lgbVal * 0.95);
+      const p90Val = item && item.lightgbm_forecast_p90 !== undefined && item.lightgbm_forecast_p90 !== null ? parseFloat(item.lightgbm_forecast_p90) : Math.round(lgbVal * 1.05);
+      
+      const p10UsdVal = item && item.lightgbm_forecast_usd_p10 !== undefined && item.lightgbm_forecast_usd_p10 !== null ? parseFloat(item.lightgbm_forecast_usd_p10) : Number((lgbUsdVal * 0.95).toFixed(2));
+      const p90UsdVal = item && item.lightgbm_forecast_usd_p90 !== undefined && item.lightgbm_forecast_usd_p90 !== null ? parseFloat(item.lightgbm_forecast_usd_p90) : Number((lgbUsdVal * 1.05).toFixed(2));
 
       return {
         timestamp: tsVal,
@@ -75,8 +87,10 @@ export async function fetchLatestRealizedComparison(dateStr: string = 'latest', 
         lightgbmForecast: isNaN(lgbVal) ? ptfVal : lgbVal,
         lightgbmForecastUsd: isNaN(lgbUsdVal) ? ptfUsdVal : lgbUsdVal,
         hybridForecast: lgbVal,
-        upperBound: Math.round(lgbVal * 1.05),
-        lowerBound: Math.round(lgbVal * 0.95),
+        upperBound: p90Val,
+        lowerBound: p10Val,
+        upperBoundUsd: p90UsdVal,
+        lowerBoundUsd: p10UsdVal,
         smf: ptfVal
       };
     });

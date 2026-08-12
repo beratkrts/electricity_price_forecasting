@@ -186,7 +186,8 @@ def fetch_turkey_weighted_temperature(start_date_str: str, end_date_str: str, ba
             f"longitude={','.join(lons)}&"
             f"start_date={start_date_str}&"
             f"end_date={end_date_str}&"
-            f"hourly=temperature_2m"
+            f"hourly=temperature_2m&"
+            f"timezone=Europe%2FIstanbul"
         )
 
         try:
@@ -282,7 +283,7 @@ def fetch_tomorrow_weighted_temperature_forecast():
         # Fallback to default summer forecast
         return {
             "time": [],
-            "temp_c": [28.0] * 24
+            "temp_c": []
         }
 
 

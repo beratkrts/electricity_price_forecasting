@@ -158,6 +158,22 @@ def build_robust_features(df):
         if 'temperature_lag_48' in df_feat.columns:
             df_feat['temp_diff_from_yesterday'] = (df_feat['temp_forecast_lag0'] - df_feat['temperature_lag_48'].astype(float)).astype(float)
 
+    # 🔮 Pre-Forecast Features Fallback for Historical Rows to Prevent Training Sample Truncation
+    if 'predicted_load_lag0' in df_feat.columns and 'load_forecast_mw' in df_feat.columns:
+        df_feat['predicted_load_lag0'] = df_feat['predicted_load_lag0'].fillna(df_feat['load_forecast_mw'])
+    elif 'load_forecast_mw' in df_feat.columns:
+        df_feat['predicted_load_lag0'] = df_feat['load_forecast_mw']
+
+    if 'predicted_solar_lag0' in df_feat.columns and 'kgup_solar_mw' in df_feat.columns:
+        df_feat['predicted_solar_lag0'] = df_feat['predicted_solar_lag0'].fillna(df_feat['kgup_solar_mw'])
+    elif 'kgup_solar_mw' in df_feat.columns:
+        df_feat['predicted_solar_lag0'] = df_feat['kgup_solar_mw']
+
+    if 'predicted_wind_lag0' in df_feat.columns and 'kgup_wind_mw' in df_feat.columns:
+        df_feat['predicted_wind_lag0'] = df_feat['predicted_wind_lag0'].fillna(df_feat['kgup_wind_mw'])
+    elif 'kgup_wind_mw' in df_feat.columns:
+        df_feat['predicted_wind_lag0'] = df_feat['kgup_wind_mw']
+
     return df_feat
 
 

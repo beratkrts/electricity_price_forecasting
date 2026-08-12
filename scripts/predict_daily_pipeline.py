@@ -119,7 +119,11 @@ def load_all_historical_data():
     with engine.connect() as conn:
         df_raw = pd.read_sql(master_sql, conn)
 
-    df_raw['ts'] = pd.to_datetime(df_raw['ts']).dt.tz_convert('Europe/Istanbul')
+    ts_series = pd.to_datetime(df_raw['ts'])
+    if ts_series.dt.tz is None:
+        df_raw['ts'] = ts_series.dt.tz_localize('Europe/Istanbul')
+    else:
+        df_raw['ts'] = ts_series.dt.tz_convert('Europe/Istanbul')
     df_raw = df_raw.set_index('ts').sort_index()
 
     df_raw['usd_try'] = df_raw['usd_try'].ffill().bfill()
@@ -138,17 +142,12 @@ def run_daily_prediction(force: bool = False):
     """
     logger.info("🔮 Running Daily LightGBM Prediction Pipeline...")
     
-    # 1. DB tablosunu doğrula
+    # 1. DB tablosunu doğrula ve boşsa otomatik 2 yıllık backfill tetikle
     create_gold_schema_if_not_exists()
-
-    # 🚀 YENİ EKLENEN KRİTİK ADIM: Ana veri yüklenmeden önce son 3 günün Rüzgar/Güneş tahminlerini üret
-    from scripts.backfill_pre_forecasts import run_pre_forecasts_backfill
-    logger.info("🌤️ Generating daily Pre-Forecasts (Wind, Solar, Load) for the last 3 days...")
-    run_pre_forecasts_backfill(num_days=3)
 
     engine = get_db_engine()
 
-    # 2. Eğer force=False ise veritabanında yarının (gelecek günün) tahminlerinin tam (24 saat) olup olmadığını kontrol et
+    # 2. Eğer force=False ise veritabanında yarının tahminlerinin tam olup olmadığını kontrol et
     if not force:
         with engine.connect() as conn:
             check_sql = text("""
@@ -161,10 +160,15 @@ def run_daily_prediction(force: bool = False):
                 max_date = conn.execute(text("SELECT MAX(target_ts::date) FROM gold.ptf_predictions_daily;")).scalar()
                 logger.info(f"✅ Tomorrow's predictions ({max_date}) already exist in database ({count} hours). Skipping re-prediction.")
                 return
-    
+
     # 3. Tüm geçmiş veriyi yükle
     df_raw = load_all_historical_data()
     logger.info(f"📊 Total historical dataset loaded: {len(df_raw)} records ({df_raw.index.min()} -> {df_raw.index.max()})")
+
+    # Son 3 günün Rüzgar/Güneş pre-forecast tahminlerini güncelle
+    from scripts.backfill_pre_forecasts import run_pre_forecasts_backfill
+    logger.info("🌤️ Generating daily Pre-Forecasts (Wind, Solar, Load) for the last 3 days...")
+    run_pre_forecasts_backfill(num_days=3, df_raw=df_raw)
 
     # 3. Robust Feature Mühendisliği
     df_feat = build_robust_features(df_raw)
@@ -174,8 +178,9 @@ def run_daily_prediction(force: bool = False):
     # Sadece eğitimde kullanılan sütunlar üzerinde dropna yapılır
     df_model = df_feat.dropna(subset=feature_cols + [target_col]).copy()
 
-    # Son bilinen dolar kuru
-    latest_usd_try = float(df_raw['usd_try'].iloc[-1]) if 'usd_try' in df_raw.columns else 35.0
+    # Son bilinen dolar kuru (4-Aşamalı dinamik çözümleyici: DB dataframe -> Canlı API -> DB Query -> ECB API)
+    from fetch_epias_data import resolve_usd_try_rate
+    latest_usd_try = resolve_usd_try_rate(df=df_raw, engine=engine)
 
     # 4. LightGBM Eğitimi (Tüm Geçmiş Veri İle - 3 Başlı Quantile Regression)
     X_train = df_model[feature_cols]
@@ -207,6 +212,13 @@ def run_daily_prediction(force: bool = False):
     logger.info("🌲 3-Head LightGBM Quantile Models (P10, P50, P90) trained successfully.")
 
     # 5. Gelecek 24 Saat İçin Inference Verisi Hazırlama (GÖP Piyasasında Tahmin Hedefi HER ZAMAN Yarındır - T+1)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # K1 FIX: Artık future_df'i MANUEL inşa etmiyoruz. Bunun yerine df_raw'a yarının
+    # 24 saatlik placeholder satırlarını ekliyoruz, canlı verileri (hava durumu,
+    # pre-forecast) bu satırlara enjekte ediyoruz, ve ardından EĞİTİMDE KULLANILAN
+    # AYNI build_robust_features() pipeline'ını çalıştırarak tüm lag, rolling, ratio
+    # ve rejim özniteliklerinin OTOMATIK ve DOĞRU hesaplanmasını sağlıyoruz.
+    # ═══════════════════════════════════════════════════════════════════════════════
     target_tomorrow = (pd.Timestamp.now(tz="Europe/Istanbul") + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
     next_24h_index = pd.date_range(start=f"{target_tomorrow} 00:00:00+03:00", periods=24, freq="h")
     
@@ -218,45 +230,29 @@ def run_daily_prediction(force: bool = False):
         logger.error(f"❌ Cannot generate prediction for {target_tomorrow}! The latest data in DB is from {last_available_date}, but we need data for {target_today_str} to predict tomorrow. Aborting.")
         raise RuntimeError(f"Data gap detected. Latest data: {last_available_date}, Expected: {target_today_str}")
 
-    # Son mevcuttaki verileri future df olarak kopyala
-    future_df = df_model.tail(24).copy()
-    future_df.index = next_24h_index
+    # --- ADIM 5a: df_raw'a yarının 24 saatlik placeholder satırlarını ekle ---
+    df_extended = df_raw.copy()
+    tomorrow_placeholder = pd.DataFrame(index=next_24h_index)
+    
+    # Yarın için bilinen ham değerleri ileriye taşı (ffill): kur, petrol, doğalgaz vb.
+    for col in df_extended.columns:
+        tomorrow_placeholder[col] = np.nan
+    df_extended = pd.concat([df_extended, tomorrow_placeholder])
+    
+    # Forward-fill macro değişkenler (kur, petrol, doğalgaz - bunlar gün içinde değişmez)
+    for macro_col in ['usd_try', 'brent_oil_usd', 'natural_gas_grf_try', 'hydro_water_energy_mwh']:
+        if macro_col in df_extended.columns:
+            df_extended[macro_col] = df_extended[macro_col].ffill()
+    
+    # Yarının son bilinen saatlik üretim/tüketim/yük verilerini bugünden kopyala (T → T+1 proxy)
+    for proxy_col in ['load_forecast_mw', 'kgup_total_mw', 'kgup_gas_mw', 'kgup_wind_mw', 
+                       'kgup_solar_mw', 'kgup_hydro_mw', 'kgup_coal_mw',
+                       'actual_gen_total_mw', 'actual_cons_mw', 'smp_price_try']:
+        if proxy_col in df_extended.columns:
+            today_values = df_raw[proxy_col].tail(24).values
+            df_extended.loc[next_24h_index, proxy_col] = today_values
 
-    # 🚀 Gelecek 24 saatin takvim ve döngüsel özniteliklerini yeni indekse göre güncelle!
-    future_df['hour'] = future_df.index.hour
-    future_df['dayofweek'] = future_df.index.dayofweek
-    future_df['month'] = future_df.index.month
-    future_df['quarter'] = future_df.index.quarter
-    future_df['dayofyear'] = future_df.index.dayofyear
-    future_df['is_weekend'] = (future_df.index.dayofweek >= 5).astype(int)
-    future_df['is_peak_hour'] = future_df['hour'].isin([17, 18, 19, 20, 21]).astype(int)
-
-    # 🚀 Gelecek 24 saatin 24h ve 48h lag özniteliklerini en son bilinen gerçek değerlerle güncelle!
-    if 'mcp_price_usd' in df_model.columns:
-        future_df['mcp_usd_lag_24'] = df_model['mcp_price_usd'].tail(24).values
-    if 'load_forecast_mw' in df_model.columns:
-        future_df['load_lag_24'] = df_model['load_forecast_mw'].tail(24).values
-    if 'kgup_total_mw' in df_model.columns:
-        future_df['kgup_lag_24'] = df_model['kgup_total_mw'].tail(24).values
-    if 'kgup_wind_mw' in df_model.columns:
-        future_df['kgup_wind_lag_24'] = df_model['kgup_wind_mw'].tail(24).values
-    if 'kgup_solar_mw' in df_model.columns:
-        future_df['kgup_solar_lag_24'] = df_model['kgup_solar_mw'].tail(24).values
-    if 'kgup_hydro_mw' in df_model.columns:
-        future_df['kgup_hydro_lag_24'] = df_model['kgup_hydro_mw'].tail(24).values
-    if 'kgup_gas_mw' in df_model.columns:
-        future_df['kgup_gas_lag_24'] = df_model['kgup_gas_mw'].tail(24).values
-
-    if 'smp_usd_lag_48' in df_model.columns:
-        future_df['smp_usd_lag_48'] = df_model['smp_usd_lag_48'].tail(24).values
-    if 'temperature_lag_48' in df_model.columns:
-        future_df['temperature_lag_48'] = df_model['temperature_lag_48'].tail(24).values
-    if 'brent_oil_lag_48' in df_model.columns:
-        future_df['brent_oil_lag_48'] = df_model['brent_oil_lag_48'].tail(24).values
-    if 'natural_gas_grf_lag_48' in df_model.columns:
-        future_df['natural_gas_grf_lag_48'] = df_model['natural_gas_grf_lag_48'].tail(24).values
-
-    # 🌡️ Open-Meteo Forecast API üzerinden yarının canlı sıcaklık tahminini çek, dedicated veritabanı tablosuna kaydet ve future_df'e aktar!
+    # --- ADIM 5b: Canlı hava durumu tahminini yarının satırlarına enjekte et ---
     try:
         from src.data_ingestion.api_trials.weather_fetcher import fetch_tomorrow_weighted_temperature_forecast
         from db.ingest_epias import EpiasDBIngestor
@@ -267,56 +263,52 @@ def run_daily_prediction(force: bool = False):
         if len(tomorrow_temps) == 24:
             records_fc = [{'date_time': t, 'turkey_weighted_temperature_c': temp} for t, temp in zip(tomorrow_times, tomorrow_temps)]
             EpiasDBIngestor().ingest_weather_forecast(records_fc)
-            future_df['temp_forecast_lag0'] = tomorrow_temps
+            df_extended.loc[next_24h_index, 'temperature_c'] = tomorrow_temps
+            df_extended.loc[next_24h_index, 'temperature_forecast_c'] = tomorrow_temps
         else:
-            future_df['temp_forecast_lag0'] = df_model['temperature_c'].tail(24).values
+            # Bugünün sıcaklığını proxy olarak kullan
+            df_extended.loc[next_24h_index, 'temperature_c'] = df_raw['temperature_c'].tail(24).values if 'temperature_c' in df_raw.columns else 25.0
     except Exception as e:
-        logger.warning(f"Could not fetch live weather forecast: {e}, falling back to tail(24)")
-        future_df['temp_forecast_lag0'] = df_model['temperature_c'].tail(24).values
+        from src.utils.fallback_logger import log_fallback
+        log_fallback("DailyPredictionPipeline", f"Live weather forecast API failed ({e}), falling back to today's temperature")
+        logger.warning(f"Could not fetch live weather forecast: {e}, falling back to today's temperature")
+        if 'temperature_c' in df_raw.columns:
+            df_extended.loc[next_24h_index, 'temperature_c'] = df_raw['temperature_c'].tail(24).values
 
-    future_df['cdh_cooling_load'] = np.maximum(future_df['temp_forecast_lag0'] - 18.0, 0.0)
-    future_df['hdh_heating_load'] = np.maximum(18.0 - future_df['temp_forecast_lag0'], 0.0)
-    if 'temperature_lag_48' in future_df.columns:
-        future_df['temp_diff_from_yesterday'] = future_df['temp_forecast_lag0'] - future_df['temperature_lag_48']
-
-    from src.features.holidays import add_holiday_features
-    future_df = add_holiday_features(future_df)
-
-    future_df['sin_hour'] = np.sin(2 * np.pi * future_df['hour'] / 24.0)
-    future_df['cos_hour'] = np.cos(2 * np.pi * future_df['hour'] / 24.0)
-    future_df['sin_dow'] = np.sin(2 * np.pi * future_df['dayofweek'] / 7.0)
-
-    # 🔮 7. YARIN İÇİN ÖN-TAHMİNLERİ (Pre-Forecasts) ÜRET VE FUTURE_DF'E EKLE!
+    # --- ADIM 5c: Pre-Forecast (Rüzgar/Güneş/Tüketim) tahminlerini enjekte et ---
     from src.features.pre_forecasters import fetch_openmeteo_wind_history, build_pre_forecast_features, train_and_predict_pre_forecasters
     
-    # Rüzgar verisini çek
     try:
         min_date = df_raw.index.min().strftime('%Y-%m-%d')
         max_date = df_raw.index.max().strftime('%Y-%m-%d')
         df_wind = fetch_openmeteo_wind_history(min_date, max_date)
         
-        # Pre-forecaster özellikleri
+        # Pre-forecaster özellikleri (eğitim verisi)
         df_pre_feat = build_pre_forecast_features(df_raw, df_wind)
         train_pre_df = df_pre_feat.copy()
         
-        # future_df'i pre-forecaster formatına sok
-        future_pre_df = future_df.copy()
+        # CRITICAL FIX: Pass a trailing window (last 20 days) so lag_1d...lag_14d exist for tomorrow!
+        trailing_start = next_24h_index.min() - pd.Timedelta(days=20)
+        future_window = df_extended.loc[trailing_start:].copy()
         if df_wind is not None:
-            overlap_cols = [c for c in df_wind.columns if c in future_pre_df.columns]
+            overlap_cols = [c for c in df_wind.columns if c in future_window.columns]
             if overlap_cols:
-                future_pre_df = future_pre_df.drop(columns=overlap_cols)
-            future_pre_df = future_pre_df.join(df_wind)
-        future_pre_df = build_pre_forecast_features(future_pre_df, df_wind)
+                future_window = future_window.drop(columns=overlap_cols)
+        future_pre_full = build_pre_forecast_features(future_window, df_wind)
+        future_pre_df = future_pre_full.loc[next_24h_index].copy()
         
-        # Tahmin et
+        # Pre-forecast tahmin et
         preds_df = train_and_predict_pre_forecasters(train_pre_df, future_pre_df)
         
-        # future_df'e ekle
-        future_df['predicted_load_lag0'] = preds_df['predicted_load_lag0']
-        future_df['predicted_solar_lag0'] = preds_df['predicted_solar_lag0']
-        future_df['predicted_wind_lag0'] = preds_df['predicted_wind_lag0']
+        # Yarının satırlarına enjekte et
+        if 'predicted_load_lag0' in preds_df.columns:
+            df_extended.loc[next_24h_index, 'predicted_load_lag0'] = preds_df['predicted_load_lag0'].values
+        if 'predicted_solar_lag0' in preds_df.columns:
+            df_extended.loc[next_24h_index, 'predicted_solar_lag0'] = preds_df['predicted_solar_lag0'].values
+        if 'predicted_wind_lag0' in preds_df.columns:
+            df_extended.loc[next_24h_index, 'predicted_wind_lag0'] = preds_df['predicted_wind_lag0'].values
         
-        # DB'ye kaydet (Opsiyonel ama Audit için iyi olur)
+        # DB'ye kaydet (Audit için)
         insert_pre_sql = text("""
             INSERT INTO gold.kgup_load_pre_forecasts (target_ts, predicted_load_lag0, predicted_solar_lag0, predicted_wind_lag0)
             VALUES (:target_ts, :predicted_load_lag0, :predicted_solar_lag0, :predicted_wind_lag0)
@@ -325,30 +317,56 @@ def run_daily_prediction(force: bool = False):
                 predicted_solar_lag0 = EXCLUDED.predicted_solar_lag0,
                 predicted_wind_lag0 = EXCLUDED.predicted_wind_lag0;
         """)
+        for col in ['predicted_load_lag0', 'predicted_solar_lag0', 'predicted_wind_lag0']:
+            if col not in preds_df.columns:
+                preds_df[col] = 0.0
         recs = preds_df.reset_index().rename(columns={'index': 'target_ts', 'ts': 'target_ts'}).to_dict('records')
         with engine.connect() as conn:
             conn.execute(insert_pre_sql, recs)
             conn.commit()
     except Exception as e:
+        from src.utils.fallback_logger import log_fallback
+        log_fallback("DailyPredictionPipeline", f"Pre-forecast ML generation failed ({e}), falling back to EPİAŞ load/wind/solar forecasts")
         logger.error(f"Pre-forecast generation failed: {e}")
-        future_df['predicted_load_lag0'] = df_model['load_forecast_mw'].tail(24).values
-        future_df['predicted_solar_lag0'] = df_model['kgup_solar_mw'].tail(24).values
-        future_df['predicted_wind_lag0'] = df_model['kgup_wind_mw'].tail(24).values
-    future_df['cos_dow'] = np.cos(2 * np.pi * future_df['dayofweek'] / 7.0)
-    future_df['sin_month'] = np.sin(2 * np.pi * future_df['month'] / 12.0)
-    future_df['cos_month'] = np.cos(2 * np.pi * future_df['month'] / 12.0)
-    future_df['sin_doy'] = np.sin(2 * np.pi * future_df['dayofyear'] / 365.25)
-    future_df['cos_doy'] = np.cos(2 * np.pi * future_df['dayofyear'] / 365.25)
+        if 'load_forecast_mw' in df_raw.columns:
+            df_extended.loc[next_24h_index, 'predicted_load_lag0'] = df_raw['load_forecast_mw'].tail(24).values
+        if 'kgup_solar_mw' in df_raw.columns:
+            df_extended.loc[next_24h_index, 'predicted_solar_lag0'] = df_raw['kgup_solar_mw'].tail(24).values
+        if 'kgup_wind_mw' in df_raw.columns:
+            df_extended.loc[next_24h_index, 'predicted_wind_lag0'] = df_raw['kgup_wind_mw'].tail(24).values
+
+    # --- ADIM 5d: Genişletilmiş veri üzerinde TAM feature pipeline'ını çalıştır ---
+    # Bu sayede tüm lag (24, 48, 168), rolling (mean, std, 7d), ratio, rejim flag,
+    # supply-demand gap, pressure ratio, cyclic, holiday, ve CDH/HDH öznitelikleri
+    # eğitimle BİREBİR AYNI şekilde otomatik hesaplanır.
+    df_extended_feat = build_robust_features(df_extended)
+    
+    # Yarının 24 satırını çıkar — bu artık tam ve doğru feature'lara sahip
+    future_df = df_extended_feat.loc[next_24h_index].copy()
+    
+    # Eksik feature'ları 0 ile doldur (nadiren olur ama güvenlik için)
+    for col in feature_cols:
+        if col in future_df.columns:
+            future_df[col] = future_df[col].fillna(0.0)
+        else:
+            future_df[col] = 0.0
+            logger.warning(f"⚠️ Feature '{col}' not found in future_df, filled with 0.0")
 
     # Tahmin Üret (3 Model)
     preds_usd = forecaster.predict(future_df[feature_cols])
-    preds_try = preds_usd * latest_usd_try
-
     preds_usd_p10 = forecaster_p10.predict(future_df[feature_cols])
-    preds_try_p10 = preds_usd_p10 * latest_usd_try
-
     preds_usd_p90 = forecaster_p90.predict(future_df[feature_cols])
+
+    # Quantile Crossover Koruması (Monotonic Guarantee: P10 <= P50 <= P90)
+    preds_usd_p10 = np.minimum(preds_usd_p10, preds_usd)
+    preds_usd_p90 = np.maximum(preds_usd_p90, preds_usd)
+
+    preds_try = preds_usd * latest_usd_try
+    preds_try_p10 = preds_usd_p10 * latest_usd_try
     preds_try_p90 = preds_usd_p90 * latest_usd_try
+
+    preds_try_p10 = np.minimum(preds_try_p10, preds_try)
+    preds_try_p90 = np.maximum(preds_try_p90, preds_try)
 
     results_df = pd.DataFrame({
         'target_ts': next_24h_index,

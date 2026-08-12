@@ -58,19 +58,54 @@ def backfill_historical_predictions(num_days: int = 730):
         if len(tr_df) < 1000 or len(te_df) < 12:
             continue
 
-        forecaster = LightGBMForecaster()
+        # P50 (Medyan)
+        forecaster = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.50, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'verbose': -1, 'random_state': 42})
         forecaster.fit(tr_df[feature_cols], tr_df[target_col].values)
 
-        preds_usd = forecaster.predict(te_df[feature_cols])
-        
-        latest_usd_try = float(tr_df['usd_try'].iloc[-1]) if 'usd_try' in tr_df.columns else 35.0
-        preds_try = preds_usd * latest_usd_try
+        # P10 (Alt Sınır)
+        forecaster_p10 = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.10, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'verbose': -1, 'random_state': 42})
+        forecaster_p10.fit(tr_df[feature_cols], tr_df[target_col].values)
 
-        for idx_ts, (ts_val, p_usd, p_try) in enumerate(zip(te_df.index, preds_usd, preds_try)):
+        # P90 (Üst Sınır)
+        forecaster_p90 = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.90, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'verbose': -1, 'random_state': 42})
+        forecaster_p90.fit(tr_df[feature_cols], tr_df[target_col].values)
+
+        preds_usd = forecaster.predict(te_df[feature_cols])
+        preds_usd_p10 = forecaster_p10.predict(te_df[feature_cols])
+        preds_usd_p90 = forecaster_p90.predict(te_df[feature_cols])
+        
+        # Quantile Crossover Koruması (Monotonic Guarantee: P10 <= P50 <= P90)
+        preds_usd_p10 = np.minimum(preds_usd_p10, preds_usd)
+        preds_usd_p90 = np.maximum(preds_usd_p90, preds_usd)
+
+        # Historical FX rate conversion: Use exact exchange rate of THAT test period in history
+        if 'usd_try' in te_df.columns and not te_df['usd_try'].isna().all():
+            day_usd_try_s = te_df['usd_try'].ffill().bfill()
+            if day_usd_try_s.isna().any():
+                from fetch_epias_data import resolve_usd_try_rate
+                fallback_fx = resolve_usd_try_rate(df=tr_df, engine=engine)
+                day_usd_try_s = day_usd_try_s.fillna(fallback_fx)
+            day_usd_try = day_usd_try_s.values
+        else:
+            from fetch_epias_data import resolve_usd_try_rate
+            day_usd_try = resolve_usd_try_rate(df=tr_df, engine=engine)
+
+        preds_try = preds_usd * day_usd_try
+        preds_try_p10 = preds_usd_p10 * day_usd_try
+        preds_try_p90 = preds_usd_p90 * day_usd_try
+
+        preds_try_p10 = np.minimum(preds_try_p10, preds_try)
+        preds_try_p90 = np.maximum(preds_try_p90, preds_try)
+
+        for idx_ts, (ts_val, p_usd, p_try, p_usd_10, p_try_10, p_usd_90, p_try_90) in enumerate(zip(te_df.index, preds_usd, preds_try, preds_usd_p10, preds_try_p10, preds_usd_p90, preds_try_p90)):
             all_records.append({
                 'target_ts': ts_val,
                 'predicted_mcp_usd': float(np.round(p_usd, 4)),
                 'predicted_mcp_try': float(np.round(p_try, 4)),
+                'predicted_mcp_usd_p10': float(np.round(p_usd_10, 4)),
+                'predicted_mcp_try_p10': float(np.round(p_try_10, 4)),
+                'predicted_mcp_usd_p90': float(np.round(p_usd_90, 4)),
+                'predicted_mcp_try_p90': float(np.round(p_try_90, 4)),
                 'model_name': 'LightGBM_v1'
             })
 
@@ -81,12 +116,26 @@ def backfill_historical_predictions(num_days: int = 730):
 
     engine = get_db_engine()
     insert_sql = text("""
-        INSERT INTO gold.ptf_predictions_daily (target_ts, predicted_mcp_usd, predicted_mcp_try, model_name)
-        VALUES (:target_ts, :predicted_mcp_usd, :predicted_mcp_try, :model_name)
+        INSERT INTO gold.ptf_predictions_daily (
+            target_ts, predicted_mcp_usd, predicted_mcp_try,
+            predicted_mcp_usd_p10, predicted_mcp_try_p10,
+            predicted_mcp_usd_p90, predicted_mcp_try_p90,
+            model_name
+        )
+        VALUES (
+            :target_ts, :predicted_mcp_usd, :predicted_mcp_try,
+            :predicted_mcp_usd_p10, :predicted_mcp_try_p10,
+            :predicted_mcp_usd_p90, :predicted_mcp_try_p90,
+            :model_name
+        )
         ON CONFLICT (target_ts, model_name) 
         DO UPDATE SET 
             predicted_mcp_usd = EXCLUDED.predicted_mcp_usd,
             predicted_mcp_try = EXCLUDED.predicted_mcp_try,
+            predicted_mcp_usd_p10 = EXCLUDED.predicted_mcp_usd_p10,
+            predicted_mcp_try_p10 = EXCLUDED.predicted_mcp_try_p10,
+            predicted_mcp_usd_p90 = EXCLUDED.predicted_mcp_usd_p90,
+            predicted_mcp_try_p90 = EXCLUDED.predicted_mcp_try_p90,
             created_at = CURRENT_TIMESTAMP;
     """)
 
