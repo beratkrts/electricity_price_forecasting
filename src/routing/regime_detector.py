@@ -1,3 +1,9 @@
+"""
+[EXPERIMENTAL - Canlı pipeline'da kullanılmıyor]
+Piyasa rejimi tespit modülü. Fiyat verilerinden düşük/yüksek fiyat rejimlerini tespit eder.
+Model router ile birlikte kullanılmak üzere tasarlanmıştır ancak canlıda aktif değildir.
+"""
+
 import pandas as pd
 import numpy as np
 from typing import Dict, Any, Union

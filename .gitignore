@@ -51,9 +51,6 @@ Thumbs.db
 *.swp
 *.swo
 
-# Temporary scratch folder
-scratch/
-
 # Documentation folder
 docs/
 
@@ -63,5 +60,7 @@ docs/
 *.docx
 *.doc
 
-# Exploratory Data Analysis & Sandbox
-eda/
+# Experiments (notebooks, research scripts, generators — tracked via experiments/scripts/ for backtest scripts)
+experiments/notebooks/
+experiments/research_scripts/
+experiments/generators/

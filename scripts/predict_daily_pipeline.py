@@ -190,6 +190,7 @@ def run_daily_prediction(force: bool = False):
     forecaster = LightGBMForecaster(params={
         'objective': 'quantile', 'alpha': 0.50,
         'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63,
+        'min_child_samples': 10,
         'verbose': -1, 'random_state': 42
     })
     forecaster.fit(X_train, y_train)
@@ -198,6 +199,7 @@ def run_daily_prediction(force: bool = False):
     forecaster_p10 = LightGBMForecaster(params={
         'objective': 'quantile', 'alpha': 0.10,
         'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63,
+        'min_child_samples': 10,
         'verbose': -1, 'random_state': 42
     })
     forecaster_p10.fit(X_train, y_train)
@@ -206,6 +208,7 @@ def run_daily_prediction(force: bool = False):
     forecaster_p90 = LightGBMForecaster(params={
         'objective': 'quantile', 'alpha': 0.90,
         'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63,
+        'min_child_samples': 10,
         'verbose': -1, 'random_state': 42
     })
     forecaster_p90.fit(X_train, y_train)
@@ -226,9 +229,12 @@ def run_daily_prediction(force: bool = False):
     target_today_str = (pd.Timestamp.now(tz="Europe/Istanbul")).strftime("%Y-%m-%d")
     last_available_date = df_model.index.max().strftime("%Y-%m-%d")
     
-    if last_available_date != target_today_str:
-        logger.error(f"❌ Cannot generate prediction for {target_tomorrow}! The latest data in DB is from {last_available_date}, but we need data for {target_today_str} to predict tomorrow. Aborting.")
-        raise RuntimeError(f"Data gap detected. Latest data: {last_available_date}, Expected: {target_today_str}")
+    days_gap = (pd.Timestamp(target_today_str) - pd.Timestamp(last_available_date)).days
+    if days_gap > 2:
+        logger.error(f"❌ Cannot generate prediction for {target_tomorrow}! Data gap too large ({days_gap} days). Latest: {last_available_date}, Expected: {target_today_str}. Aborting.")
+        raise RuntimeError(f"Data gap too large ({days_gap} days). Latest data: {last_available_date}, Expected: {target_today_str}")
+    elif days_gap > 0:
+        logger.warning(f"⚠️ Data gap: {days_gap} day(s). Latest data: {last_available_date}. Proceeding with available data.")
 
     # --- ADIM 5a: df_raw'a yarının 24 saatlik placeholder satırlarını ekle ---
     df_extended = df_raw.copy()

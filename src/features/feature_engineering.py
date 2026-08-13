@@ -178,6 +178,18 @@ def build_robust_features(df):
     elif 'kgup_wind_mw' in df_feat.columns:
         df_feat['predicted_wind_lag0'] = df_feat['kgup_wind_mw']
 
+    # ☀️ Zero-Price & Pressure Ratio Lag0 Features (Net Load, Ramps, Ratios)
+    if 'predicted_load_lag0' in df_feat.columns and 'predicted_solar_lag0' in df_feat.columns and 'predicted_wind_lag0' in df_feat.columns:
+        load_lag0_safe = df_feat['predicted_load_lag0'].replace(0, np.nan)
+        hydro_lag24 = df_feat['kgup_hydro_lag_24'].fillna(0) if 'kgup_hydro_lag_24' in df_feat.columns else 0.0
+        
+        df_feat['net_load_lag0'] = (df_feat['predicted_load_lag0'] - (df_feat['predicted_solar_lag0'] + df_feat['predicted_wind_lag0'])).astype(float)
+        df_feat['renewable_pressure_ratio_lag0'] = (((df_feat['predicted_solar_lag0'] + df_feat['predicted_wind_lag0'] + hydro_lag24) / load_lag0_safe).fillna(0)).astype(float)
+        df_feat['solar_peak_pressure_ratio_lag0'] = (((df_feat['predicted_solar_lag0']) / load_lag0_safe).fillna(0)).astype(float)
+        df_feat['solar_ramp_rate_lag0'] = df_feat['predicted_solar_lag0'].diff().fillna(0).astype(float)
+        df_feat['renewable_ramp_rate_lag0'] = (df_feat['predicted_solar_lag0'] + df_feat['predicted_wind_lag0']).diff().fillna(0).astype(float)
+        df_feat['zero_price_risk_score'] = (df_feat['renewable_pressure_ratio_lag0'] * (1.0 - (df_feat['hour'].isin([17,18,19,20,21])).astype(float))).astype(float)
+
     return df_feat
 
 
@@ -215,7 +227,9 @@ def get_feature_columns(set_name='full', df=None):
         'is_low_price_regime', 'is_zero_price_hour', 'price_volatility_24h',
         'smp_usd_lag_48', 'temperature_lag_48', 'brent_oil_lag_48', 'natural_gas_grf_lag_48',
         'temp_forecast_lag0', 'cdh_cooling_load', 'hdh_heating_load', 'temp_diff_from_yesterday',
-        'predicted_load_lag0', 'predicted_solar_lag0', 'predicted_wind_lag0'
+        'predicted_load_lag0', 'predicted_solar_lag0', 'predicted_wind_lag0',
+        'net_load_lag0', 'renewable_pressure_ratio_lag0', 'solar_peak_pressure_ratio_lag0',
+        'solar_ramp_rate_lag0', 'renewable_ramp_rate_lag0', 'zero_price_risk_score'
     ]
     
     set_map = {

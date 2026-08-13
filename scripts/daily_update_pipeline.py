@@ -1,8 +1,3 @@
-import sys
-from pathlib import Path
-project_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "scripts"))
 """Daily In-Memory ETL Pipeline.
 
 Streamlines data collection from EPİAŞ Transparency API, Open-Meteo Weather API,
@@ -10,10 +5,16 @@ and yfinance Macro indicators directly into PostgreSQL Bronze and Silver layers
 without intermediate disk-based JSON storage.
 """
 
-import os
 import sys
+from pathlib import Path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "scripts"))
+
+import os
 import time
 import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Optional
 import pandas as pd
@@ -35,12 +36,12 @@ os.makedirs("logs", exist_ok=True)
 log_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 
 # 1. Main log handler (INFO and above)
-main_file_handler = logging.FileHandler("logs/daily_update.log", encoding="utf-8")
+main_file_handler = RotatingFileHandler("logs/daily_update.log", maxBytes=10*1024*1024, backupCount=5, encoding="utf-8")
 main_file_handler.setLevel(logging.INFO)
 main_file_handler.setFormatter(log_formatter)
 
 # 2. Anomalies / Errors dedicated handler (WARNING and ERROR only - concise, non-repetitive)
-anomaly_file_handler = logging.FileHandler("logs/anomalies.log", encoding="utf-8")
+anomaly_file_handler = RotatingFileHandler("logs/anomalies.log", maxBytes=5*1024*1024, backupCount=3, encoding="utf-8")
 anomaly_file_handler.setLevel(logging.WARNING)
 anomaly_file_handler.setFormatter(log_formatter)
 

@@ -95,9 +95,7 @@ export const Forecast: React.FC<ForecastProps> = ({
       return {
         ...d,
         ptf: ptfVal,
-        epnetForecast: lgbVal,
         lightgbmForecast: lgbVal,
-        hybridForecast: lgbVal,
         upperBound: ubVal,
         lowerBound: lbVal,
       };

@@ -1,3 +1,10 @@
+"""
+[EXPERIMENTAL - Canlı pipeline'da kullanılmıyor]
+Model routing modülü. Rejim tespitine göre farklı modeller arasında geçiş yapar.
+Deneysel sonuçlar bu yaklaşımın LightGBM tek başına çalıştırmaktan daha iyi
+sonuç vermediğini göstermiştir.
+"""
+
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, Union, Optional

@@ -1,3 +1,10 @@
+"""
+[EXPERIMENTAL - Canlı pipeline'da kullanılmıyor]
+EPNet (Energy Price Network) - CNN+LSTM tabanlı derin öğrenme modeli.
+Walk-forward backtestlerde LightGBM'e göre belirgin şekilde daha kötü performans
+göstermiş (12 ay WAPE: EPNet %39.67 vs LightGBM %26.88). Canlıya alınmamıştır.
+"""
+
 import random
 import numpy as np
 import torch

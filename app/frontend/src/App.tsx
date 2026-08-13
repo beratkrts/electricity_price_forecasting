@@ -74,26 +74,28 @@ export const App: React.FC = () => {
       const lgbUsd = d.lightgbmForecastUsd !== undefined ? d.lightgbmForecastUsd : 0;
       const lgbTry = d.lightgbmForecastUsd !== undefined ? Number((d.lightgbmForecastUsd * usdRate).toFixed(2)) : d.lightgbmForecast;
 
+      const p10Usd = d.lowerBoundUsd !== undefined ? d.lowerBoundUsd : (d.lowerBound !== undefined ? Number((d.lowerBound / (usdRate || 1)).toFixed(2)) : Number((lgbUsd * 0.95).toFixed(2)));
+      const p90Usd = d.upperBoundUsd !== undefined ? d.upperBoundUsd : (d.upperBound !== undefined ? Number((d.upperBound / (usdRate || 1)).toFixed(2)) : Number((lgbUsd * 1.05).toFixed(2)));
+
+      const p10Try = d.lowerBound !== undefined ? d.lowerBound : (d.lowerBoundUsd !== undefined ? Number((d.lowerBoundUsd * usdRate).toFixed(2)) : Number((lgbTry * 0.95).toFixed(2)));
+      const p90Try = d.upperBound !== undefined ? d.upperBound : (d.upperBoundUsd !== undefined ? Number((d.upperBoundUsd * usdRate).toFixed(2)) : Number((lgbTry * 1.05).toFixed(2)));
+
       if (currencyMode === 'USD') {
         return {
           ...d,
           ptf: ptfUsd,
-          epnetForecast: lgbUsd,
           lightgbmForecast: lgbUsd,
-          hybridForecast: lgbUsd,
-          upperBound: Number((lgbUsd * 1.05).toFixed(2)),
-          lowerBound: Number((lgbUsd * 0.95).toFixed(2)),
+          upperBound: p90Usd,
+          lowerBound: p10Usd,
           smf: d.smf ? Number((d.smf / usdRate).toFixed(2)) : undefined
         };
       } else {
         return {
           ...d,
           ptf: ptfTry,
-          epnetForecast: lgbTry,
           lightgbmForecast: lgbTry,
-          hybridForecast: lgbTry,
-          upperBound: Number((lgbTry * 1.05).toFixed(2)),
-          lowerBound: Number((lgbTry * 0.95).toFixed(2)),
+          upperBound: p90Try,
+          lowerBound: p10Try,
           smf: d.smf
         };
       }

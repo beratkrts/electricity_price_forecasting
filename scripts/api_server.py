@@ -55,6 +55,10 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     TO_CHAR(target_ts, 'HH24:00') as hour, 
                     ROUND(predicted_mcp_try, 2) as lightgbm_forecast,
                     ROUND(predicted_mcp_usd, 2) as lightgbm_forecast_usd,
+                    ROUND(predicted_mcp_try_p10, 2) as price_p10,
+                    ROUND(predicted_mcp_try_p90, 2) as price_p90,
+                    ROUND(predicted_mcp_usd_p10, 2) as price_usd_p10,
+                    ROUND(predicted_mcp_usd_p90, 2) as price_usd_p90,
                     TO_CHAR(target_ts, 'YYYY-MM-DD') as target_date
                 FROM gold.ptf_predictions_daily 
                 WHERE target_ts::date = (SELECT MAX(target_ts::date) FROM gold.ptf_predictions_daily) 
@@ -299,7 +303,7 @@ async def db_data(date: str = Query(..., description="Date param or 'latest'"),
                     "kgup": "SELECT TO_CHAR(ts, 'HH24:00') as hour, total_mw as toplam FROM raw_kgup_hourly WHERE ts::date = :dt ORDER BY ts",
                     "load_forecast": "SELECT TO_CHAR(ts, 'HH24:00') as hour, load_forecast_mw as lep FROM raw_load_forecast_hourly WHERE ts::date = :dt ORDER BY ts",
                     "actual_generation": "SELECT TO_CHAR(ts, 'HH24:00') as hour, total_mw as total FROM raw_actual_generation_hourly WHERE ts::date = :dt ORDER BY ts",
-                    "lightgbm": "SELECT TO_CHAR(target_ts, 'HH24:00') as hour, predicted_mcp_try as price, predicted_mcp_try_p10 as price_p10, predicted_mcp_try_p90 as price_p90 FROM gold.ptf_predictions_daily WHERE target_ts::date = :dt ORDER BY target_ts",
+                    "lightgbm": "SELECT TO_CHAR(target_ts, 'HH24:00') as hour, predicted_mcp_try as price, predicted_mcp_try_p10 as price_p10, predicted_mcp_try_p90 as price_p90, predicted_mcp_usd as price_usd, predicted_mcp_usd_p10 as price_usd_p10, predicted_mcp_usd_p90 as price_usd_p90 FROM gold.ptf_predictions_daily WHERE target_ts::date = :dt ORDER BY target_ts",
                 }
                 if type in sql_map:
                     with engine.connect() as conn:
@@ -325,6 +329,18 @@ async def get_live_fx_rate():
     if _FX_CACHE["response"] is not None and (now_ts - _FX_CACHE["timestamp"]) < 300:
         return _FX_CACHE["response"]
 
+    # Fetch yesterday's USD/TRY from DB for accurate prevClose
+    db_prev_usd_try = None
+    try:
+        with engine.connect() as conn:
+            row = conn.execute(text(
+                "SELECT usd_try FROM raw_macro_daily WHERE usd_try IS NOT NULL AND entry_date < CURRENT_DATE ORDER BY entry_date DESC LIMIT 1"
+            )).fetchone()
+            if row and row[0]:
+                db_prev_usd_try = float(row[0])
+    except Exception:
+        pass
+
     # 1. Primary FX Provider: Open ExchangeRate API (Clean, fast, no 429 rate limiting)
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
@@ -336,9 +352,11 @@ async def get_live_fx_rate():
                     raise ValueError("TRY rate missing from ExchangeRate API")
                 eur_val = rates.get("EUR", 0.92)
                 eur_try = usd_try / eur_val if eur_val else usd_try * 1.08
+                usd_prev = db_prev_usd_try if db_prev_usd_try else round(usd_try * 0.998, 4)
+                eur_prev = round(usd_prev / eur_val, 4) if (db_prev_usd_try and eur_val) else round(eur_try * 0.998, 4)
                 res = JSONResponse(content={
-                    "USD": {"price": round(usd_try, 4), "prevClose": round(usd_try * 0.998, 4)},
-                    "EUR": {"price": round(eur_try, 4), "prevClose": round(eur_try * 0.998, 4)},
+                    "USD": {"price": round(usd_try, 4), "prevClose": usd_prev},
+                    "EUR": {"price": round(eur_try, 4), "prevClose": eur_prev},
                 })
                 _FX_CACHE["timestamp"] = now_ts
                 _FX_CACHE["response"] = res
@@ -383,9 +401,10 @@ async def get_live_fx_rate():
             row = conn.execute(text("SELECT usd_try FROM raw_macro_daily WHERE usd_try IS NOT NULL ORDER BY entry_date DESC LIMIT 1;")).fetchone()
             if row and row[0]:
                 db_usd = float(row[0])
+                usd_prev = db_prev_usd_try if db_prev_usd_try else round(db_usd * 0.998, 4)
                 res = JSONResponse(content={
-                    "USD": {"price": round(db_usd, 4), "prevClose": round(db_usd * 0.998, 4)},
-                    "EUR": {"price": round(db_usd * 1.08, 4), "prevClose": round(db_usd * 1.08 * 0.998, 4)},
+                    "USD": {"price": round(db_usd, 4), "prevClose": usd_prev},
+                    "EUR": {"price": round(db_usd * 1.08, 4), "prevClose": round(usd_prev * 1.08, 4)},
                 })
                 _FX_CACHE["timestamp"] = now_ts
                 _FX_CACHE["response"] = res

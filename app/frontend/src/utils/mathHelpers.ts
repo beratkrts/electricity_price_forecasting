@@ -9,15 +9,9 @@ export function formatDashboardMetrics(
   if (!backendMetrics || Object.keys(backendMetrics).length === 0) {
     return {
       avgPtf: 0,
-      avgEpnetForecast: 0,
       avgLightgbmForecast: 0,
-      avgHybridForecast: 0,
-      mapeEpnet: 0,
       mapeLightgbm: 0,
-      mapeHybrid: 0,
-      wapeEpnet: 0,
       wapeLightgbm: 0,
-      wapeHybrid: 0,
       wapeOob: 0,
       bestModel: 'LightGBM',
       totalIntersections: 0,
@@ -49,19 +43,10 @@ export function formatDashboardMetrics(
 
   return {
     avgPtf,
-    avgEpnetForecast: avgLightgbmForecast, // Dummy fallback for missing models
     avgLightgbmForecast,
-    avgHybridForecast: avgLightgbmForecast,
-    
-    mapeEpnet: mapeLightgbm,
     mapeLightgbm,
-    mapeHybrid: mapeLightgbm,
-    
-    wapeEpnet: wapeLightgbm,
     wapeLightgbm,
-    wapeHybrid: wapeLightgbm,
     wapeOob,
-    
     bestModel: 'LightGBM',
     totalIntersections: backendMetrics.total_hours || 0,
     peakHour: '00:00',

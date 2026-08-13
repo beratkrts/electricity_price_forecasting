@@ -55,7 +55,7 @@ export const TodayBenchmarkSection: React.FC<TodayBenchmarkSectionProps> = ({
 
       const seriesData = data.map((d: any) => {
         if (sc.id === 'lightgbmForecast') {
-          return d.lightgbmForecast !== undefined ? d.lightgbmForecast : (d.lightgbm_forecast !== undefined ? d.lightgbm_forecast : d.epnetForecast);
+          return d.lightgbmForecast !== undefined ? d.lightgbmForecast : (d.lightgbm_forecast !== undefined ? d.lightgbm_forecast : 0);
         }
         return d[sc.id] !== undefined ? d[sc.id] : 0;
       });

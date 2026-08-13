@@ -1,6 +1,6 @@
 export type ChartTypeOption = 'line' | 'smooth' | 'area' | 'bar';
 
-export type ModelType = 'epnet' | 'lightgbm' | 'hybrid';
+export type ModelType = 'lightgbm';
 
 export interface EnergyDataPoint {
   timestamp: string; // '2026-07-31 00:00'
@@ -8,12 +8,10 @@ export interface EnergyDataPoint {
   date: string; // '2026-07-31'
   ptf: number; // Gerçekleşen EPİAŞ PTF (₺/MWh)
   ptfUsd?: number; // Gerçekleşen EPİAŞ PTF ($/MWh - DB)
-  epnetForecast: number; // EPNet (CNN+LSTM) PTF Tahmini (₺/MWh)
   lightgbmForecast: number; // LightGBM PTF Tahmini (₺/MWh)
   lightgbmForecastUsd?: number; // LightGBM PTF Tahmini ($/MWh - DB)
-  hybridForecast: number; // Hibrit Model (EPNet + LightGBM Ensemble) PTF Tahmini (₺/MWh)
-  upperBound: number; // %80 Güven Aralığı Üst Sınır (₺/MWh)
-  lowerBound: number; // %80 Güven Aralığı Alt Sınır (₺/MWh)
+  upperBound: number; // P90 Güven Aralığı Üst Sınır (₺/MWh)
+  lowerBound: number; // P10 Güven Aralığı Alt Sınır (₺/MWh)
   upperBoundUsd?: number;
   lowerBoundUsd?: number;
   smf?: number; // Referans SMF (₺/MWh)
@@ -49,15 +47,9 @@ export interface IntersectionPoint {
 
 export interface DashboardMetrics {
   avgPtf: number;
-  avgEpnetForecast: number;
   avgLightgbmForecast: number;
-  avgHybridForecast: number;
-  mapeEpnet: number;
   mapeLightgbm: number;
-  mapeHybrid: number;
-  wapeEpnet: number;
   wapeLightgbm: number;
-  wapeHybrid: number;
   wapeOob: number;
   bestModel: string;
   totalIntersections: number;

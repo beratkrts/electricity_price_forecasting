@@ -1,8 +1,3 @@
-import sys
-from pathlib import Path
-project_root = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(project_root / "scripts"))
 """24/7 Continuous Background Daemon Service.
 
 Performs an initial startup sync/gap-fill, then enters a 24/7 loop sleeping until
@@ -14,9 +9,14 @@ the daemon immediately detects missed 4:00 AM runs upon waking up and executes
 the ETL pipeline instantly without needing a manual container restart.
 """
 
+import sys
+from pathlib import Path
+project_root = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "scripts"))
+
 import time
 import logging
-import sys
 from datetime import timedelta
 import pandas as pd
 from daily_update_pipeline import run_daily_pipeline

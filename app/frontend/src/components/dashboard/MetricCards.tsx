@@ -28,23 +28,23 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ metrics }) => {
         </div>
       </div>
 
-      {/* Card 2: EPNet Forecast */}
+      {/* Card 2: LightGBM WAPE */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '16px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>EPNet (CNN+LSTM) MAPE</span>
+          <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>LightGBM WAPE</span>
           <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981' }}>
             <AlertTriangle size={18} />
           </div>
         </div>
         <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#10b981', fontFamily: 'Outfit' }}>
-          %{metrics.mapeEpnet}
+          %{metrics.wapeLightgbm}
         </div>
         <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
-          Ort. Fiyat Tahmini: <strong>{formatCurrency(metrics.avgEpnetForecast, '₺')}</strong>
+          Ağırlıklı Mutlak Yüzde Hata
         </div>
       </div>
 
-      {/* Card 3: LightGBM Forecast */}
+      {/* Card 3: LightGBM MAPE */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '16px 18px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>LightGBM MAPE</span>
@@ -60,19 +60,19 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ metrics }) => {
         </div>
       </div>
 
-      {/* Card 4: Hybrid Model Forecast */}
+      {/* Card 4: Best Model */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '16px 18px', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 600 }}>Hibrit Model (Ensemble)</span>
+          <span style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 600 }}>Aktif Tahmin Modeli</span>
           <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }}>
             <Award size={18} />
           </div>
         </div>
-        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#fbbf24', fontFamily: 'Outfit' }}>
-          %{metrics.mapeHybrid} <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>MAPE</span>
+        <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fbbf24', fontFamily: 'Outfit' }}>
+          {metrics.bestModel}
         </div>
         <div style={{ fontSize: '0.72rem', color: '#fbbf24', marginTop: '4px' }}>
-          Lider Model: <strong>{metrics.bestModel}</strong>
+          Ort. Tahmin: <strong>{formatCurrency(metrics.avgLightgbmForecast, '₺')}</strong>
         </div>
       </div>
 

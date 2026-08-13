@@ -59,15 +59,15 @@ def backfill_historical_predictions(num_days: int = 730):
             continue
 
         # P50 (Medyan)
-        forecaster = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.50, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'verbose': -1, 'random_state': 42})
+        forecaster = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.50, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'min_child_samples': 10, 'verbose': -1, 'random_state': 42})
         forecaster.fit(tr_df[feature_cols], tr_df[target_col].values)
 
         # P10 (Alt Sınır)
-        forecaster_p10 = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.10, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'verbose': -1, 'random_state': 42})
+        forecaster_p10 = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.10, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'min_child_samples': 10, 'verbose': -1, 'random_state': 42})
         forecaster_p10.fit(tr_df[feature_cols], tr_df[target_col].values)
 
         # P90 (Üst Sınır)
-        forecaster_p90 = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.90, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'verbose': -1, 'random_state': 42})
+        forecaster_p90 = LightGBMForecaster(params={'objective': 'quantile', 'alpha': 0.90, 'n_estimators': 300, 'learning_rate': 0.03, 'max_depth': 8, 'num_leaves': 63, 'min_child_samples': 10, 'verbose': -1, 'random_state': 42})
         forecaster_p90.fit(tr_df[feature_cols], tr_df[target_col].values)
 
         preds_usd = forecaster.predict(te_df[feature_cols])
