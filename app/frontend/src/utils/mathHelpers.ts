@@ -10,7 +10,6 @@ export function formatDashboardMetrics(
     return {
       avgPtf: 0,
       avgLightgbmForecast: 0,
-      mapeLightgbm: 0,
       wapeLightgbm: 0,
       wapeOob: 0,
       bestModel: 'LightGBM',
@@ -23,9 +22,8 @@ export function formatDashboardMetrics(
 
   const isUsd = currencyMode === 'USD';
 
-  // Yüzdelik Hatalar (WAPE / MAPE)
+  // Yüzdelik Hatalar (WAPE)
   // Kur oynamalarından (FX distortion) etkilenmemesi için her zaman USD bazlı metrikleri baz alırız.
-  const mapeLightgbm = backendMetrics.mape_usd !== undefined ? Number(backendMetrics.mape_usd) : Number(backendMetrics.mape || 0);
   const wapeLightgbm = backendMetrics.wape_usd !== undefined ? Number(backendMetrics.wape_usd) : Number(backendMetrics.wape || 0);
   const wapeOob = backendMetrics.wape_oob_usd !== undefined ? Number(backendMetrics.wape_oob_usd) : Number(backendMetrics.wape_oob || 0);
 
@@ -44,7 +42,6 @@ export function formatDashboardMetrics(
   return {
     avgPtf,
     avgLightgbmForecast,
-    mapeLightgbm,
     wapeLightgbm,
     wapeOob,
     bestModel: 'LightGBM',

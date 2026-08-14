@@ -40,9 +40,14 @@ def run_fast_cqr():
                 e.predicted_mcp_usd_p90,
                 e.predicted_mcp_try_p90,
                 m.price_usd as y_true,
-                COALESCE(e.predicted_mcp_try / NULLIF(e.predicted_mcp_usd, 0), 34.0) as live_usd_try
+                -- FX rate as knowable at prediction time: the day before the target.
+                -- Do NOT derive it back out of predicted_mcp_try / predicted_mcp_usd —
+                -- that propagates whatever rate the source backfill happened to use.
+                mc.usd_try as live_usd_try
             FROM gold.ptf_predictions_experimental e
             JOIN raw_mcp_hourly m ON e.target_ts = m.ts
+            LEFT JOIN raw_macro_daily mc
+                   ON mc.entry_date = ((e.target_ts AT TIME ZONE 'Europe/Istanbul')::date - 1)
             WHERE e.model_name = :model_name
             ORDER BY e.target_ts ASC;
         """), conn, params={"model_name": MODEL_SOURCE})
@@ -53,7 +58,12 @@ def run_fast_cqr():
     p10_all = df_pred['predicted_mcp_usd_p10'].astype(float).values
     p90_all = df_pred['predicted_mcp_usd_p90'].astype(float).values
     p50_all = df_pred['predicted_mcp_usd'].astype(float).values
-    fx_all = df_pred['live_usd_try'].values
+    # A missing macro row for the day before the target leaves the rate NULL; carry the
+    # nearest known rate forward/backward rather than writing NaN into the TRY columns.
+    fx_series = pd.to_numeric(df_pred['live_usd_try'], errors='coerce').ffill().bfill()
+    if fx_series.isna().all():
+        raise RuntimeError("No USD/TRY rate available for any target day — aborting CQR update.")
+    fx_all = fx_series.values
     ts_all = df_pred['target_ts'].values
     
     cqr_records = []

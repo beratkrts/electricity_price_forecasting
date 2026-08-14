@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, AlertTriangle, Crosshair, Zap, Award, Activity } from 'lucide-react';
+import { TrendingUp, AlertTriangle, Crosshair, Zap, Award } from 'lucide-react';
 import { DashboardMetrics } from '../../types/energy';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -44,23 +44,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ metrics }) => {
         </div>
       </div>
 
-      {/* Card 3: LightGBM MAPE */}
-      <div className="glass-panel glass-panel-interactive" style={{ padding: '16px 18px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-          <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontWeight: 600 }}>LightGBM MAPE</span>
-          <div style={{ padding: '6px', borderRadius: '8px', background: 'rgba(225, 29, 72, 0.15)', color: '#e11d48' }}>
-            <Activity size={18} />
-          </div>
-        </div>
-        <div style={{ fontSize: '1.45rem', fontWeight: 800, color: '#e11d48', fontFamily: 'Outfit' }}>
-          %{metrics.mapeLightgbm}
-        </div>
-        <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '4px' }}>
-          Ort. Fiyat Tahmini: <strong>{formatCurrency(metrics.avgLightgbmForecast, '₺')}</strong>
-        </div>
-      </div>
-
-      {/* Card 4: Best Model */}
+      {/* Card 3: Best Model */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '16px 18px', border: '1px solid rgba(251, 191, 36, 0.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <span style={{ fontSize: '0.8rem', color: '#fbbf24', fontWeight: 600 }}>Aktif Tahmin Modeli</span>
@@ -76,7 +60,7 @@ export const MetricCards: React.FC<MetricCardsProps> = ({ metrics }) => {
         </div>
       </div>
 
-      {/* Card 5: Intersections Ping Count */}
+      {/* Card 4: Intersections Ping Count */}
       <div className="glass-panel glass-panel-interactive" style={{ padding: '16px 18px', border: '1px solid rgba(244, 63, 94, 0.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
           <span style={{ fontSize: '0.8rem', color: '#fda4af', fontWeight: 600 }}>Kesişim Ping Sayısı</span>

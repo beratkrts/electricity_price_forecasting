@@ -78,15 +78,17 @@ def backfill_historical_predictions(num_days: int = 730):
         preds_usd_p10 = np.minimum(preds_usd_p10, preds_usd)
         preds_usd_p90 = np.maximum(preds_usd_p90, preds_usd)
 
-        # Historical FX rate conversion: Use exact exchange rate of THAT test period in history
-        if 'usd_try' in te_df.columns and not te_df['usd_try'].isna().all():
-            day_usd_try_s = te_df['usd_try'].ffill().bfill()
-            if day_usd_try_s.isna().any():
-                from fetch_epias_data import resolve_usd_try_rate
-                fallback_fx = resolve_usd_try_rate(df=tr_df, engine=engine)
-                day_usd_try_s = day_usd_try_s.fillna(fallback_fx)
-            day_usd_try = day_usd_try_s.values
-        else:
+        # Historical FX conversion: use the rate as it was KNOWABLE at prediction time —
+        # the last rate in the training window, i.e. the day before the target.
+        # Using te_df['usd_try'] (the target day's own rate) would be a lookahead: at 04:00
+        # the next day's rate does not exist yet, so the backfill would flatter itself
+        # relative to what the live pipeline can actually do.
+        day_usd_try = None
+        if 'usd_try' in tr_df.columns:
+            known_fx = tr_df['usd_try'].dropna()
+            if len(known_fx) > 0:
+                day_usd_try = float(known_fx.iloc[-1])
+        if day_usd_try is None:
             from fetch_epias_data import resolve_usd_try_rate
             day_usd_try = resolve_usd_try_rate(df=tr_df, engine=engine)
 

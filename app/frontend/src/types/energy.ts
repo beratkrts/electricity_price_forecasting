@@ -48,7 +48,6 @@ export interface IntersectionPoint {
 export interface DashboardMetrics {
   avgPtf: number;
   avgLightgbmForecast: number;
-  mapeLightgbm: number;
   wapeLightgbm: number;
   wapeOob: number;
   bestModel: string;

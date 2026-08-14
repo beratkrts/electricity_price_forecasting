@@ -333,6 +333,26 @@ def resolve_usd_try_rate(df: Optional[pd.DataFrame] = None, engine: Any = None) 
     return 36.0
 
 
+# Weekends plus a holiday bridge; anything longer is a real data outage, not a closed market.
+MARKET_GAP_FFILL_LIMIT = 4
+
+
+def _fill_market_gaps(s: pd.Series, limit: int = MARKET_GAP_FFILL_LIMIT) -> pd.Series:
+    """Forward-fills non-trading days (weekends/holidays) up to `limit` days only.
+
+    Longer gaps deliberately stay NaN: a stale price repeated for a week is
+    indistinguishable from real movement downstream, whereas a NaN is visible.
+    Leading NaNs (before the first observation) are back-filled so the series
+    still starts at start_date.
+    """
+    s = s.astype(float)
+    filled = s.ffill(limit=limit)
+    first_valid = s.first_valid_index()
+    if first_valid is not None:
+        filled.loc[:first_valid] = filled.loc[:first_valid].bfill()
+    return filled
+
+
 def fetch_historical_usdtry_frankfurter(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> pd.Series:
     """Fetches official historical USD/TRY exchange rates from Frankfurter (ECB API)."""
     try:
@@ -348,15 +368,18 @@ def fetch_historical_usdtry_frankfurter(start_date: str = "2023-01-01", end_date
                 df["Date"] = pd.to_datetime(df["Date"])
                 df = df.set_index("Date").sort_index()
                 full_idx = pd.date_range(start=start_date, end=end_date, freq="D")
-                s = df["usd_try"].reindex(full_idx).ffill().bfill()
-                return s
+                return _fill_market_gaps(df["usd_try"].reindex(full_idx))
     except Exception as e:
         logger.warning(f"Could not fetch historical USD/TRY from Frankfurter API: {e}")
     return pd.Series(dtype=float)
 
 
 def fetch_historical_brent_oil_fred(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> pd.Series:
-    """Fetches official historical Brent Oil prices from FRED (Federal Reserve Bank of St. Louis API)."""
+    """Fetches official historical Brent Oil prices from FRED (Federal Reserve Bank of St. Louis API).
+
+    NOTE: FRED's DCOILBRENTEU series is published with a 2-3 business day lag, so its
+    tail is always stale. Used only as a fallback for yfinance BZ=F (see fetch_macro_in_memory).
+    """
     try:
         if not end_date:
             end_date = pd.Timestamp.now().strftime("%Y-%m-%d")
@@ -368,18 +391,54 @@ def fetch_historical_brent_oil_fred(start_date: str = "2023-01-01", end_date: Op
             df = df.set_index("observation_date").sort_index()
             df = df.loc[start_date:]
             full_idx = pd.date_range(start=start_date, end=end_date, freq="D")
-            s = df["DCOILBRENTEU"].reindex(full_idx).ffill().bfill()
-            return s
+            return _fill_market_gaps(df["DCOILBRENTEU"].reindex(full_idx))
     except Exception as e:
         logger.warning(f"Could not fetch historical Brent Oil from FRED API: {e}")
+    return pd.Series(dtype=float)
+
+
+def fetch_historical_brent_oil_yfinance(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> pd.Series:
+    """Fetches Brent Oil futures (BZ=F) from Yahoo Finance — same-day, no publication lag.
+
+    Preferred over FRED because DCOILBRENTEU lags 2-3 business days, which used to leave
+    the most recent days forward-filled with a stale price.
+    """
+    try:
+        if not end_date:
+            end_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+        # yfinance treats `end` as exclusive, so request one extra day to include end_date itself.
+        yf_end = (pd.Timestamp(end_date) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        for attempt in range(1, 4):
+            try:
+                t_df = yf.download("BZ=F", start=start_date, end=yf_end, interval="1d",
+                                   progress=False, timeout=15, auto_adjust=False)
+                if not t_df.empty and "Close" in t_df.columns:
+                    close_col = t_df["Close"]
+                    if isinstance(close_col, pd.DataFrame):
+                        close_col = close_col.iloc[:, 0]
+                    close_col.index = pd.to_datetime(close_col.index).tz_localize(None).normalize()
+                    full_idx = pd.date_range(start=start_date, end=end_date, freq="D")
+                    return _fill_market_gaps(close_col.reindex(full_idx))
+            except Exception as e:
+                logger.warning(f"yfinance attempt {attempt}/3 failed for BZ=F: {e}")
+                time.sleep(2 * attempt)
+    except Exception as e:
+        logger.warning(f"Could not fetch Brent Oil from yfinance: {e}")
     return pd.Series(dtype=float)
 
 
 def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str] = None) -> List[Dict[str, Any]]:
     """Fetches macro indicators (USD/TRY & Brent Oil) into memory safely as list of dicts with retries and fallbacks."""
     try:
+        # Never extend past today: macro observations for future dates do not exist, and
+        # reindexing to a future end_date used to write a forward-filled row for tomorrow.
         if not end_date:
-            end_date = (pd.Timestamp.now() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+            end_date = pd.Timestamp.now().strftime("%Y-%m-%d")
+        else:
+            today_str = pd.Timestamp.now().strftime("%Y-%m-%d")
+            if end_date > today_str:
+                logger.warning(f"macro end_date {end_date} is in the future; clamping to {today_str}.")
+                end_date = today_str
 
         logger.info(f"Fetching macro indicators ({start_date} to {end_date})...")
 
@@ -395,28 +454,47 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
         except Exception as e:
             logger.warning(f"Frankfurter historical FX fetch error: {e}")
 
-        # 2. Try official FRED API for historical Brent Oil prices first
+        # 2. Brent Oil: yfinance BZ=F first (same-day), FRED only as a fallback.
+        #    FRED's DCOILBRENTEU lags 2-3 business days, which left the latest days stale.
         try:
-            brent_series = fetch_historical_brent_oil_fred(start_date, end_date)
+            brent_series = fetch_historical_brent_oil_yfinance(start_date, end_date)
             if not brent_series.empty:
                 df_dict["BZ=F"] = brent_series
-                logger.info(f"✅ Ingested {len(brent_series)} official historical Brent Oil prices from FRED API.")
+                logger.info(f"✅ Ingested {len(brent_series)} Brent Oil prices from yfinance (BZ=F).")
         except Exception as e:
-            logger.warning(f"FRED historical Brent Oil fetch error: {e}")
+            logger.warning(f"yfinance Brent Oil fetch error: {e}")
+
+        if "BZ=F" not in df_dict:
+            try:
+                brent_series = fetch_historical_brent_oil_fred(start_date, end_date)
+                if not brent_series.empty:
+                    from src.utils.fallback_logger import log_fallback
+                    df_dict["BZ=F"] = brent_series
+                    last_val = float(brent_series.dropna().iloc[-1]) if brent_series.notna().any() else 0.0
+                    log_fallback("DataFetcher", "yfinance BZ=F unavailable, fell back to FRED DCOILBRENTEU (2-3 day publication lag)", last_val)
+                    logger.info(f"✅ Ingested {len(brent_series)} official historical Brent Oil prices from FRED API.")
+            except Exception as e:
+                logger.warning(f"FRED historical Brent Oil fetch error: {e}")
+
+        full_idx = pd.date_range(start=start_date, end=end_date, freq="D")
 
         for symbol in tickers:
             if symbol in df_dict:
                 continue
 
             fetched = False
+            # yfinance treats `end` as exclusive, so request one extra day to include end_date.
+            yf_end = (pd.Timestamp(end_date) + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
             for attempt in range(1, 4):
                 try:
-                    t_df = yf.download(symbol, start=start_date, end=end_date, interval="1d", progress=False, timeout=15)
+                    t_df = yf.download(symbol, start=start_date, end=yf_end, interval="1d",
+                                       progress=False, timeout=15, auto_adjust=False)
                     if not t_df.empty and "Close" in t_df.columns:
                         close_col = t_df["Close"]
                         if isinstance(close_col, pd.DataFrame):
                             close_col = close_col.iloc[:, 0]
-                        df_dict[symbol] = close_col
+                        close_col.index = pd.to_datetime(close_col.index).tz_localize(None).normalize()
+                        df_dict[symbol] = _fill_market_gaps(close_col.reindex(full_idx))
                         fetched = True
                         break
                 except Exception as e:
@@ -427,11 +505,13 @@ def fetch_macro_in_memory(start_date: str = "2023-01-01", end_date: Optional[str
                 logger.warning(f"⚠️ yfinance unavailable for {symbol}. Omitting symbol from fetch batch to preserve existing DB values.")
 
         if df_dict:
+            # Every source is already reindexed onto full_idx and gap-filled within
+            # MARKET_GAP_FFILL_LIMIT, so no blanket ffill/bfill here — that would silently
+            # revive stale values across long outages.
             macro = pd.DataFrame(df_dict)
             macro.index = pd.to_datetime(macro.index).strftime("%Y-%m-%d")
             macro = macro.reset_index()
             date_col = macro.columns[0]
-            macro = macro.ffill().bfill()
 
             records = []
             for _, row in macro.iterrows():

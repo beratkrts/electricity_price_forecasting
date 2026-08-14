@@ -1,6 +1,7 @@
 # Local environment & secret files
 .env
 .env.*
+!.env.example
 .eptr2-tgt
 .venv/
 venv/

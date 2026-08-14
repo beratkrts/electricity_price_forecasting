@@ -30,8 +30,6 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
   const [perfData, setPerfData] = useState<{
     wape: string;
     wapeUsd: string;
-    mape: string;
-    mapeUsd: string;
     mae: string;
     maeUsd: string;
     avgPredicted: string;
@@ -42,8 +40,6 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
   }>({
     wape: '16.88',
     wapeUsd: '16.92',
-    mape: '18.42',
-    mapeUsd: '18.51',
     mae: '371.35',
     maeUsd: '11.20',
     avgPredicted: '2169.32',
@@ -65,8 +61,6 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
           setPerfData({
             wape: item.wape || '16.88',
             wapeUsd: item.wape_usd || '16.92',
-            mape: item.mape || '18.42',
-            mapeUsd: item.mape_usd || '18.51',
             mae: item.mae || '371.35',
             maeUsd: item.mae_usd || '11.20',
             avgPredicted: item.avg_predicted || '2169.32',
@@ -97,7 +91,7 @@ export const HistoricalPerformanceSection: React.FC<HistoricalPerformanceSection
 
   const symbol = currencyMode === 'USD' ? '$' : '₺';
 
-  // Yüzdelik hata metrikleri (WAPE, MAPE) her zaman USD üzerinden hesaplanmalıdır.
+  // Yüzdelik hata metriği (WAPE) her zaman USD üzerinden hesaplanır.
   // Çünkü geçmiş TRY verilerindeki kur dalgalanmaları veya veritabanındaki sabit kur 
   // backfill işlemleri TRY hatalarını manipüle edebilir. Yüzde, para biriminden bağımsız gerçek başarıyı göstermelidir.
   const wapeVal = perfData.wapeUsd;

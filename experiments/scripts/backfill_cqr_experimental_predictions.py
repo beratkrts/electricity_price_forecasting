@@ -54,7 +54,10 @@ def run_cqr_backfill():
     total_dates = len(unique_dates)
     
     calibrator = CQRCalibrator(target_coverage=0.80, cal_window_days=30)
-    latest_usd_try = resolve_usd_try_rate(df=df_raw, engine=engine)
+    # Fallback only — the per-day rate below is resolved inside the walk-forward loop.
+    # This used to be resolved ONCE here and applied to every historical day, which
+    # converted 2024 predictions with a 2026 rate (up to +43% inflation in TRY).
+    fallback_usd_try = resolve_usd_try_rate(df=df_raw, engine=engine)
     
     records = []
     
@@ -104,16 +107,24 @@ def run_cqr_backfill():
         hist_p90.extend(raw_p90)
         hist_y.extend(act_y)
         
+        # FX rate as it was knowable at prediction time: the last rate in the training
+        # window, i.e. the day before the target. Same definition the live pipeline uses.
+        day_fx = fallback_usd_try
+        if 'usd_try' in train_data.columns:
+            known_fx = train_data['usd_try'].dropna()
+            if len(known_fx) > 0:
+                day_fx = float(known_fx.iloc[-1])
+
         for ts_val, p50, p10, p90 in zip(future_data.index, raw_p50, p10_cqr, p90_cqr):
             records.append({
                 'target_ts': ts_val,
                 'model_name': MODEL_NAME,
                 'predicted_mcp_usd': round(float(p50), 4),
-                'predicted_mcp_try': round(float(p50 * latest_usd_try), 4),
+                'predicted_mcp_try': round(float(p50 * day_fx), 4),
                 'predicted_mcp_usd_p10': round(float(p10), 4),
-                'predicted_mcp_try_p10': round(float(p10 * latest_usd_try), 4),
+                'predicted_mcp_try_p10': round(float(p10 * day_fx), 4),
                 'predicted_mcp_usd_p90': round(float(p90), 4),
-                'predicted_mcp_try_p90': round(float(p90 * latest_usd_try), 4)
+                'predicted_mcp_try_p90': round(float(p90 * day_fx), 4)
             })
             
         if (idx + 1) % 50 == 0 or (idx + 1) == total_dates:

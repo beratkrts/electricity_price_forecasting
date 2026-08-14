@@ -81,8 +81,11 @@ def run_experimental_backfill():
     total_dates = len(unique_dates)
     logger.info(f"⏳ Total prediction days to process: {total_dates}")
     
-    latest_usd_try = resolve_usd_try_rate(df=df_raw, engine=engine)
-    
+    # Fallback only — the per-day rate below is resolved inside the walk-forward loop.
+    # This used to be resolved ONCE here and applied to every historical day, which
+    # converted 2024 predictions with a 2026 rate (up to +43% inflation in TRY).
+    fallback_usd_try = resolve_usd_try_rate(df=df_raw, engine=engine)
+
     for idx, d in enumerate(unique_dates):
         train_end = d - pd.Timedelta(days=1) + pd.Timedelta(hours=23)
         train_data = df_model.loc[:train_end]
@@ -109,17 +112,25 @@ def run_experimental_backfill():
         
         preds_p10 = np.minimum(preds_p10, preds_p50)
         preds_p90 = np.maximum(preds_p90, preds_p50)
-        
+
+        # FX rate as it was knowable at prediction time: the last rate in the training
+        # window, i.e. the day before the target. Same definition the live pipeline uses.
+        day_fx = fallback_usd_try
+        if 'usd_try' in train_data.columns:
+            known_fx = train_data['usd_try'].dropna()
+            if len(known_fx) > 0:
+                day_fx = float(known_fx.iloc[-1])
+
         for ts_val, p50, p10, p90 in zip(future_data.index, preds_p50, preds_p10, preds_p90):
             records.append({
                 'target_ts': ts_val,
                 'model_name': MODEL_NAME,
                 'predicted_mcp_usd': round(float(p50), 4),
-                'predicted_mcp_try': round(float(p50 * latest_usd_try), 4),
+                'predicted_mcp_try': round(float(p50 * day_fx), 4),
                 'predicted_mcp_usd_p10': round(float(p10), 4),
-                'predicted_mcp_try_p10': round(float(p10 * latest_usd_try), 4),
+                'predicted_mcp_try_p10': round(float(p10 * day_fx), 4),
                 'predicted_mcp_usd_p90': round(float(p90), 4),
-                'predicted_mcp_try_p90': round(float(p90 * latest_usd_try), 4)
+                'predicted_mcp_try_p90': round(float(p90 * day_fx), 4)
             })
             
         if (idx + 1) % 30 == 0 or (idx + 1) == total_dates:

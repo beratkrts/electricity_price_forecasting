@@ -335,7 +335,7 @@ export const Forecast: React.FC<ForecastProps> = ({
                   // Always use USD values for percentage error to prevent FX distortion
                   const ptfUsd = row.ptfUsd && row.ptfUsd > 0 ? row.ptfUsd : ptfVal;
                   const lgbUsd = row.lightgbmForecastUsd !== undefined ? row.lightgbmForecastUsd : lgbVal;
-                  const mape = ptfUsd > 0 ? (Math.abs(lgbUsd - ptfUsd) / ptfUsd) * 100 : 0;
+                  const ape = ptfUsd > 0 ? (Math.abs(lgbUsd - ptfUsd) / ptfUsd) * 100 : 0;
                   
                   const symbolStr = currencyMode === 'USD' ? '$' : '₺';
 
@@ -345,7 +345,7 @@ export const Forecast: React.FC<ForecastProps> = ({
                       <td style={{ padding: '8px 12px', color: '#fff', fontWeight: 600 }}>{formatCurrency(ptfVal, symbolStr)}</td>
                       <td style={{ padding: '8px 12px', color: '#c084fc', fontWeight: 600 }}>{formatCurrency(lgbVal, symbolStr)}</td>
                       <td style={{ padding: '8px 12px', color: '#38bdf8' }}>{formatCurrency(diff, symbolStr)}</td>
-                      <td style={{ padding: '8px 12px', color: mape > 10 ? '#f43f5e' : '#10b981' }}>%{mape.toFixed(2)}</td>
+                      <td style={{ padding: '8px 12px', color: ape > 10 ? '#f43f5e' : '#10b981' }}>%{ape.toFixed(2)}</td>
                     </tr>
                   )
                 })}
