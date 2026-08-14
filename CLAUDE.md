@@ -226,13 +226,15 @@ docker compose up --build -d
 | `EXPERIMENT_REPORT.md` | Tüm model deneylerinin sonuç tabloları ve karşılaştırması |
 | `EXPERIMENT_WORKFLOW.md` | Sistematik deney çalışma rehberi ve repo temizleme planı |
 | `CRISIS_ANALYSIS_PLAN.md` | **Yeni aşama:** kriz/olay istihbarat sistemi — tasarım ve fizibilite |
+| `LOW_PRICE_REGIME_ANALYSIS.md` | 2026 bahar fiyat çöküşü teşhisi — hidro rejim kırılması, tekrar üretilebilir SQL + notebook planı |
+| `METRICS.md` | **Metrik rehberi** — çekirdek set (MAE/BIAS/rMAE/sMAPE/WAPE/kapsama), naive baseline, hazır SQL. Model kararı tek metriğe dayanmaz. |
 
 ## Model Versiyonları
 
 | Model | Durum | Fark |
 |-------|-------|------|
-| **LightGBM_v1** | CANLI (`gold.ptf_predictions_daily`) | Quantile P10/P50/P90, robust features, min_child=20 |
-| **lgb_lag0_v2** | Deneysel (`gold.ptf_predictions_experimental`) | + lag0 renewable ratios, min_child=10 |
+| **lgb_lag0_v2** | **CANLI** (`gold.ptf_predictions_daily`) | Quantile P10/P50/P90, robust features + lag0 renewable ratios, min_child=10 |
+| **LightGBM_v1** | Sadece **etiket** — kaldırıldı | `gold.ptf_predictions_daily.model_name` hâlâ bu değeri yazıyor ama içerik lag0_v2. Etikete güvenme. |
 | **lgb_cqr_v2** | Deneysel (`gold.ptf_predictions_experimental`) | lgb_lag0_v2 + CQR kalibre güven aralığı |
 | Eski Log1p | Kaldırıldı | Notebook benchmark'larının çoğu buna ait |
 
