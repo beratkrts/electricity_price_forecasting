@@ -11,8 +11,21 @@ class LightGBMForecaster:
     LightGBM tabanlı enerji fiyat tahmin modeli.
     Log-transform (log1p / expm1) ile eğitilir ve tahmin verir.
     """
+    # Reproducibility guards, kept separate from the hyperparameters below.
+    # `params or {...}` discards the whole default dict whenever a caller supplies its own,
+    # and every call site does — so these used to be silently dropped everywhere. They are
+    # re-applied via setdefault so a caller can still override them explicitly.
+    # Hyperparameters are deliberately NOT merged: injecting subsample/regularisation into
+    # a caller's dict would change model behaviour, not just reproducibility.
+    _REPRODUCIBILITY_DEFAULTS = {
+        'verbose': -1,
+        'random_state': 42,
+        'deterministic': True,
+        'force_col_wise': True,
+    }
+
     def __init__(self, params: Optional[Dict] = None, use_log_transform: Optional[bool] = None):
-        self.params = params or {
+        self.params = dict(params) if params else {
             'n_estimators': 300,
             'learning_rate': 0.03,
             'max_depth': 8,
@@ -22,11 +35,9 @@ class LightGBMForecaster:
             'reg_alpha': 0.1,
             'reg_lambda': 0.1,
             'min_child_samples': 20,
-            'verbose': -1,
-            'random_state': 42,
-            'deterministic': True,
-            'force_col_wise': True,
         }
+        for key, value in self._REPRODUCIBILITY_DEFAULTS.items():
+            self.params.setdefault(key, value)
         # If use_log_transform not explicitly set: disable for quantile regression so high price spikes are captured accurately
         if use_log_transform is not None:
             self.use_log_transform = use_log_transform

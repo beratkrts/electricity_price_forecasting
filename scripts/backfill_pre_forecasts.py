@@ -71,15 +71,25 @@ def run_pre_forecasts_backfill(num_days: int = 730, df_raw: Optional[pd.DataFram
     logger.info(f"💾 Saving {len(all_records)} pre-forecast records to gold.kgup_load_pre_forecasts...")
 
     engine = get_db_engine()
+    # Pre-forecasts are immutable once written: the first forecast produced for a target
+    # hour is the one the price model actually consumed, so it must stay put. This used to
+    # be DO UPDATE, and because every run regenerates the last 3 days, a given day's
+    # pre-forecast silently changed depending on when it was last rewritten — which made
+    # the same day's price prediction irreproducible across runs and machines.
+    # The WHERE clause is the only escape hatch: an incomplete (NULL) row gets repaired.
+    # To deliberately regenerate a range, DELETE those rows first.
     insert_sql = text("""
         INSERT INTO gold.kgup_load_pre_forecasts (target_ts, predicted_load_lag0, predicted_solar_lag0, predicted_wind_lag0)
         VALUES (:target_ts, :predicted_load_lag0, :predicted_solar_lag0, :predicted_wind_lag0)
-        ON CONFLICT (target_ts) 
-        DO UPDATE SET 
+        ON CONFLICT (target_ts)
+        DO UPDATE SET
             predicted_load_lag0 = EXCLUDED.predicted_load_lag0,
             predicted_solar_lag0 = EXCLUDED.predicted_solar_lag0,
             predicted_wind_lag0 = EXCLUDED.predicted_wind_lag0,
-            created_at = CURRENT_TIMESTAMP;
+            created_at = CURRENT_TIMESTAMP
+        WHERE gold.kgup_load_pre_forecasts.predicted_load_lag0 IS NULL
+           OR gold.kgup_load_pre_forecasts.predicted_solar_lag0 IS NULL
+           OR gold.kgup_load_pre_forecasts.predicted_wind_lag0 IS NULL;
     """)
 
     chunk_size = 1000

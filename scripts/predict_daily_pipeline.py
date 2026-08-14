@@ -315,13 +315,19 @@ def run_daily_prediction(force: bool = False):
             df_extended.loc[next_24h_index, 'predicted_wind_lag0'] = preds_df['predicted_wind_lag0'].values
         
         # DB'ye kaydet (Audit için)
+        # Immutable once written — see the note in backfill_pre_forecasts.py. Only an
+        # incomplete (NULL) row is repaired; otherwise the first forecast for this hour wins.
         insert_pre_sql = text("""
             INSERT INTO gold.kgup_load_pre_forecasts (target_ts, predicted_load_lag0, predicted_solar_lag0, predicted_wind_lag0)
             VALUES (:target_ts, :predicted_load_lag0, :predicted_solar_lag0, :predicted_wind_lag0)
-            ON CONFLICT (target_ts) DO UPDATE SET 
+            ON CONFLICT (target_ts) DO UPDATE SET
                 predicted_load_lag0 = EXCLUDED.predicted_load_lag0,
                 predicted_solar_lag0 = EXCLUDED.predicted_solar_lag0,
-                predicted_wind_lag0 = EXCLUDED.predicted_wind_lag0;
+                predicted_wind_lag0 = EXCLUDED.predicted_wind_lag0,
+                created_at = CURRENT_TIMESTAMP
+            WHERE gold.kgup_load_pre_forecasts.predicted_load_lag0 IS NULL
+               OR gold.kgup_load_pre_forecasts.predicted_solar_lag0 IS NULL
+               OR gold.kgup_load_pre_forecasts.predicted_wind_lag0 IS NULL;
         """)
         for col in ['predicted_load_lag0', 'predicted_solar_lag0', 'predicted_wind_lag0']:
             if col not in preds_df.columns:
