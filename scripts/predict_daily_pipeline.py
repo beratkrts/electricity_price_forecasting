@@ -1,10 +1,12 @@
 """
 Günlük LightGBM Tahmin Pipeline Script'i.
 
-PostgreSQL veritabanındaki 2024-01-01'den itibaren TÜM geçmiş veriyi yükler,
-Robust Feature Set ile LightGBM (log-transform) modelini eğitir,
+PostgreSQL veritabanındaki TRAINING_DATA_START (2023-01-01) sonrası geçmiş veriyi yükler,
+Robust Feature Set ile 3 başlı LightGBM quantile modelini (P10/P50/P90) eğitir,
 önümüzdeki 24 saat için PTF tahminlerini üretir ve
 `gold.ptf_predictions_daily` tablosuna kaydeder.
+
+Not: log-transform quantile objective ile KULLANILMAZ (bkz. LightGBMForecaster).
 """
 
 import sys
@@ -24,6 +26,14 @@ from src.features.feature_engineering import build_robust_features, get_feature_
 from src.models.lightgbm_model import LightGBMForecaster
 
 logger = logging.getLogger("DailyPredictionPipeline")
+
+# Price model training window floor. The raw tables deliberately hold more history than
+# this (2021+ is ingested for the crisis/event impact analysis), but 2021-2022 was a
+# different market regime — the azami fiyat limiti (price cap) period — and letting it
+# into training would silently change live model behaviour. The master query below had no
+# date filter at all, so every row in raw_mcp_hourly used to become training data.
+# Raise this only as a deliberate, benchmarked decision.
+TRAINING_DATA_START = "2023-01-01"
 
 
 def create_gold_schema_if_not_exists(run_backfill_if_empty: bool = True):
@@ -113,11 +123,12 @@ def load_all_historical_data():
             GROUP BY DATE(date_time)
         ) wp ON DATE(m.ts) = wp.entry_date
         LEFT JOIN gold.kgup_load_pre_forecasts pf ON m.ts = pf.target_ts
+        WHERE m.ts >= :training_start
         ORDER BY m.ts ASC;
     """)
 
     with engine.connect() as conn:
-        df_raw = pd.read_sql(master_sql, conn)
+        df_raw = pd.read_sql(master_sql, conn, params={"training_start": TRAINING_DATA_START})
 
     ts_series = pd.to_datetime(df_raw['ts'])
     if ts_series.dt.tz is None:

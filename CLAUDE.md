@@ -5,6 +5,11 @@
 Türkiye elektrik piyasası (EPİAŞ) Gün Öncesi Piyasa Takas Fiyatı (PTF/MCP) tahmini için uçtan uca AI/ML pipeline'ı.
 Her gün saat 04:00'te (Europe/Istanbul) 14+ veri kaynağından veri çeker, LightGBM ile yarının 24 saatlik fiyatını tahmin eder ve React dashboard üzerinden sunar.
 
+**Proje aşaması (14 Ağustos 2026):** Fiyat modeli geliştirmesi kapandı — `lgb_lag0_v2` canlı
+şampiyon, 24 saatlik ayrı model deneyi reddedildi (%16.00 vs %15.92 WAPE, 700 kat maliyet).
+Aktif çalışma **kriz/olay istihbarat sistemine** kaydı: bkz. `CRISIS_ANALYSIS_PLAN.md`.
+Ham veri bu nedenle 2021'e kadar çekildi; **modelin eğitim penceresi 2023'te sabit kaldı.**
+
 ## Teknoloji Stack
 
 | Katman | Teknoloji |
@@ -97,7 +102,7 @@ daily_update_pipeline.py
     │
     └── 16. predict_daily_pipeline.py
             │
-            ├── Tüm geçmiş veri yükle (2024-01-01+)
+            ├── Geçmiş veriyi yükle (TRAINING_DATA_START = 2023-01-01+)
             ├── Pre-forecasters güncelle (son 3 gün)
             ├── build_robust_features() (65+ feature)
             ├── 3x LightGBM eğit (P10, P50, P90)
@@ -148,7 +153,9 @@ USD/TRY ve EUR/TRY döviz kurları (3 kademeli fallback: ExchangeRate-API → Ya
 | EPİAŞ EPTR2 | `eptr2` lib | Saatlik | MCP, SMP, KGÜP, Load, ActGen, ActCons, Bids |
 | EPİAŞ Custom | REST | Günlük | Dam fullness, Water energy, Natural gas GRF |
 | Open-Meteo | REST | Saatlik | Ağırlıklı sıcaklık (26 bölge), rüzgar hızı (3 şehir) |
-| Yahoo Finance | `yfinance` | Günlük | USD/TRY, Brent Oil |
+| Yahoo Finance | `yfinance` ≥1.5.2 | Günlük | Brent (`BZ=F`) **birincil**, USD/TRY yedek |
+| Frankfurter (ECB) | REST | Günlük | USD/TRY **birincil** |
+| FRED | CSV | Günlük | Brent `DCOILBRENTEU` — **sadece yedek** (2-3 iş günü gecikmeli) |
 
 ## Geliştirme Komutları
 
@@ -175,7 +182,28 @@ docker compose up --build -d
 - **Quantile crossover:** P10 ≤ P50 ≤ P90 monotonic garanti her zaman uygulanır.
 - **İlk deployment:** `gold.ptf_predictions_daily < 1000 satır` ise otomatik 730 gün backfill tetiklenir.
 - **USD/TRY resolver:** 4 aşamalı: df_raw → yfinance API → DB query → ECB API fallback.
-- **Model her gün sıfırdan eğitilir** (tüm geçmiş veri ile). Disk'e kaydedilmez.
+- **Model her gün sıfırdan eğitilir.** Disk'e kaydedilmez.
+- **İki ayrı tarih sınırı var, karıştırma:**
+
+  | Sabit | Değer | Kontrol ettiği |
+  |---|---|---|
+  | `daily_update_pipeline.HISTORY_START` | `2021-01-01` | Ham verinin geriye kapsamı (kriz analizi için) |
+  | `predict_daily_pipeline.TRAINING_DATA_START` | `2023-01-01` | Fiyat modelinin eğitim penceresi |
+
+  2021-2022 azami fiyat limiti (tavan fiyat) rejimiydi — Mart 2022'de saatlerin %65'i tavanda.
+  O veri modele girerse canlı davranış bozulur. `TRAINING_DATA_START`'ı ancak ölçülmüş,
+  bilinçli bir kararla yükselt.
+- **TL dönüşümü gün-bazlı kurla yapılır.** Backfill'lerde kur döngü *içinde*, eğitim
+  penceresinin son değerinden alınır (`train_data['usd_try'].dropna().iloc[-1]`) — yani
+  hedef günden bir önceki gün, canlı pipeline ile aynı tanım. Döngü dışında tek skaler
+  çözmek 730 günün hepsini aynı kurla çevirir; bu bug TL WAPE'i %28.5 gösteriyordu (gerçek %12.5).
+  Kuru **asla** kaydedilmiş `predicted_mcp_try / predicted_mcp_usd` oranından geri türetme.
+- **Pre-forecast'lar immutable.** `gold.kgup_load_pre_forecasts` bir hedef saat için ilk
+  yazılan tahmini korur (`ON CONFLICT ... WHERE ... IS NULL`). Eskiden her koşu son 3 günü
+  yeniden yazdığı için aynı günün fiyat tahmini koşular ve makineler arasında tekrarlanamıyordu.
+  Bilinçli yeniden üretim için önce ilgili satırları `DELETE` et.
+- **`LightGBMForecaster`'a params geçerken:** `deterministic` / `force_col_wise` /
+  `random_state` `setdefault` ile korunur. Hiperparametreler kasıtlı olarak birleştirilmez.
 
 ## Canlıda KULLANILMAYAN (Deneysel) Modüller
 
@@ -197,6 +225,7 @@ docker compose up --build -d
 | `ISSUES.md` | Tespit edilen sorunlar ve iyileştirme önerileri |
 | `EXPERIMENT_REPORT.md` | Tüm model deneylerinin sonuç tabloları ve karşılaştırması |
 | `EXPERIMENT_WORKFLOW.md` | Sistematik deney çalışma rehberi ve repo temizleme planı |
+| `CRISIS_ANALYSIS_PLAN.md` | **Yeni aşama:** kriz/olay istihbarat sistemi — tasarım ve fizibilite |
 
 ## Model Versiyonları
 

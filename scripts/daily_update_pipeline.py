@@ -62,6 +62,13 @@ if not root_logger.handlers:
 
 logger = logging.getLogger("ETLPipeline")
 
+# How far back a first-time install ingests raw history. Moved from 2023-01-01 to cover the
+# 2021-2022 shocks (Jan 2022 Iran gas cut, Feb 2022 war shock) that the crisis/event impact
+# analysis needs. This does NOT widen the price model's training window — that is pinned
+# separately by predict_daily_pipeline.TRAINING_DATA_START, because 2021-2022 was the
+# azami fiyat limiti (price cap) regime and would distort the live model.
+HISTORY_START = "2021-01-01"
+
 
 def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optional[str] = None, force_prediction: bool = False) -> None:
     """Executes the in-memory ETL pipeline for the specified date range or defaults to historical sync."""
@@ -108,9 +115,9 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
             sync_start = (today_dt - pd.DateOffset(months=2)).replace(day=1)
             logger.info("ℹ️ Existing database detected. Running fast daily sync (recent 2 months)...")
         else:
-            # Initial first-time run: full historical backfill from 2023-01-01
-            sync_start = pd.to_datetime("2023-01-01")
-            logger.info("📦 Empty database detected. Triggering initial full historical backfill from 2023-01-01...")
+            # Initial first-time run: full historical backfill from HISTORY_START.
+            sync_start = pd.to_datetime(HISTORY_START)
+            logger.info(f"📦 Empty database detected. Triggering initial full historical backfill from {HISTORY_START}...")
 
         monthly_starts = pd.date_range(start=sync_start, end=today_dt, freq="MS")
         periods = [
