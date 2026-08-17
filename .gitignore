@@ -65,3 +65,6 @@ docs/
 experiments/notebooks/
 experiments/research_scripts/
 experiments/generators/
+
+# Raporlar (yerel deliverable — GitHub'a gitmez)
+reports/

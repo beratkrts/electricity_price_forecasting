@@ -243,3 +243,47 @@ CREATE TABLE IF NOT EXISTS gold.kgup_load_pre_forecasts (
 
 CREATE INDEX IF NOT EXISTS idx_gold_predictions_target_ts ON gold.ptf_predictions_daily(target_ts);
 
+
+-- -----------------------------------------------------------------------------
+-- 4. BRONZE KATMANI (HABER ARŞİVİ) — Kriz & Olay İstihbarat Sistemi
+--    Bkz. CRISIS_ANALYSIS_PLAN.md. Bu katman HAM'dır ve değiştirilmez:
+--    türetilmiş her şey (alaka filtresi, LLM etiketleri) silver/gold'a yazılır.
+-- -----------------------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS bronze;
+
+CREATE TABLE IF NOT EXISTS bronze.news_raw (
+    article_id   BIGINT PRIMARY KEY,           -- URL'deki sıralı ID: ...-41334h.htm -> 41334
+    url          TEXT NOT NULL UNIQUE,
+    source       VARCHAR(50) NOT NULL DEFAULT 'enerjigunlugu',
+    published_at TIMESTAMPTZ NOT NULL,         -- itemprop=datePublished — YETKİLİ yayın anı
+    modified_at  TIMESTAMPTZ,                  -- itemprop=dateModified
+    section      VARCHAR(100),                 -- itemprop=articleSection (Elektrik/Doğalgaz/Mevzuat/...)
+    title        TEXT NOT NULL,                -- itemprop=headline
+    description  TEXT,                         -- itemprop=description (spot)
+    body         TEXT NOT NULL,                -- itemprop=articleBody, boşluk normalize
+    body_chars   INT NOT NULL,
+    keywords     TEXT[],                       -- itemprop=keywords — editör etiketleri, kural filtresini besler
+    author       VARCHAR(200),
+    content_hash CHAR(64) NOT NULL,            -- SHA-256(title|body) — mükerrer içerik tespiti
+    http_status  SMALLINT,
+    fetched_at   TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_news_published_at ON bronze.news_raw(published_at);
+CREATE INDEX IF NOT EXISTS idx_news_section      ON bronze.news_raw(section);
+CREATE INDEX IF NOT EXISTS idx_news_hash         ON bronze.news_raw(content_hash);
+CREATE INDEX IF NOT EXISTS idx_news_keywords     ON bronze.news_raw USING GIN(keywords);
+-- Tam metin arama: LLM hiç çalışmasa bile anahtar kelimeyle vaka çalışması yapılabilsin.
+-- 'simple' konfigürasyonu bilinçli: PostgreSQL'de Türkçe stemmer yok, yanlış kök bulmaktansa hiç bulma.
+CREATE INDEX IF NOT EXISTS idx_news_fts ON bronze.news_raw
+    USING GIN(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(body,'')));
+
+-- Başarısız çekimler: hedefli yeniden deneme için. Başarılı çekimde satır silinir.
+CREATE TABLE IF NOT EXISTS bronze.news_fetch_errors (
+    url         TEXT PRIMARY KEY,
+    article_id  BIGINT,
+    http_status SMALLINT,
+    error       TEXT,
+    attempts    INT DEFAULT 1,
+    last_try_at TIMESTAMPTZ DEFAULT NOW()
+);
