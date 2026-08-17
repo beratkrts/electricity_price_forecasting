@@ -19,9 +19,11 @@ verisi bir olayda gerçekten örtüşüyor mu, ve sansürlü rejimde etki nasıl
    Talep baskısı eşzamanlı.
 3. **Tetikleyici.** İran kesintisi — gazdan elektrik üretimi %28,6 düştü.
 
-Ve bir metodolojik kazanım: **tavan çıkarımı doğrulandı** (Şubat 2022 için haberin verdiği
-resmî değer 1.524 TL, veriden çıkarılan 1.524 TL — birebir), ama **koşullu geçerli olduğu**
-da ortaya çıktı. Detay Bölüm 3'te.
+Ve bir metodolojik kazanım: **tavan artık çıkarım değil, ölçüm.** Haber arşivinden resmî
+azami fiyat serisi derlendi (`silver.price_cap_official`, 28 yürürlük kaydı) ve 67 ayın
+67'sinde doğrulandı. Bu, planın §5'teki "elle etiket gerektirmeyen kalite testi"nin ilk
+ürünü — ve beklenenin tersine, haber hattı üzerine kurulduğu **ölçümü** düzeltti.
+Detay Bölüm 3'te.
 
 ---
 
@@ -86,11 +88,28 @@ her satırın kaynak haberi kayıtlı.
 | Hata | Örnek | Etkisi |
 |---|---|---|
 | **Tavan ay ortasında değişebiliyor** | 2021-10-15 (718 → 1.078), 2022-05-19, 2025-04-05, 2026-04-04 | Aylık maksimum düşük olanı hiç görmüyor. Ekim 2021: %8,1 yerine gerçekte **%22,6** |
-| **Fiyat tavana hiç değmediği aylarda maksimum tavan değil** | Şubat 2023: tavan 4.200 TL, fiyat 3.650'yi geçmedi | Eski yöntem %15,6 "tavanda" gösteriyordu, gerçek **%0** |
+| **Fiyat tavana hiç değmediği aylarda maksimum tavan değil** | Şubat 2021: tavan 572 TL, fiyat 335'i geçmedi | O ay tavan hiç devreye girmedi, oran **%0** |
 
 Bu iki hata düzeltildi; aşağıdaki bütün tavan oranları resmî seriyle hesaplandı
-(`silver.mcp_with_cap` görünümü). Bölüm 3.1 ve 3.2 çıkarım yönteminin nasıl doğrulandığını
-belgeliyor — yöntem artık kullanılmıyor ama nasıl test edildiği kayıtta kalsın.
+(`silver.mcp_with_cap` görünümü).
+
+**Serinin kendi öz-testi ve kör noktası.** Seri 28 yürürlük kaydı içeriyor ama 67 ayı
+kapsıyor — kayıt olmayan aylarda önceki değerin devam ettiği varsayılıyor. Bu varsayımın
+testi şu: *fiyat hiçbir saatte tavanı aşamaz.* Aşıyorsa kaçırılmış bir **artış** var.
+Test 48.000 saatte sıfır aşım verdi.
+
+Ama testin kör noktası var: kaçırılmış bir **düşüş** görünmez, çünkü fiyat zaten daha
+düşük kalır. Ve bu senaryo gerçekten olmuştu — Şubat 2023'te EPDK tavanı 4.200'den
+**3.650'ye indirmiş** (haber `52617`, 26 Ocak 2023). Bu kaydı ilk derlemede kaçırmıştım
+ve o ayın maksimumu olan 3.650'yi "piyasanın kendi zirvesi" sanmıştım. Kayıt eklendikten
+sonra **67 ayın 67'si doğrulanmış** durumda: 28'i doğrudan duyurudan, 39'u fiyatın tavana
+değmesiyle.
+
+> **Yeni ay geldiğinde:** aynı kör nokta tekrar açılır. Fiyatın tavana hiç değmediği bir
+> ay için mutlaka duyuru aranmalı; sadece "aşım yok" testine güvenilemez.
+
+Bölüm 3.1 ve 3.2 çıkarım yönteminin nasıl doğrulandığını belgeliyor — yöntem artık
+kullanılmıyor ama nasıl test edildiği kayıtta kalsın.
 
 ### 3.1 Bağlayıcılık testi (çıkarım yönteminin öz-testi)
 
@@ -123,8 +142,9 @@ Yüzlerce saatin **tam olarak** aynı ondalıkta durması piyasa sonucu olamaz. 
 > **≥%5 saat tam maksimumda ⇒ tavan bağlayıcı, maksimum = tavan.**
 > Altındaysa maksimum sadece piyasa zirvesidir ve tavan hakkında hiçbir şey söylemez.
 
-Tavan Haziran 2021'de **ilk kez** bağlayıcı oldu ama sürekli bağlayıcı kalmadı. 68 ayın
-49'unda bağlayıcı, **19'unda değil**:
+Bu test **artık kullanılmıyor** — resmî seri onun yerini aldı. Kayıtta kalmasının sebebi,
+çıkarım yönteminin nasıl sınandığını göstermesi. Tavan Haziran 2021'de ilk kez bağlayıcı
+oldu ama sürekli bağlayıcı kalmadı; testin "bağlayıcı değil" dediği aylar:
 
 ```
 2021-01 … 2021-05   (5 ay — piyasa tavana hiç yaklaşmadı)

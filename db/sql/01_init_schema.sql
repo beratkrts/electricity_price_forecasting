@@ -323,3 +323,37 @@ LEFT JOIN LATERAL (
     WHERE p.effective_from <= (m.ts AT TIME ZONE 'Europe/Istanbul')::date
     ORDER BY p.effective_from DESC LIMIT 1
 ) c ON TRUE;
+
+-- Resmî tavan serisi — haber arşivinden derlendi, 67 ayın 67'sinde doğrulandı.
+-- Yeniden derlemek için: CRISIS_CASE_IRAN_2022.md §3.2b
+INSERT INTO silver.price_cap_official (effective_from, cap_try, source_article_id, note) VALUES
+    ('2021-02-01', 572, 41077, NULL),
+    ('2021-03-01', 569, 41563, NULL),
+    ('2021-04-01', 567, 42050, NULL),
+    ('2021-05-01', 578, 42445, 'haber "11 TL arttı" diyor: 567+11'),
+    ('2021-06-01', 595, 42974, NULL),
+    ('2021-07-01', 617, 43403, NULL),
+    ('2021-08-01', 636, 43863, NULL),
+    ('2021-09-01', 674, 44243, NULL),
+    ('2021-10-01', 718, 44641, NULL),
+    ('2021-10-15', 1078, 44932, 'AY ORTASI değişiklik; haber 728 TL diyor ama 44641 Ekim tavanını 718 vermişti'),
+    ('2021-11-01', 1131, 45102, NULL),
+    ('2021-12-01', 1217, 45589, NULL),
+    ('2022-01-01', 1345, 46117, NULL),
+    ('2022-02-01', 1524, 46596, NULL),
+    ('2022-03-01', 1745, 47113, NULL),
+    ('2022-04-01', 2500, 47685, 'kaynak bazlı teklif tavanı: gaz/ithal kömür 2,5 TL/kWh, diğer 1,2 TL/kWh. PTF tek fiyat olduğu için etkin tavan 2500; veride 1200 kümesi YOK (doğrulandı)'),
+    ('2022-05-19', 2750, 48414, 'AY ORTASI değişiklik'),
+    ('2022-06-01', 3200, 48558, NULL),
+    ('2022-07-01', 3750, 49021, NULL),
+    ('2022-08-01', 4000, 49427, NULL),
+    ('2022-09-01', 4800, 49974, NULL),
+    ('2023-01-01', 4200, 52175, NULL),
+    ('2023-02-01', 3650, 52617, 'EPDK 26 Ocak 2023 duyurusu: 4.200 -> 3.650, Subat''tan itibaren. Kacirilmis DUSUS: fiyat tavani asmadigi icin oz-test bunu yakalamiyordu.'),
+    ('2023-03-01', 3050, 53075, NULL),
+    ('2023-04-01', 2600, 53499, NULL),
+    ('2023-07-04', 2700, 54712, 'EPDK kararı, haber 2023-07-04'),
+    ('2024-07-01', 3000, 59281, NULL),
+    ('2025-04-05', 3400, 62872, 'AY ORTASI değişiklik'),
+    ('2026-04-04', 4500, 67710, 'AY ORTASI değişiklik, +%32,4')
+ON CONFLICT (effective_from) DO NOTHING;

@@ -65,11 +65,13 @@ Aylık maksimum fiyata değen saat oranı:
 >
 > **GÜNCELLEME (17 Ağustos 2026) — açık soru KAPANDI, çıkarıma gerek kalmadı.**
 >
-> EPİAŞ/EPDK azami fiyat limitini **her ay duyuruyor** ve haber arşivi bu duyuruların hepsini içeriyor. Resmî seri korpustan derlendi: **`silver.price_cap_official`** — 28 yürürlük kaydı, 2021-02 → 2026-04, her satırın kaynak `article_id`'si kayıtlı. Artık tavan çıkarım değil, **ölçüm**.
+> EPİAŞ/EPDK azami fiyat limitini **her ay duyuruyor** ve haber arşivi bu duyuruların hepsini içeriyor. Resmî seri korpustan derlendi: **`silver.price_cap_official`** — 28 yürürlük kaydı, 2021-02 → 2026-04, 67 ayın 67'si doğrulanmış, her satırın kaynak `article_id`'si kayıtlı. Artık tavan çıkarım değil, **ölçüm**.
 >
-> Çıkarım yöntemi 24 ayda birebir tuttu ama iki yerde sessizce yanlıştı: **(a)** tavan ay ortasında değişebiliyor (2021-10-15, 2022-05-19, 2025-04-05, 2026-04-04) — aylık maksimum düşük olanı hiç görmüyor, Ekim 2021 %8,1 yerine gerçekte %22,6; **(b)** fiyat tavana hiç değmediği aylarda maksimum tavan değil — Şubat 2023'te tavan 4.200 TL, fiyat 3.650'yi geçmedi, eski yöntem %15,6 gösteriyordu, gerçek %0.
+> Çıkarım yöntemi 24 ayda birebir tuttu ama iki yerde sessizce yanlıştı: **(a)** tavan ay ortasında değişebiliyor (2021-10-15, 2022-05-19, 2025-04-05, 2026-04-04) — aylık maksimum düşük olanı hiç görmüyor, Ekim 2021 %8,1 yerine gerçekte %22,6; **(b)** fiyat tavana hiç değmediği aylarda maksimum tavan değil — Şubat 2021'de resmî tavan 572 TL, verideki maksimum 335 TL.
 >
-> Bu, planın §5'teki "elle etiket gerektirmeyen kalite testi"nin de ilk somut ürünü: haber hattı, üzerine kurulduğu veriyi düzeltti.
+> **Serinin öz-testi ve kör noktası:** kayıt olmayan aylarda önceki değer devam ettiği varsayılıyor; testi "fiyat tavanı aşamaz" (48.000 saatte sıfır aşım). Kör nokta: kaçırılmış bir **düşüş** görünmez. Bu gerçekten oldu — Şubat 2023 indirimi (4.200 → 3.650, haber `52617`) ilk derlemede kaçırıldı. Eklendikten sonra 67 ayın 67'si doğrulandı. Yeni ay geldiğinde fiyatın tavana değmediği aylar için mutlaka duyuru aranmalı.
+>
+> Bu, planın §5'teki "elle etiket gerektirmeyen kalite testi"nin de ilk somut ürünü: haber hattı, üzerine kurulduğu **ölçümü** düzeltti. (Ham fiyat verisi hiç yanlış değildi; yanlış olan ondan türetilen vekil metrikti.)
 >
 > İkinci bulgu: aynı duyuru azami fiyatın **GÖP ve DGP'ye birlikte** uygulandığını yazıyor. Bu, §3.5'teki "tamamlayıcı sinyal olarak SMF kullanılabilir" maddesini çürütüyor — SMF de aynı tavanda sansürlü (her ay `smf_max = ptf_tavan`, aşan saat %0,0). Ayrıntı: `CRISIS_CASE_IRAN_2022.md` §3.
 
