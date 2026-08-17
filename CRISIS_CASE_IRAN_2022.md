@@ -74,7 +74,25 @@ düzenleme olayı ve haber resmî değeri veriyor. Bölüm 3'ün tamamı buna da
 Bu pencerede fiyat seviyesi kullanılamaz: Ocak 2022'de saatlerin %38,6'sı tam olarak
 aynı değerde. Ama "aylık maksimum = tavan" varsayımı da her ay geçerli değil.
 
-### 3.1 Bağlayıcılık testi
+### 3.0 Sonuç önce: tavan artık çıkarım değil, ölçüm
+
+Bu bölümün ilk sürümü tavanı aylık maksimumdan **istatistikle çıkarıyordu.** Sonra haber
+arşivi tarandı ve EPİAŞ/EPDK'nın **her ay yaptığı azami fiyat duyurusu** korpusta bulundu.
+Artık resmî seri elde: `silver.price_cap_official`, 28 yürürlük kaydı, 2021-02 → 2026-04,
+her satırın kaynak haberi kayıtlı.
+
+**Çıkarım yöntemi 24 ayda birebir tuttu.** Ama iki yerde sessizce yanlıştı:
+
+| Hata | Örnek | Etkisi |
+|---|---|---|
+| **Tavan ay ortasında değişebiliyor** | 2021-10-15 (718 → 1.078), 2022-05-19, 2025-04-05, 2026-04-04 | Aylık maksimum düşük olanı hiç görmüyor. Ekim 2021: %8,1 yerine gerçekte **%22,6** |
+| **Fiyat tavana hiç değmediği aylarda maksimum tavan değil** | Şubat 2023: tavan 4.200 TL, fiyat 3.650'yi geçmedi | Eski yöntem %15,6 "tavanda" gösteriyordu, gerçek **%0** |
+
+Bu iki hata düzeltildi; aşağıdaki bütün tavan oranları resmî seriyle hesaplandı
+(`silver.mcp_with_cap` görünümü). Bölüm 3.1 ve 3.2 çıkarım yönteminin nasıl doğrulandığını
+belgeliyor — yöntem artık kullanılmıyor ama nasıl test edildiği kayıtta kalsın.
+
+### 3.1 Bağlayıcılık testi (çıkarım yönteminin öz-testi)
 
 ```sql
 WITH m AS (SELECT date_trunc('month', ts AT TIME ZONE 'Europe/Istanbul') ay, price_try
@@ -139,11 +157,38 @@ Haber `46596` resmî değerleri veriyor:
 "EPDK ile teyit edilmeli" uyarısı bu ay için karşılandı. Bağlayıcı değilken çıkarım
 tamamen yanlış — Şubat 2021'de piyasa tavana hiç yaklaşmamış (335 vs 572).
 
-> **Mevcut analizlerde düzeltilmesi gereken:** `LOW_PRICE_REGIME_ANALYSIS.md` ve
-> `reports/tavandan_sifira.html` içindeki "tavanda geçen saat oranı" sütunu, tavanın
-> bağlayıcı **olmadığı** aylarda (%5 altı) anlamlı değil — orada ölçtüğü şey "piyasanın
-> kendi zirvesinde geçen saat", ki bu farklı bir istatistik. Bağlayıcı aylarda
-> (2021-06 sonrası) yorum geçerli.
+### 3.2b Resmî seri — tam doğrulama
+
+Korpustan derlenen resmî tavan serisi ile veriden çıkarılan aylık maksimum karşılaştırıldı:
+
+| Sonuç | Ay sayısı |
+|---|---|
+| Birebir eşleşen | **24** |
+| Fiyat tavana hiç değmediği için eşleşmeyen | 2 (2021-02, 2023-02) |
+| Ay ortası değişiklik nedeniyle eksik sayılan | 4 (2021-10, 2022-05, 2023-07 + 2026-04) |
+
+Örnek kayıtlar:
+
+| Yürürlük | Resmî tavan | Kaynak haber |
+|---|---|---|
+| 2021-07-01 | 617 TL | `43403` |
+| 2021-10-01 | 718 TL | `44641` |
+| **2021-10-15** | **1.078 TL** | `44932` — ay ortası |
+| 2022-01-01 | 1.345 TL | `46117` |
+| 2022-02-01 | 1.524 TL | `46596` |
+| 2022-04-01 | 2.500 TL | `47685` — kaynak bazlı teklif tavanı |
+| 2023-01-01 | 4.200 TL | `52175` |
+| 2026-04-04 | 4.500 TL | `67710` |
+
+**Nisan 2022 notu:** EPDK o ay kaynak bazlı teklif tavanı koydu — gaz ve ithal kömür için
+2,5 TL/kWh, diğer kaynaklar için 1,2 TL/kWh. Bu **iki ayrı takas fiyatı yaratmıyor**: PTF
+saatte tek fiyat, kaynak tavanları sadece teklifleri sınırlıyor. Etkin PTF tavanı en yüksek
+olan, yani 2.500. Doğrulama: Nisan 2022 fiyat dağılımında 1.200 civarında hiçbir yığılma yok
+(2.500'de 94 saat var).
+
+> **Düzeltildi:** `reports/tavandan_sifira.html` ve üreteci artık `silver.mcp_with_cap`
+> üzerinden, resmî seriyle hesaplıyor. `LOW_PRICE_REGIME_ANALYSIS.md` etkilenmiyor —
+> o dosyada tavan sütunu yok.
 
 ### 3.3 SMF sansürsüz bir alternatif DEĞİL
 
@@ -251,7 +296,7 @@ Aynı takvim penceresi (20 Oca – 6 Şub) diğer yıllarda:
 |---|---|---|---|---|---|
 | 2021 | 0,0 | 40,5 | 11.218 | 12.805 | 36.824 |
 | **2022** | **77,5** | **98,1** | **8.672** | 14.148 | 37.958 |
-| 2023 | 23,8 | 175,8 | 9.942 | 15.072 | 36.907 |
+| 2023 | 17,1 | 175,8 | 9.942 | 15.072 | 36.907 |
 | **2024** | **2,3** | 66,5 | **5.083** | 14.310 | 39.452 |
 | 2025 | 17,1 | 71,2 | 11.570 | 14.851 | 40.674 |
 | 2026 | 25,9 | 64,7 | 9.548 | 14.666 | 42.411 |

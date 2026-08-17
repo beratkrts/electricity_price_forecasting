@@ -63,9 +63,13 @@ Aylık maksimum fiyata değen saat oranı:
 
 > Not: Buradaki "tavan" aylık maksimumdan çıkarım. Yüzlerce saatin tam olarak aynı değerde durması güçlü kanıt, ama EPDK'nın yayımladığı resmî azami fiyat limiti değerleriyle teyit edilmeli.
 >
-> **GÜNCELLEME (17 Ağustos 2026) — çıkarım doğrulandı, ama koşullu.** Haber arşivindeki bir EPİAŞ duyurusu (`bronze.news_raw`, `article_id=46596`) resmî değerleri veriyor: Şubat 2022 için 1.524 TL — veriden çıkarılan da **1.524 TL, birebir**. Aynı haber Şubat 2021 tavanının 572 TL olduğunu da yazıyor, oysa o ay verideki maksimum 335 TL; piyasa tavana hiç yaklaşmamış. Yani:
+> **GÜNCELLEME (17 Ağustos 2026) — açık soru KAPANDI, çıkarıma gerek kalmadı.**
 >
-> **Çıkarım ancak tavan bağlayıcıyken geçerli. Ölçülebilir test: ≥%5 saat tam maksimumda ⇒ bağlayıcı.** 68 ayın 49'u bağlayıcı, 19'u değil (2021'in ilk yarısı, bazı yaz ayları, 2026-04'ten itibaren tüm bahar çöküşü). Yukarıdaki tablodaki bütün aylar bağlayıcı, dolayısıyla tablo geçerli.
+> EPİAŞ/EPDK azami fiyat limitini **her ay duyuruyor** ve haber arşivi bu duyuruların hepsini içeriyor. Resmî seri korpustan derlendi: **`silver.price_cap_official`** — 28 yürürlük kaydı, 2021-02 → 2026-04, her satırın kaynak `article_id`'si kayıtlı. Artık tavan çıkarım değil, **ölçüm**.
+>
+> Çıkarım yöntemi 24 ayda birebir tuttu ama iki yerde sessizce yanlıştı: **(a)** tavan ay ortasında değişebiliyor (2021-10-15, 2022-05-19, 2025-04-05, 2026-04-04) — aylık maksimum düşük olanı hiç görmüyor, Ekim 2021 %8,1 yerine gerçekte %22,6; **(b)** fiyat tavana hiç değmediği aylarda maksimum tavan değil — Şubat 2023'te tavan 4.200 TL, fiyat 3.650'yi geçmedi, eski yöntem %15,6 gösteriyordu, gerçek %0.
+>
+> Bu, planın §5'teki "elle etiket gerektirmeyen kalite testi"nin de ilk somut ürünü: haber hattı, üzerine kurulduğu veriyi düzeltti.
 >
 > İkinci bulgu: aynı duyuru azami fiyatın **GÖP ve DGP'ye birlikte** uygulandığını yazıyor. Bu, §3.5'teki "tamamlayıcı sinyal olarak SMF kullanılabilir" maddesini çürütüyor — SMF de aynı tavanda sansürlü (her ay `smf_max = ptf_tavan`, aşan saat %0,0). Ayrıntı: `CRISIS_CASE_IRAN_2022.md` §3.
 

@@ -287,3 +287,39 @@ CREATE TABLE IF NOT EXISTS bronze.news_fetch_errors (
     attempts    INT DEFAULT 1,
     last_try_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- -----------------------------------------------------------------------------
+-- 5. SILVER: RESMÎ AZAMİ FİYAT LİMİTİ (TAVAN) SERİSİ
+--    Kaynak: EPİAŞ/EPDK duyurularının haber arşivindeki karşılıkları
+--    (bronze.news_raw). Her satırın provenance'ı var.
+--
+--    NEDEN GEREKLİ: Tavan daha önce aylık maksimumdan İSTATİSTİKLE çıkarılıyordu.
+--    O yöntem 23 ayda birebir tuttu ama iki yerde sessizce yanlıştı:
+--      (a) tavan ay ortasında değişebiliyor (2021-10-15, 2022-05-19,
+--          2025-04-05, 2026-04-04) — aylık maksimum düşük olanı hiç görmüyor;
+--      (b) fiyat tavana hiç değmediği aylarda maksimum tavan DEĞİL
+--          (Şubat 2021: resmî 572, veri maksimumu 335).
+--    Analiz modeli sansürsüz saatlerde eğitileceği için doğru maske şart.
+-- -----------------------------------------------------------------------------
+CREATE SCHEMA IF NOT EXISTS silver;
+
+CREATE TABLE IF NOT EXISTS silver.price_cap_official (
+    effective_from    DATE PRIMARY KEY,        -- yürürlük başlangıcı (dahil)
+    cap_try           NUMERIC(12,2) NOT NULL,  -- TL/MWh, GÖP ve DGP'ye birlikte uygulanır
+    source_article_id BIGINT,                  -- bronze.news_raw provenance
+    note              TEXT,
+    created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Herhangi bir saat için geçerli tavan + tavanda mı bayrağı.
+-- Analiz modelinin eğitim maskesi bu görünümden gelir.
+CREATE OR REPLACE VIEW silver.mcp_with_cap AS
+SELECT m.ts, m.price_try, m.price_usd,
+       c.cap_try, c.effective_from AS cap_effective_from,
+       (c.cap_try IS NOT NULL AND m.price_try >= c.cap_try * 0.999) AS at_cap
+FROM public.raw_mcp_hourly m
+LEFT JOIN LATERAL (
+    SELECT p.cap_try, p.effective_from FROM silver.price_cap_official p
+    WHERE p.effective_from <= (m.ts AT TIME ZONE 'Europe/Istanbul')::date
+    ORDER BY p.effective_from DESC LIMIT 1
+) c ON TRUE;
