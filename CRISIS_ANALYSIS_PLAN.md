@@ -62,6 +62,12 @@ Aylık maksimum fiyata değen saat oranı:
 **İncelemek istediğimiz en büyük krizlerin tam ortasında fiyat sansürlü.** Klasik event study ile "anormal fiyat sapması" ölçülürse şok sistematik olarak olduğundan küçük görünür — fiyat fiziksel olarak yükselemiyordu.
 
 > Not: Buradaki "tavan" aylık maksimumdan çıkarım. Yüzlerce saatin tam olarak aynı değerde durması güçlü kanıt, ama EPDK'nın yayımladığı resmî azami fiyat limiti değerleriyle teyit edilmeli.
+>
+> **GÜNCELLEME (17 Ağustos 2026) — çıkarım doğrulandı, ama koşullu.** Haber arşivindeki bir EPİAŞ duyurusu (`bronze.news_raw`, `article_id=46596`) resmî değerleri veriyor: Şubat 2022 için 1.524 TL — veriden çıkarılan da **1.524 TL, birebir**. Aynı haber Şubat 2021 tavanının 572 TL olduğunu da yazıyor, oysa o ay verideki maksimum 335 TL; piyasa tavana hiç yaklaşmamış. Yani:
+>
+> **Çıkarım ancak tavan bağlayıcıyken geçerli. Ölçülebilir test: ≥%5 saat tam maksimumda ⇒ bağlayıcı.** 68 ayın 49'u bağlayıcı, 19'u değil (2021'in ilk yarısı, bazı yaz ayları, 2026-04'ten itibaren tüm bahar çöküşü). Yukarıdaki tablodaki bütün aylar bağlayıcı, dolayısıyla tablo geçerli.
+>
+> İkinci bulgu: aynı duyuru azami fiyatın **GÖP ve DGP'ye birlikte** uygulandığını yazıyor. Bu, §3.5'teki "tamamlayıcı sinyal olarak SMF kullanılabilir" maddesini çürütüyor — SMF de aynı tavanda sansürlü (her ay `smf_max = ptf_tavan`, aşan saat %0,0). Ayrıntı: `CRISIS_CASE_IRAN_2022.md` §3.
 
 Tavan seviyesinin kendisi bir düzenleme olayı (569 TL → 4.800 TL → 2.600 TL) ve veriden doğrudan çıkarılabiliyor. Bu, haber hattını doğrulamak için **elle etiket gerektirmeyen bir kalite testi** sağlıyor: LLM o dönemin haberlerini okuyup tavan değişikliğini yakalayamıyorsa recall'ü kötüdür.
 
