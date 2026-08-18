@@ -1,0 +1,33 @@
+# Kriz Analizi Notebook'ları
+
+`CRISIS_ANALYSIS_PLAN.md` §8'in analiz tarafı. Her notebook kendi başına koşar
+(veri DB'den gelir, aralarında dosya bağımlılığı yoktur) ama **sırayla okunmalıdır**.
+
+| # | Notebook | Ne anlatır |
+|---|---|---|
+| 01 | `01_counterfactual_model.ipynb` | Aletin kendisi: kontrafaktüel nasıl kuruldu, ne kadar doğru, "anormal" eşiği ne, İran penceresi ve 2024 karşılaştırması |
+| 02 | `02_model_bias_investigation.ipynb` | Aletin iki dönemde neden bozuk olduğu — **elenen hipotezler dahil** |
+| 03 | `03_gas_tariff_discovery.ipynb` | Sapmanın kaynağı: BOTAŞ tarifesi ≠ GRF, r = 0,852 |
+
+## Koşmadan önce
+
+- PostgreSQL ayakta olmalı; `gold.crisis_counterfactual` dolu olmalı.
+  Değilse: `python scripts/build_analysis_model.py --variant both --write`
+- `02` §4 model eğitir (~30 sn). Diğer hücreler sorgu ve grafik.
+- Tümünü baştan koşmak: `python -m nbconvert --to notebook --execute --inplace <dosya>`
+
+## Sorgu yazarken
+
+`gold.crisis_counterfactual` **dört sürüm** içerir. Analizde daima:
+
+    variant = 'fundamental'   AND   model_name = 'crisis_cf_v1'
+
+Filtreyi atlarsan sonuçlar sessizce karışır. v2 İran sinyalini +$16,5'ten +$0,2'ye
+düşürüyor — yani yanlış filtre "olay yok" dedirtir. Gerekçe: `02` §6.
+
+## Bu klasörün kuralı
+
+Kriz hattına yeni bir analiz eklendiğinde **aynı oturumda buraya da eklenir**.
+Notebook'lar sonradan yazılan bir özet değil, analizin kendisinin kaydıdır:
+elenen hipotezler de kalır, çünkü bir sonraki oturumun aynı yolu tekrar yürümemesi
+onlara bağlı.
