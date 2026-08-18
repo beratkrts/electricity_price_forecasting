@@ -357,3 +357,37 @@ INSERT INTO silver.price_cap_official (effective_from, cap_try, source_article_i
     ('2025-04-05', 3400, 62872, 'AY ORTASI değişiklik'),
     ('2026-04-04', 4500, 67710, 'AY ORTASI değişiklik, +%32,4')
 ON CONFLICT (effective_from) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- 6. GOLD: KRİZ KONTRAFAKTÜELİ (analiz modeli çıktısı)
+--    Üreten: scripts/build_analysis_model.py  →  src/crisis/analysis_model.py
+--
+--    CANLIYA GİRMEZ. gold.ptf_predictions_daily ile karıştırma:
+--    orası canlı fiyat tahmini (2023'ten eğitilir, T+1'i tahmin eder);
+--    burası geçmişe dönük açıklayıcı model (2021'den eğitilir, sadece
+--    sansürsüz saatlerde, o saatin gerçekleşen fundamentallerini görerek).
+--
+--    residual_usd = actual_usd - counterfactual_usd
+--      = "bilinen fundamentaller verildiğinde fiyatın AÇIKLANAMAYAN kısmı".
+--    Etki analizinin (CRISIS_ANALYSIS_PLAN.md §8 adım 7) girdisi budur.
+--
+--    is_lower_bound: tavandaki saatler için TRUE. Model eğitimde tavan üstü
+--    fiyat hiç görmediği için ağaç oraya tahmin ÜRETEMEZ — o saatlerde
+--    kontrafaktüel de kalıntı da ALT SINIRDIR. Yöntemin düzeltilebilir bir
+--    hatası değil, doğasında olan kısıt; raporda öyle sunulmalı.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS gold.crisis_counterfactual (
+    ts                 TIMESTAMPTZ    NOT NULL,
+    variant            VARCHAR(20)    NOT NULL,  -- fundamental | autoregressive
+    model_name         VARCHAR(50)    NOT NULL DEFAULT 'crisis_cf_v1',
+    actual_usd         NUMERIC(10,4),
+    counterfactual_usd NUMERIC(10,4),
+    residual_usd       NUMERIC(10,4),
+    at_cap             BOOLEAN,
+    is_lower_bound     BOOLEAN,
+    fold_id            INT,                      -- bloklu OOF şemasındaki blok no
+    created_at         TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY (ts, variant, model_name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_crisis_cf_ts ON gold.crisis_counterfactual(ts);

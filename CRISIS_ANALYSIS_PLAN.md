@@ -161,6 +161,69 @@ Elimizde fundamentallerden fiyat tahmin eden eğitilmiş bir model var. Tahmini 
 
 **Kısıt:** Canlı model 2023'ten eğitiliyor, 2021-2022 için kontrafaktüel üretemez. Bunun için **ayrı bir analiz modeli** (2021+ eğitilmiş, sadece kontrafaktüel üretmek için, canlıya asla girmeyen) gerekir. Bu ayrım net tutulmalı.
 
+> **GÜNCELLEME (18 Ağustos 2026) — analiz modeli kuruldu (adım 6 kapandı).**
+>
+> `src/crisis/analysis_model.py` + `scripts/build_analysis_model.py`. Çıktı:
+> `gold.crisis_counterfactual`, 2021-01-08 → bugün, 49.064 saat. Canlı modelden
+> üç bilinçli ayrım: eğitim 2021'den, **sadece `at_cap = false` saatlerde**, ve
+> lag0 gerçekleşen fundamentaller (canlı model tahmin anında bunları göremez).
+> Üçüncüsü "açıklanamayan" ölçümü demek, "sürpriz" değil.
+>
+> **Örneklem-dışı şema: bloklu OOF, ileri yönlü walk-forward DEĞİL.** 28 günlük
+> bloklar, iki yanında 8 günlük tampon (168 saatlik lag'ler sızmasın). Gerekçe:
+> genişleyen pencere Ocak 2022 için sadece 2021'i görür ve ağaç modeli eğitimde
+> gördüğü maksimumun üstünü tahmin edemez — serinin ilk büyük şoku sistematik
+> olarak "açıklanamayan" çıkardı, yöntem artefaktı olurdu.
+>
+> **Doğruluk:** sansürsüz saatlerde MAE $9,96, BIAS +$0,49. Kalıntının boş bandı
+> p5=−$21,1 / p95=+$26,6 — bir olayın "anormal" sayılması için bu bandın dışına
+> çıkması gerekiyor.
+>
+> **ÖLÇÜLMÜŞ KARAR 1 — fiyat türevli feature'lar dışarıda.** İki varyant koşuldu.
+> `autoregressive` (canlı feature seti) İran epizodunu yutuyor: 5 Şubat'ta
+> fundamental +$27,4 derken o +$4,3 diyor, pencere ortalaması +$0,5. Çünkü
+> `mcp_usd_lag_24` modele dünkü şok fiyatını veriyor, model şoku "tahmin ediyor",
+> kalıntı çöküyor — 10 günlük epizodun 9 günü görünmez oluyor. Bedeli sadece
+> $0,79 MAE. **Olay ölçümünde `fundamental` varyant kullanılacak.**
+>
+> **ÖLÇÜLMÜŞ KARAR 2 — yakıt maliyeti geçmişi EKLENMEYECEK.** Ekim 2022 – Mart
+> 2023 arasında kalıntı beş ay boyunca +$12,7 şişikti. Bu bir olay değil: medyan
+> = ortalama (dağılımın tamamı kaymış, tepe değil), pozitif saat oranı %70 (boş
+> beklenti %50), ve tüm seride kalıntı ile GRF'nin 3 aylık değişimi arasında
+> korelasyon −0,43. Sebep: model gaz maliyetinin fiyata ANINDA geçtiğini
+> varsayıyor; gerçekte geçiş gecikmeli (gaz %64 düştü, fiyat o hızda düşmedi).
+>
+> Üç düzeltme denendi, ortak 47.072 saatte:
+>
+> | Model | Yakıt sütunları | MAE | ort \|aylık sapma\| | Eki22–Mar23 | İran (1-10 Şub) |
+> |---|---|---|---|---|---|
+> | **v1** | yok | 10,29 | 4,11 | +12,74 | **+16,49** |
+> | v2 | mutlak seviye (ma_30d/90d) | 10,34 | 4,29 | **+3,57** | +0,17 ✗ |
+> | v3 | sadece 7 günlük | 10,28 | 4,05 | +11,17 | +16,48 |
+> | v4 | birimsiz, uzun pencere | 10,57 | 4,53 | +11,15 | +18,57 |
+>
+> Sapmayı düzelten tek set mutlak seviye sütunları (v2) — ve düzeltmeyi **dönemi
+> ezberleyerek** yapıyor: 90 günlük ortalama "anlık maliyet"ten çok "hangi
+> dönemdeyiz" demek, dönemi tanıyan model o dönemde ne olduysa onu da açıklıyor.
+> İran sinyali +$16,5'ten +$0,2'ye çöküyor — `autoregressive` hatasının aynısı,
+> dünkü fiyat yerine son 90 günün gaz maliyeti üzerinden. v3 v1'in aynısı
+> (ortalama fark $0,55; gaz günden güne çok yavaş hareket ettiği için 7 günlük
+> ortalama lag0'a yeni bilgi katmıyor). v4'ün birimsiz sütunları ne sapmayı
+> düzeltti ne de modeli iyileştirdi.
+>
+> **Sonuç: geçiş gecikmesi ile dönem etkisi bu veriyle kimliklendirilemiyor.**
+> Ayırmak için modelin göremediği dışsal bilgi gerekir — BOTAŞ'ın elektrik
+> üreticilerine uyguladığı tarifenin gerçek seviyesi. O da haber arşivinden
+> derlenebilir (tavan serisi böyle derlendi), ama ayrı bir iş.
+>
+> **v1 birincil alet.** Ekim 2022 – Mart 2023 **bilinen sapmalı dönem** olarak
+> işaretlendi: o dönemdeki her olay ölçümünden ~+$12 düşülmeli, yoksa olaylar
+> olduğundan büyük görünür. Dört sürüm de tabloda duruyor (`model_name`).
+>
+> **Açık kalan:** Ocak–Şubat 2022 kalıntısı −$14 ile −$23 arası ve sebebi
+> bilinmiyor. Gaz geçiş gecikmesi DEĞİL — v2'de daha da kötüleşiyor (−$27,4).
+> İran vakasının tam ortasında olduğu için öncelikli.
+
 ### 3.5 Sansür altında çıktı değişkeni
 
 Doz büyüdükçe fiyat tavana yapışıyor — doz-tepki eğrisi tam da ilgilendiğimiz üst uçta kesik.
@@ -248,12 +311,14 @@ Doz gerektirmeyen ikinci çıktı (betimsel, kendi başına değerli): *"2021'de
 | 3 | Toplayıcıyı tam koşuya çıkar (27.419 haber, ~3-4 saat, LLM yok) | 2 (paralel yürüyebilir) |
 | 4 | Kural bazlı ön filtre + alaka kademesi | 3 |
 | 5 | 200 haberlik altın küme + kappa ölçümü | 4 |
-| 6 | Analiz modeli (2021+, sadece kontrafaktüel için) | — |
+| 6 | ✅ Analiz modeli (2021+, sadece kontrafaktüel için) — bkz. §3.4 güncellemesi | — |
 | 7 | Etki analizi: kalıntı + tavan oranı, faz kümeleme | 5, 6 |
 | 8 | Düşürülebilir test: olay feature'ları modeli iyileştiriyor mu | 7 |
 
 **Açık sorular:**
-- EPDK'nın resmî azami fiyat limiti değerleri (tavan çıkarımını teyit için)
+- ~~EPDK'nın resmî azami fiyat limiti değerleri~~ — kapandı, `silver.price_cap_official`
+- Ocak–Şubat 2022'nin −$23'lük kalıntısı neden negatif (analiz modeli, §3.4)
+- BOTAŞ'ın elektrik üreticisi gaz tarifesi arşivden derlenebilir mi (Eki22–Mar23 sapması için)
 - Dış LLM API erişimi var mı
 - Resmî duyuru kaynakları (EPİAŞ/BOTAŞ/TEİAŞ) arşiv yapısı — henüz incelenmedi
 
