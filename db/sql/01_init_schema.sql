@@ -391,3 +391,90 @@ CREATE TABLE IF NOT EXISTS gold.crisis_counterfactual (
 );
 
 CREATE INDEX IF NOT EXISTS idx_crisis_cf_ts ON gold.crisis_counterfactual(ts);
+
+-- -----------------------------------------------------------------------------
+-- 7. SILVER: BOTAŞ ELEKTRİK ÜRETİM AMAÇLI DOĞAL GAZ TARİFESİ
+--    Kaynak: BOTAŞ resmî tarife PDF'leri + haber arşivi (bronze.news_raw) zinciri
+--
+--    NEDEN GEREKLİ: Modele beslediğimiz natural_gas_grf_try, EPİAŞ'ın gaz piyasası
+--    REFERANS fiyatı. Santrallerin fiilen ödediği ise BOTAŞ'ın idari tarifesi.
+--    Normal aylarda ikisi yakın (oran 0,94-1,10) ve model sorunsuz çalışıyor.
+--    İki dönemde ayrışıyorlar ve analiz modelinin kalıntısı tam o iki dönemde bozuluyor:
+--      Ara 2021 - Mar 2022 : oran 0,55-0,77 (BOTAŞ piyasanın altında sattı) -> kalıntı NEGATİF
+--      Kas 2022 - Mar 2023 : oran 1,01-1,28 (piyasa düştü, tarife inmedi)   -> kalıntı POZİTİF
+--    Tarife/GRF oranı ile aylık kalıntı korelasyonu 0,852 (n=17 ay).
+--    Ayrıntı: experiments/notebooks/05_crisis_analysis/03_gas_tariff_discovery.ipynb
+--
+--    BİRİM: TL / 1000 Sm3. price_try_kwh PDF'te doğrudan verilir, türetilmez.
+--    Isıl değer 9155 Kcal/Sm3 (= 10,646 kWh) -> kwh/sm3 oranı 0,09393 sabittir;
+--    bu, PDF ayrıştırıcısının sessiz hata yapmadığının testidir.
+--
+--    effective_from TARİH, ay değil: ay ortası yürürlükler gerçek
+--    (5 Nisan 2025, 2 Temmuz 2025, 4 Nisan 2026). Aylık varsaymak
+--    silver.price_cap_official'da Ekim 2021'i 3 kat yanlış ölçtürmüştü.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS silver.gas_tariff_electricity (
+    effective_from   DATE PRIMARY KEY,
+    price_try_1000m3 NUMERIC(14,4) NOT NULL,  -- TL / 1000 Sm3
+    price_try_kwh    NUMERIC(12,8),           -- PDF'ten gelir, yoksa NULL
+    source           VARCHAR(16) NOT NULL,    -- botas_pdf | news_absolute | news_chain
+    source_ref       TEXT,                    -- PDF dosya adı veya bronze.news_raw.article_id
+    is_gap           BOOLEAN DEFAULT FALSE,   -- değeri bilinmiyor, önceki taşınıyor
+    note             TEXT,
+    created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Herhangi bir saat için yürürlükteki tarife. silver.mcp_with_cap ile aynı desen.
+CREATE OR REPLACE VIEW silver.gas_cost_hourly AS
+SELECT m.ts,
+       t.price_try_1000m3,
+       t.price_try_kwh,
+       t.effective_from AS tariff_effective_from,
+       t.is_gap        AS tariff_is_gap
+FROM public.raw_mcp_hourly m
+LEFT JOIN LATERAL (
+    SELECT g.price_try_1000m3, g.price_try_kwh, g.effective_from, g.is_gap
+    FROM silver.gas_tariff_electricity g
+    WHERE g.effective_from <= (m.ts AT TIME ZONE 'Europe/Istanbul')::date
+    ORDER BY g.effective_from DESC LIMIT 1
+) t ON TRUE;
+
+-- Seri. Çıpalar resmî PDF veya haber gövdesindeki mutlak değer; aradaki aylar
+-- duyurulan yüzdelerle zincirlenir. Zincirin kapanış testleri (hepsi tuttu):
+--   Şub 2022 : zincir 6.298 -> resmî PDF 6.300            (%0,03)
+--   Eyl 2022 : 13.750 x 1,50 = 20.625 -> Kas/Ara çıpası    (tam; haberdeki %49,5 yuvarlanmış)
+--   Nis 2022 : 7.450 x 1,443 = 10.750 -> resmî PDF Mayıs   (tam)
+--   Oca 2023 : 20.625 x 0,8727 = 18.000 -> resmî PDF       (tam)
+INSERT INTO silver.gas_tariff_electricity
+    (effective_from, price_try_1000m3, price_try_kwh, source, source_ref, is_gap, note) VALUES
+    ('2021-01-01',  1414.00, NULL, 'news_absolute', '40682', FALSE, NULL),
+    ('2021-02-01',  1428.14, NULL, 'news_chain',    '41158', FALSE, '+%1'),
+    ('2021-03-01',  1442.42, NULL, 'news_chain',    '41610', FALSE, '+%1'),
+    ('2021-04-01',  1456.85, NULL, 'news_chain',    '42129', FALSE, '+%1'),
+    ('2021-05-01',  1631.67, NULL, 'news_absolute', '42577', FALSE, '+%12'),
+    ('2021-06-01',  1713.25, NULL, 'news_absolute', '43026', FALSE, '+%5'),
+    ('2021-07-01',  2055.90, NULL, 'news_chain',    '43481', FALSE, '+%20'),
+    ('2021-08-01',  2060.00, NULL, 'news_absolute', '44348', FALSE, 'Eylul haberi Agustos degerini veriyor'),
+    ('2021-09-01',  2369.00, NULL, 'news_chain',    '44348', FALSE, '+%15'),
+    ('2021-10-01',  2724.35, NULL, 'news_chain',    '44725', FALSE, '+%15'),
+    ('2021-11-01',  3999.34, NULL, 'news_chain',    '45165', FALSE, '+%46,8'),
+    ('2021-12-01',  4800.00, NULL, 'news_absolute', '45690', FALSE, 'haber "Kasim tarifesi" diyor ama 4800 Aralik degeri: 3999x1,20=4799'),
+    ('2022-01-01',  5520.00, NULL, 'news_chain',    '46182', FALSE, '+%15'),
+    ('2022-02-01',  6300.00, 0.59210526, 'botas_pdf', '10212-ubat_2022_tarifesi.pdf', FALSE, 'zincir 6298 -> resmi 6300, %0,03 sapma'),
+    ('2022-03-01',  7450.00, NULL, 'news_absolute', '47185', FALSE, '7,45 TL/Sm3, +%18,3'),
+    ('2022-04-01', 10750.00, NULL, 'news_chain',    '47723', FALSE, '+%44,30; Mayis PDF ile birebir kapaniyor'),
+    ('2022-05-01', 10750.00, 1.01033835, 'botas_pdf', '827613-mayis_2022_tarifesi.pdf', FALSE, 'degismedi (48210)'),
+    ('2022-06-01', 12524.83, NULL, 'news_chain',    '48595', FALSE, '+%16,51'),
+    ('2022-07-01', 12524.83, NULL, 'news_chain',    '49041', FALSE, 'degismedi'),
+    ('2022-08-01', 13750.00, 1.29229323, 'botas_pdf', '949372-agustos_2022_tarifesi.pdf', FALSE, 'haber +%10 diyor, resmi deger 13750'),
+    ('2022-09-01', 20625.00, NULL, 'news_chain',    '49973', FALSE, 'haber +%49,5 diyor; 13750x1,50=20625 Kas/Ara cipasiyla tam kapaniyor'),
+    ('2022-11-01', 20625.00, NULL, 'news_absolute', '51622', FALSE, 'Kasim = Aralik, degismedi'),
+    ('2023-01-01', 18000.00, 1.69172932, 'botas_pdf', '704191-ocak_2023_tarifesi.pdf', FALSE, '-%12,73'),
+    ('2023-02-01', 15000.00, NULL, 'news_chain',    '52626', FALSE, '-%16,67'),
+    ('2023-03-01', 12000.00, NULL, 'news_chain',    '53067', FALSE, '-%20. DIKKAT: haber basligindaki %26,12 SANAYI icin'),
+    ('2023-04-01', 10000.00, NULL, 'news_absolute', '53897', FALSE, 'Nisan indirimi (53500); Mayis haberi 10 bin lira diyor'),
+    ('2023-10-01', 12000.00, NULL, 'news_chain',    '55873', FALSE, '+%20'),
+    ('2025-04-05', 12000.00, NULL, 'news_chain',    '62459', TRUE,  'BOSLUK: BOTAS bu tarihte yeni tarife yayimladi (sayfa id 801) ama degeri bulunamadi. Onceki deger tasiniyor. Gercek deger 12000-15000 arasinda.'),
+    ('2025-07-02', 15000.00, 1.40977444, 'botas_pdf', '128513-2_temmuz_2025_tarifesi.pdf', FALSE, NULL),
+    ('2026-04-04', 18000.00, 1.69172932, 'botas_pdf', '139364-4-nisan_2026_tarife.pdf', FALSE, NULL)
+ON CONFLICT (effective_from) DO NOTHING;

@@ -49,6 +49,8 @@ FUEL_SET_TO_MODEL = {
     "short": "crisis_cf_v3",   # sadece 7 günlük pencere
     "ratio": "crisis_cf_v4",   # uzun pencere, birimsiz sütunlar
 }
+# GRF yerine BOTAŞ elektrik üretim tarifesi
+MODEL_NAME_TARIFF = "crisis_cf_v5"
 
 # Plan §2.4'teki İran gaz kesintisi penceresi. Adım 7'nin ilk vakası, bu yüzden
 # koşunun sonunda otomatik raporlanıyor.
@@ -181,6 +183,8 @@ def main():
     ap.add_argument("--block-days", type=int, default=28)
     ap.add_argument("--buffer-days", type=int, default=8)
     ap.add_argument("--write", action="store_true", help="Sonuçları gold.crisis_counterfactual'a yaz")
+    ap.add_argument("--gas-cost", default="grf", choices=["grf", "tariff"],
+                    help="Yakıt maliyeti kaynağı. 'tariff' = silver.gas_tariff_electricity (v5).")
     ap.add_argument("--fuel-dynamics", default=None, choices=["long", "short", "ratio"],
                     help="Yakıt maliyeti geçmişi seti. Belirtilmezse v1 (yok).")
     args = ap.parse_args()
@@ -199,10 +203,11 @@ def main():
         create_table()
 
     fuel_dynamics = args.fuel_dynamics
-    model_name = FUEL_SET_TO_MODEL[fuel_dynamics]
+    model_name = MODEL_NAME_TARIFF if args.gas_cost == "tariff" else FUEL_SET_TO_MODEL[fuel_dynamics]
 
     for variant in variants:
-        feature_cols = get_analysis_feature_columns(variant, df_feat, fuel_dynamics=fuel_dynamics)
+        feature_cols = get_analysis_feature_columns(
+            variant, df_feat, fuel_dynamics=fuel_dynamics, gas_cost=args.gas_cost)
         df_model = prepare_model_frame(df_feat, feature_cols)
         logger.info(
             "🌲 variant=%s | %d feature | %d satır (%d sansürsüz eğitim adayı)",

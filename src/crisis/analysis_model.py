@@ -82,6 +82,14 @@ ANALYSIS_PARAMS: Dict = {
     "random_state": 42,
 }
 
+# GRF tabanlı yakıt maliyeti sütunları. 'tariff' kaynağı seçildiğinde bunlar
+# feature setinden çıkarılır ve yerlerine gas_tariff_usd_mwh_lag0 girer.
+# Gerekçe: GRF, EPİAŞ'ın gaz piyasası REFERANS fiyatı; santrallerin fiilen ödediği
+# BOTAŞ tarifesi. İkisi normalde örtüşüyor ama Kas 2021 - Haz 2023 arasında
+# ayrışıyorlar (ort |oran-1| = 0,17) ve kalıntı tam orada bozuluyor (r = 0,81).
+GRF_COST_COLS = ["natural_gas_grf_usd_lag0", "natural_gas_grf_lag_48"]
+TARIFF_COST_COLS = ["gas_tariff_usd_mwh_lag0"]
+
 # Geçmiş fiyattan türeyen her şey. 'fundamental' varyantta bunlar dışarıda —
 # gerekçesi modül docstring'inde.
 PRICE_DERIVED_COLS = [
@@ -171,6 +179,8 @@ def load_analysis_data(start: str = ANALYSIS_DATA_START) -> pd.DataFrame:
             mc.usd_try,
             mc.brent_oil_usd,
             ng.gas_reference_price_try AS natural_gas_grf_try,
+            gt.price_try_1000m3 AS gas_tariff_try_1000m3,
+            gt.tariff_is_gap AS gas_tariff_is_gap,
             wp.hydro_water_energy_mwh
         FROM raw_mcp_hourly m
         JOIN silver.mcp_with_cap cap ON m.ts = cap.ts
@@ -183,6 +193,7 @@ def load_analysis_data(start: str = ANALYSIS_DATA_START) -> pd.DataFrame:
         LEFT JOIN raw_weather_forecast_hourly wf ON m.ts = wf.ts
         LEFT JOIN raw_macro_daily mc ON DATE(m.ts) = mc.entry_date
         LEFT JOIN raw_natural_gas_daily ng ON DATE(m.ts) = ng.entry_date
+        LEFT JOIN silver.gas_cost_hourly gt ON m.ts = gt.ts
         LEFT JOIN (
             SELECT DATE(date_time) AS entry_date, SUM(water_energy_provision_mwh) AS hydro_water_energy_mwh
             FROM raw_master_water_energy_provision
@@ -202,7 +213,8 @@ def load_analysis_data(start: str = ANALYSIS_DATA_START) -> pd.DataFrame:
         df_raw["ts"] = ts_series.dt.tz_convert("Europe/Istanbul")
     df_raw = df_raw.set_index("ts").sort_index()
 
-    for col in ["usd_try", "brent_oil_usd", "natural_gas_grf_try", "hydro_water_energy_mwh"]:
+    for col in ["usd_try", "brent_oil_usd", "natural_gas_grf_try",
+                "hydro_water_energy_mwh", "gas_tariff_try_1000m3"]:
         if col in df_raw.columns:
             df_raw[col] = df_raw[col].ffill().bfill()
 
@@ -273,6 +285,13 @@ def build_analysis_features(df: pd.DataFrame) -> pd.DataFrame:
     df_feat["brent_oil_usd_lag0"] = col("brent_oil_usd")
     df_feat["hydro_water_energy_lag0"] = col("hydro_water_energy_mwh")
 
+    # BOTAŞ elektrik üretim tarifesi -> $/MWh(gaz). GRF'nin yerine geçen aday.
+    # 1000 Sm3 = 10,646 MWh (9155 Kcal/Sm3 üst ısıl değer, BOTAŞ tarife dipnotu).
+    # Santral verimi sabit olduğu için modele ayrıca verilmiyor; ağaç öğrenir.
+    df_feat["gas_tariff_usd_mwh_lag0"] = (
+        (col("gas_tariff_try_1000m3") / 10.646) / fx_safe
+    ).astype(float)
+
     # --- Yakıt maliyeti dinamiği (bkz. FUEL_DYNAMICS_SETS gerekçesi) ---
     # Tümü üretiliyor, seçimi get_analysis_feature_columns yapıyor. Pencereler
     # saat cinsinden: 7g=168, 30g=720, 90g=2160. Hepsi geriye dönük (trailing),
@@ -280,22 +299,24 @@ def build_analysis_features(df: pd.DataFrame) -> pd.DataFrame:
     gas_usd = df_feat["natural_gas_grf_usd_lag0"]
     brent = df_feat["brent_oil_usd_lag0"]
 
+    # Sütunlar tek seferde eklenir: döngü içinde tek tek atamak çerçeveyi
+    # parçalıyor ve pandas PerformanceWarning basıyor (notebook çıktısını kirletir).
+    yakit = {}
     for src, name in ((gas_usd, "gas"), (brent, "brent")):
         for days, hours, min_p in ((7, 168, 48), (30, 720, 168), (90, 2160, 336)):
             ma = src.rolling(hours, min_periods=min_p).mean()
-            df_feat[f"{name}_usd_ma_{days}d"] = ma
-            df_feat[f"{name}_usd_vs_ma{days}"] = (src / ma.replace(0, np.nan)).astype(float)
-            df_feat[f"{name}_usd_chg_{days}d"] = src.pct_change(hours, fill_method=None).astype(float)
+            yakit[f"{name}_usd_ma_{days}d"] = ma
+            yakit[f"{name}_usd_vs_ma{days}"] = (src / ma.replace(0, np.nan)).astype(float)
+            yakit[f"{name}_usd_chg_{days}d"] = src.pct_change(hours, fill_method=None).astype(float)
 
-    # Yukarıdaki döngü onlarca sütun eklediği için çerçeve parçalanıyor; tek
-    # kopya ile birleştir (pandas PerformanceWarning'i bunun için uyarıyor).
-    return df_feat.copy()
+    return pd.concat([df_feat, pd.DataFrame(yakit, index=df_feat.index)], axis=1)
 
 
 def get_analysis_feature_columns(
     variant: str = "fundamental",
     df: Optional[pd.DataFrame] = None,
     fuel_dynamics: Optional[str] = None,
+    gas_cost: str = "grf",
 ) -> List[str]:
     """
     Varyanta göre feature listesi. Bkz. modül docstring'i.
@@ -307,6 +328,10 @@ def get_analysis_feature_columns(
         raise ValueError(f"Bilinmeyen varyant: {variant!r} (fundamental | autoregressive)")
 
     cols = list(get_feature_columns("robust")) + list(LAG0_FUNDAMENTAL_COLS)
+    if gas_cost == "tariff":
+        cols = [c for c in cols if c not in GRF_COST_COLS] + list(TARIFF_COST_COLS)
+    elif gas_cost != "grf":
+        raise ValueError(f"Bilinmeyen gaz maliyeti kaynağı: {gas_cost!r} (grf | tariff)")
     if fuel_dynamics:
         if fuel_dynamics not in FUEL_DYNAMICS_SETS:
             raise ValueError(f"Bilinmeyen yakıt seti: {fuel_dynamics!r} ({list(FUEL_DYNAMICS_SETS)})")
