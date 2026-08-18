@@ -474,7 +474,7 @@ INSERT INTO silver.gas_tariff_electricity
     ('2023-03-01', 12000.00, NULL, 'news_chain',    '53067', FALSE, '-%20. DIKKAT: haber basligindaki %26,12 SANAYI icin'),
     ('2023-04-01', 10000.00, NULL, 'news_absolute', '53897', FALSE, 'Nisan indirimi (53500); Mayis haberi 10 bin lira diyor'),
     ('2023-10-01', 12000.00, NULL, 'news_chain',    '55873', FALSE, '+%20'),
-    ('2025-04-05', 12000.00, NULL, 'news_chain',    '62459', TRUE,  'BOSLUK: BOTAS bu tarihte yeni tarife yayimladi (sayfa id 801) ama degeri bulunamadi. Onceki deger tasiniyor. Gercek deger 12000-15000 arasinda.'),
+    ('2025-04-05', 14904.00, NULL, 'news_chain',    '62869', FALSE, 'haber 62869 govdesinin sonunda: elektrik uretim santralleri icin ortalama %24,2 artis, 5 Nisan 2025 itibariyle. 12000 x 1,242 = 14904. Temmuz resmi cipasi 15000 -> kalan belirsizlik %0,6. ILK DERLEMEDE KACIRILDI: haberin basligi elektrik perakende zammiyla ilgili, gaz tarifesi govdenin sonunda; baslik/bolum filtresi yetmiyor.'),
     ('2025-07-02', 15000.00, 1.40977444, 'botas_pdf', '128513-2_temmuz_2025_tarifesi.pdf', FALSE, NULL),
     ('2026-04-04', 18000.00, 1.69172932, 'botas_pdf', '139364-4-nisan_2026_tarife.pdf', FALSE, NULL)
 ON CONFLICT (effective_from) DO NOTHING;

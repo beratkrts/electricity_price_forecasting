@@ -8,6 +8,11 @@
 | 01 | `01_counterfactual_model.ipynb` | Aletin kendisi: kontrafaktüel nasıl kuruldu, ne kadar doğru, "anormal" eşiği ne, İran penceresi ve 2024 karşılaştırması |
 | 02 | `02_model_bias_investigation.ipynb` | Aletin iki dönemde neden bozuk olduğu — **elenen hipotezler dahil** |
 | 03 | `03_gas_tariff_discovery.ipynb` | Sapmanın kaynağı ve çözümü: BOTAŞ tarifesi ≠ GRF, `silver.gas_tariff_electricity`, ve **v5 testi** |
+| 04 | `04_event_attribution_attempt.ipynb` | **Üç negatif sonuç**: haberden günlük olay atfetme çalışmıyor. Kural filtresi, elle etiketleme (182 haber altın küme), korpus teşhisi |
+
+İlgili, ama canlı model tarafında:
+`03_ptf_model_comparison/05_gas_tariff_feature_backtest.ipynb` — BOTAŞ tarifesi canlı
+tahmin modelini iyileştiriyor mu (hayır: rMAE 0,817 → 0,817).
 
 ## Koşmadan önce
 
@@ -35,6 +40,8 @@ kayıttır, güncel ölçüm değildir.
 ## Bu klasörün kuralı
 
 Kriz hattına yeni bir analiz eklendiğinde **aynı oturumda buraya da eklenir**.
+Negatif sonuçlar da yazılır — `04` tamamen negatif sonuçlardan oluşuyor ve en değerli
+notebook'lardan biri: bir sonraki oturumun aynı üç yolu tekrar denemesini engelliyor.
 Notebook'lar sonradan yazılan bir özet değil, analizin kendisinin kaydıdır:
 elenen hipotezler de kalır, çünkü bir sonraki oturumun aynı yolu tekrar yürümemesi
 onlara bağlı.
