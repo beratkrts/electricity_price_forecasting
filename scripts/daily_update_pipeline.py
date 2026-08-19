@@ -74,6 +74,13 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     """Executes the in-memory ETL pipeline for the specified date range or defaults to historical sync."""
     logger.info("🚀 Starting In-Memory Direct Database Ingestion Pipeline...")
 
+    # Her adım kendi istisnasını yutup devam ediyor. Bu bilinçli — tek bir kaynak
+    # düştüğünde tüm koşu çökmesin. Ama 19 Ağustos 2026'da internet tamamen yokken
+    # 16 adımın HEPSİ düştü ve pipeline yine "başarıyla tamamlandı" yazdı; kimse
+    # fark etmedi ve bozuk tahmin sağlıklı koşuyu kilitledi. Artık düşen adımlar
+    # sayılıyor ve kapanış mesajı buna göre yazılıyor.
+    failed_steps: list[str] = []
+
     # Load environment variables robustly from project_root
     env_path = project_root / ".env"
     if env_path.exists():
@@ -154,6 +161,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_mcp(mcp_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [MCP] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("MCP")
 
         # 2. System Marginal Price (SMF / SMP)
         try:
@@ -162,6 +170,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_smp(smp_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [SMP] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("SMP")
 
         # 3. Load Forecast (LEP / Yük Tahmini)
         try:
@@ -170,6 +179,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_load_forecast(load_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [LOAD_FORECAST] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("LOAD_FORECAST")
 
         # 4. Final Day-Ahead Generation Plan (KGÜP)
         try:
@@ -178,6 +188,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_kgup(kgup_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [KGUP] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("KGUP")
 
         # 5. Real-Time Actual Generation (Gerçekleşen Üretim)
         try:
@@ -186,6 +197,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_actual_generation(rt_gen_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [ACTUAL_GEN] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("ACTUAL_GEN")
 
         # 6. Real-Time Actual Consumption (Gerçekleşen Tüketim)
         try:
@@ -194,6 +206,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_actual_consumption(rt_cons_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [ACTUAL_CONS] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("ACTUAL_CONS")
 
         # 7. Day-Ahead Bids and Offers (dam-bid & dam-offer)
         try:
@@ -203,6 +216,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_bids_offers(bids_data, offers_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [BIDS_OFFERS] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("BIDS_OFFERS")
 
         # 8. Licensed Real-Time Generation (ren-rt-gen via eptr2)
         try:
@@ -211,6 +225,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_licensed_realtime_generation(licensed_gen_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [LICENSED_GEN] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("LICENSED_GEN")
 
         # 9. Installed Capacity (ren-capacity via eptr2)
         try:
@@ -219,6 +234,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_installed_capacity(installed_cap_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [INSTALLED_CAP] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("INSTALLED_CAP")
 
         # 10. Dam Active Fullness (Custom Endpoint)
         try:
@@ -227,6 +243,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_active_fullness(fullness_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [ACTIVE_FULLNESS] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("ACTIVE_FULLNESS")
 
         # 11. Dam Water Energy Provision (Custom Endpoint)
         try:
@@ -235,6 +252,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_water_energy_provision(provision_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [WATER_PROVISION] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("WATER_PROVISION")
 
         # 12. Natural Gas Daily Reference Price (GRF)
         try:
@@ -243,6 +261,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_natural_gas_daily(gas_price_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [NATURAL_GAS] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("NATURAL_GAS")
 
         # 13. Weather Data (Open-Meteo Archive)
         try:
@@ -251,6 +270,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
                 db.ingest_weather(weather_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [WEATHER] Step skipped due to fetch/ingest error: {e}")
+            failed_steps.append("WEATHER")
 
         time.sleep(0.5)
 
@@ -264,6 +284,7 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
             db.ingest_macro(macro_data, period_key="ALL")
     except Exception as e:
         logger.warning(f"⚠️ [MACRO] Step skipped due to error: {e}")
+        failed_steps.append("MACRO")
 
     # 15. Live Weather Forecast & Historical Forecast Seeding
     try:
@@ -284,15 +305,41 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
             conn.commit()
     except Exception as e:
         logger.warning(f"⚠️ [WEATHER_FORECAST] Step skipped due to error: {e}")
+        failed_steps.append("WEATHER_FORECAST")
 
-    logger.info("🎉 In-Memory Direct Database Pipeline completed successfully!")
+    if failed_steps:
+        logger.error(
+            "❌ ETL completed with %d FAILED step(s): %s — this run's data is INCOMPLETE. "
+            "A prediction built on it will be wrong; re-run once connectivity is restored.",
+            len(failed_steps), ", ".join(failed_steps))
+    else:
+        logger.info("🎉 In-Memory Direct Database Pipeline completed successfully!")
 
     # 16. LightGBM Daily Prediction Execution & DB Ingestion
-    logger.info("\n🔮 Step 16: Executing LightGBM Daily Prediction & Gold Ingestion...")
-    try:
-        run_daily_prediction(force=force_prediction)
-    except Exception as e:
-        logger.error(f"❌ Error during LightGBM daily prediction step: {e}")
+    # Tahmini EKSİK veriyle üretmek, üretmemekten kötü: gold.ptf_predictions_daily'ye
+    # yazılan bozuk bir tahmin, sonraki sağlıklı koşunun "zaten var" kontrolüne
+    # takılıp kilit oluyor (19 Ağustos 2026). Kaynaklardan biri düştüyse tahmin
+    # adımı hiç çalıştırılmaz; erişim düzelince koşu tekrarlandığında üretilir.
+    #
+    # EŞİK NEDEN "HERHANGİ BİRİ" DEĞİL: bazı kaynakların düşmesi zararsız
+    # (ACTIVE_FULLNESS, WATER_PROVISION geçmişi zaten gelmiyor; MACRO düşerse
+    # yfinance mevcut DB değerlerini koruyor). Fiyat modelinin girdisi olan
+    # çekirdek seriler düşerse tahmin anlamsızlaşır — kapı sadece onlara bakar.
+    CORE_STEPS = {"MCP", "SMP", "LOAD_FORECAST", "KGUP", "ACTUAL_GEN", "ACTUAL_CONS", "WEATHER"}
+    failed_core = CORE_STEPS.intersection(failed_steps)
+
+    if failed_core:
+        logger.error(
+            "⛔ Step 16 SKIPPED: core data steps failed (%s). Refusing to write a forecast "
+            "from incomplete data — a bad forecast would block the next healthy run's "
+            "'already exists' check. Re-run the pipeline once connectivity is restored.",
+            ", ".join(sorted(failed_core)))
+    else:
+        logger.info("\n🔮 Step 16: Executing LightGBM Daily Prediction & Gold Ingestion...")
+        try:
+            run_daily_prediction(force=force_prediction)
+        except Exception as e:
+            logger.error(f"❌ Error during LightGBM daily prediction step: {e}")
 
 
 if __name__ == "__main__":

@@ -36,12 +36,14 @@ def fetch_openmeteo_wind_history(start_date_str, end_date_str):
             'balikesir': {'lat': 39.64, 'lon': 27.88}
         }
         df_weather = None
+        failed_cities = []
         for city, coords in cities.items():
             url = f"https://archive-api.open-meteo.com/v1/archive?latitude={coords['lat']}&longitude={coords['lon']}&start_date={fetch_start_date}&end_date={end_date_str}&hourly=wind_speed_100m&timezone=Europe%2FIstanbul"
             try:
                 resp = httpx.get(url, timeout=30.0)
                 data = resp.json()
                 if 'hourly' not in data:
+                    failed_cities.append(city)
                     continue
                 times = pd.to_datetime(data['hourly']['time']).tz_localize('Europe/Istanbul', ambiguous='infer', nonexistent='shift_forward')
                 speeds = data['hourly']['wind_speed_100m']
@@ -49,7 +51,26 @@ def fetch_openmeteo_wind_history(start_date_str, end_date_str):
                 if df_weather is None: df_weather = temp_df
                 else: df_weather = df_weather.join(temp_df)
             except Exception as e:
+                failed_cities.append(city)
                 logger.error(f"Error fetching wind for {city}: {e}")
+
+        # Hepsi düşerse SESSİZCE DEVAM ETME. Pre-forecast'lar değiştirilemez
+        # (gold.kgup_load_pre_forecasts, ON CONFLICT ... WHERE ... IS NULL), yani
+        # rüzgar verisi olmadan hesaplanan bir satır kalıcı olarak yanlış kalır ve
+        # ancak elle DELETE ile düzeltilebilir. Değiştirilemez bir depoda "eksik"
+        # geri alınabilir, "yanlış" geri alınamaz — o yüzden burada hata fırlatıyoruz.
+        # 19 Ağustos 2026'da tam bu oldu: internet yokken üç şehir de DNS hatası
+        # verdi, satırlar yine yazıldı, ve sağlıklı koşu üzerine yazamadı.
+        if failed_cities and df_weather is None:
+            raise RuntimeError(
+                f"Open-Meteo wind fetch failed for every city ({', '.join(failed_cities)}). "
+                "Refusing to write pre-forecasts: rows in gold.kgup_load_pre_forecasts are "
+                "immutable, so a row computed without wind data stays permanently wrong."
+            )
+        if failed_cities:
+            logger.warning(
+                "Wind fetch failed for %d/%d cities (%s); continuing with the rest.",
+                len(failed_cities), len(cities), ", ".join(failed_cities))
 
         if df_weather is not None and not df_weather.empty:
             recs = df_weather.reset_index().to_dict('records')
