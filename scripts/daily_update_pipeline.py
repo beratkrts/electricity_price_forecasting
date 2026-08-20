@@ -81,6 +81,25 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     # sayılıyor ve kapanış mesajı buna göre yazılıyor.
     failed_steps: list[str] = []
 
+    def check_fetched(step: str, data) -> bool:
+        """Fetch denendi ama boş döndü mü — SESSİZ başarısızlık kontrolü.
+
+        fetch_epias_data.py üç denemeden sonra istisna FIRLATMIYOR, `return []`
+        yapıyor. Ingestor da `if not records: return 0` diyor. Sonuçta adımın
+        except bloğu hiç tetiklenmiyor ve başarısızlık hiçbir yere yazılmıyor.
+        20 Ağustos 2026'da tam bu oldu: DNS koptu, lisanslı üretim ve kurulu
+        kapasite alınamadı, ama log'da tek bir uyarı bile yok.
+
+        Bu yüzden fetch'ten sonra dönen verinin boş olup olmadığına da bakıyoruz.
+        Sadece should_fetch() true dönüp gerçekten deneme yapıldıysa çağrılır;
+        veri zaten DB'deyse deneme olmaz ve bu kontrol de çalışmaz.
+        """
+        if not data:
+            logger.warning("⚠️ [%s] Fetch returned no data (silent failure, no exception).", step)
+            failed_steps.append(step)
+            return False
+        return True
+
     # Load environment variables robustly from project_root
     env_path = project_root / ".env"
     if env_path.exists():
@@ -158,7 +177,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         try:
             if should_fetch("mcp", period_key, start_dt):
                 mcp_data = fetcher.fetch_eptr2_service("mcp", start_iso, end_iso)
-                db.ingest_mcp(mcp_data, period_key)
+                if check_fetched("MCP", mcp_data):
+                    db.ingest_mcp(mcp_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [MCP] Step skipped due to fetch/ingest error: {e}")
             failed_steps.append("MCP")
@@ -167,7 +187,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         try:
             if should_fetch("smp", period_key, start_dt):
                 smp_data = fetcher.fetch_eptr2_service("smp", start_iso, end_iso)
-                db.ingest_smp(smp_data, period_key)
+                if check_fetched("SMP", smp_data):
+                    db.ingest_smp(smp_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [SMP] Step skipped due to fetch/ingest error: {e}")
             failed_steps.append("SMP")
@@ -176,7 +197,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         try:
             if should_fetch("load_forecast", period_key, start_dt):
                 load_data = fetcher.fetch_eptr2_service("load-plan", start_iso, end_iso)
-                db.ingest_load_forecast(load_data, period_key)
+                if check_fetched("LOAD_FORECAST", load_data):
+                    db.ingest_load_forecast(load_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [LOAD_FORECAST] Step skipped due to fetch/ingest error: {e}")
             failed_steps.append("LOAD_FORECAST")
@@ -185,7 +207,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         try:
             if should_fetch("kgup", period_key, start_dt):
                 kgup_data = fetcher.fetch_eptr2_service("kgup", start_iso, end_iso)
-                db.ingest_kgup(kgup_data, period_key)
+                if check_fetched("KGUP", kgup_data):
+                    db.ingest_kgup(kgup_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [KGUP] Step skipped due to fetch/ingest error: {e}")
             failed_steps.append("KGUP")
@@ -194,7 +217,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         try:
             if should_fetch("actual_generation", period_key, start_dt):
                 rt_gen_data = fetcher.fetch_eptr2_service("rt-gen", start_iso, end_iso)
-                db.ingest_actual_generation(rt_gen_data, period_key)
+                if check_fetched("ACTUAL_GEN", rt_gen_data):
+                    db.ingest_actual_generation(rt_gen_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [ACTUAL_GEN] Step skipped due to fetch/ingest error: {e}")
             failed_steps.append("ACTUAL_GEN")
@@ -203,7 +227,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         try:
             if should_fetch("actual_consumption", period_key, start_dt):
                 rt_cons_data = fetcher.fetch_eptr2_service("rt-cons", start_iso, end_iso)
-                db.ingest_actual_consumption(rt_cons_data, period_key)
+                if check_fetched("ACTUAL_CONS", rt_cons_data):
+                    db.ingest_actual_consumption(rt_cons_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [ACTUAL_CONS] Step skipped due to fetch/ingest error: {e}")
             failed_steps.append("ACTUAL_CONS")
@@ -267,7 +292,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
         try:
             if should_fetch("weather", period_key, start_dt):
                 weather_data = fetch_weather_in_memory(start_str, end_str)
-                db.ingest_weather(weather_data, period_key)
+                if check_fetched("WEATHER", weather_data):
+                    db.ingest_weather(weather_data, period_key)
         except Exception as e:
             logger.warning(f"⚠️ [WEATHER] Step skipped due to fetch/ingest error: {e}")
             failed_steps.append("WEATHER")
