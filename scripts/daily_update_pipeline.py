@@ -382,7 +382,12 @@ def fetch_published_prices(days_ahead: int = 1) -> int:
       - tahmin üretmez, pre-forecast'a dokunmaz
       - dolayısıyla 04:00 koşusunun kurduğu hiçbir şeyi bozamaz
 
-    Dönen değer: veritabanına yazılan saat sayısı.
+    Dönen değer: HEDEF GÜNÜN veritabanındaki saat sayısı (yazılan toplam değil).
+
+    Neden hedef günün sayısı: fiyat geç yayımlanırsa çekim yine de bugünün 24
+    saatini getirir ve "başarılı" görünür, ama asıl istediğimiz yarının fiyatıdır.
+    Toplam sayıya bakmak bu durumu gizler; çağıran taraf yarının tam gelip
+    gelmediğini bilmek zorunda ki gerekirse tekrar denesin.
     """
     logger.info("💰 Fetching published day-ahead prices (light run, no prediction)...")
 
@@ -410,10 +415,23 @@ def fetch_published_prices(days_ahead: int = 1) -> int:
         logger.warning("⚠️ Published price fetch returned no data — prices may not be out yet.")
         return 0
 
-    n = db.ingest_mcp(mcp, f"{today:%Y-%m-%d}_pub")
-    logger.info("✅ Published prices ingested: %d hour(s) covering %s → %s",
-                len(mcp), today.date(), end.date())
-    return len(mcp)
+    db.ingest_mcp(mcp, f"{today:%Y-%m-%d}_pub")
+
+    # Hedef gün (varsayılan: yarın) gerçekten tam geldi mi
+    with db.engine.connect() as conn:
+        hedef_saat = conn.execute(text(
+            "SELECT count(*) FROM raw_mcp_hourly "
+            "WHERE (ts AT TIME ZONE 'Europe/Istanbul')::date = :g"),
+            {"g": end.date()}).scalar() or 0
+
+    # 23 eşiği yaz/kış saati geçişleri için: o günler 23 veya 25 saat sürebiliyor.
+    if hedef_saat >= 23:
+        logger.info("✅ Published prices complete for %s (%d hours) — model performance "
+                    "can be evaluated today.", end.date(), hedef_saat)
+    else:
+        logger.warning("⚠️ %s prices not published yet (%d/24 hours). Fetch will be retried.",
+                       end.date(), hedef_saat)
+    return hedef_saat
 
 
 if __name__ == "__main__":

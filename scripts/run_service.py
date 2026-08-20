@@ -39,6 +39,13 @@ logger = logging.getLogger("DaemonService")
 #: gün performansı gösterebilir.
 PRICE_FETCH_HOUR = 15
 
+#: Fiyat o saatte henüz çıkmamışsa ne sıklıkla ve ne zamana kadar tekrar denenir.
+#: Geç yayın gerçek bir ihtimal; tek deneme yapıp bırakırsak o günü kaçırır ve
+#: eski davranışa (ertesi sabah öğrenme) sessizce geri döneriz. Akşam saatinden
+#: sonra denemeyi bırakıyoruz — o noktadan sonra zaten 04:00 koşusu yakın.
+PRICE_RETRY_MINUTES = 30
+PRICE_RETRY_UNTIL_HOUR = 22
+
 
 def get_target_4am() -> pd.Timestamp:
     """Calculates target datetime for 4:00 AM Europe/Istanbul time."""
@@ -111,16 +118,25 @@ def main() -> None:
         # bozamaz. Hata alırsa döngü devam eder — bu çekim kritik yol üzerinde değil,
         # sadece geri bildirimi hızlandırıyor.
         if (price_target - now_istanbul).total_seconds() <= 0:
-            logger.info(f"💰 {PRICE_FETCH_HOUR}:00 price fetch trigger — pulling published day-ahead prices...")
+            logger.info(f"💰 Price fetch trigger — pulling published day-ahead prices...")
+            tamam = False
             try:
-                n = fetch_published_prices()
-                if n:
-                    logger.info("✅ Published prices in DB — model performance can now be shown same day.")
-                else:
-                    logger.warning("⚠️ No published prices returned; will retry at next trigger.")
+                tamam = fetch_published_prices() >= 23
             except Exception as e:
                 logger.error(f"Error during scheduled price fetch: {e}")
-            price_target = get_target_price_fetch()
+
+            if tamam:
+                logger.info("✅ Tomorrow's prices in DB — model performance can be shown today.")
+                price_target = get_target_price_fetch()
+            elif now_istanbul.hour < PRICE_RETRY_UNTIL_HOUR:
+                # Fiyat henüz çıkmamış. Yarına ertelemek yerine kısa aralıkla tekrar
+                # dene: geç yayın yüzünden günü kaçırmak, eski davranışa dönmek demek.
+                price_target = now_istanbul + timedelta(minutes=PRICE_RETRY_MINUTES)
+                logger.info(f"↻ Prices not out yet, retrying in {PRICE_RETRY_MINUTES} min.")
+            else:
+                logger.warning(f"⚠️ Prices still not published by {PRICE_RETRY_UNTIL_HOUR}:00 — "
+                               "giving up for today; the 04:00 run will pick them up.")
+                price_target = get_target_price_fetch()
             logger.info(f"⏳ Next price fetch: {price_target.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Sleep in short 60-second chunks to safely handle computer sleep/wake events
