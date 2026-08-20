@@ -368,5 +368,53 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
             logger.error(f"❌ Error during LightGBM daily prediction step: {e}")
 
 
+def fetch_published_prices(days_ahead: int = 1) -> int:
+    """Yayımlanan GÖP takas fiyatlarını çeker. Tam pipeline değil, sadece fiyat.
+
+    NEDEN AYRI BİR FONKSİYON: GÖP sonuçları öğleden sonra (~14:00) yayımlanıyor,
+    yani yarının fiyatı bugün öğleden sonra belli oluyor. Ama tek koşumuz 04:00'te
+    olduğu için o fiyat veritabanına ancak ERTESİ SABAH giriyordu. Sonuç: bugün
+    ürettiğimiz tahminin tutup tutmadığını yarın sabah öğreniyorduk, oysa bu akşam
+    öğrenebiliriz. Yaklaşık 14 saatlik gereksiz gecikme.
+
+    Bilinçli olarak DAR tutuldu:
+      - sadece MCP çekilir, tam ETL koşmaz
+      - tahmin üretmez, pre-forecast'a dokunmaz
+      - dolayısıyla 04:00 koşusunun kurduğu hiçbir şeyi bozamaz
+
+    Dönen değer: veritabanına yazılan saat sayısı.
+    """
+    logger.info("💰 Fetching published day-ahead prices (light run, no prediction)...")
+
+    env_path = project_root / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+    username = os.getenv("EPIAS_USERNAME") or os.getenv("EPTR_USERNAME")
+    password = os.getenv("EPIAS_PASSWORD") or os.getenv("EPTR_PASSWORD")
+
+    db = EpiasDBIngestor()
+    fetcher = EpiasFetcher(username=username, password=password,
+                           env_path=str(env_path) if env_path else None)
+
+    today = pd.Timestamp.now(tz="Europe/Istanbul").normalize().tz_localize(None)
+    end = today + pd.Timedelta(days=days_ahead)
+    start_iso = f"{today:%Y-%m-%d}T00:00:00+03:00"
+    end_iso = f"{end:%Y-%m-%d}T23:59:59+03:00"
+
+    try:
+        mcp = fetcher.fetch_eptr2_service("mcp", start_iso, end_iso)
+    except Exception as e:
+        logger.error("❌ Published price fetch failed: %s", e)
+        return 0
+    if not mcp:
+        logger.warning("⚠️ Published price fetch returned no data — prices may not be out yet.")
+        return 0
+
+    n = db.ingest_mcp(mcp, f"{today:%Y-%m-%d}_pub")
+    logger.info("✅ Published prices ingested: %d hour(s) covering %s → %s",
+                len(mcp), today.date(), end.date())
+    return len(mcp)
+
+
 if __name__ == "__main__":
     run_daily_pipeline()

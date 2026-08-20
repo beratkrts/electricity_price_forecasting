@@ -19,7 +19,7 @@ import time
 import logging
 from datetime import timedelta
 import pandas as pd
-from daily_update_pipeline import run_daily_pipeline
+from daily_update_pipeline import run_daily_pipeline, fetch_published_prices
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,10 +31,28 @@ logging.basicConfig(
 logger = logging.getLogger("DaemonService")
 
 
+#: GÖP sonuçlarının yayımlanmasından sonraki hafif çekim saati.
+#: Yarının takas fiyatı öğleden sonra (~14:00) belli oluyor. Tek koşumuz 04:00'te
+#: olduğu için o fiyat veritabanına ancak ertesi sabah giriyordu; yani bugün
+#: ürettiğimiz tahminin tutup tutmadığını yarın sabah öğreniyorduk. Bu tetikleyici
+#: o gecikmeyi ~14 saatten sıfıra indiriyor: akşam fiyat gelir, dashboard aynı
+#: gün performansı gösterebilir.
+PRICE_FETCH_HOUR = 15
+
+
 def get_target_4am() -> pd.Timestamp:
     """Calculates target datetime for 4:00 AM Europe/Istanbul time."""
     now_istanbul = pd.Timestamp.now(tz="Europe/Istanbul").tz_localize(None)
     target = now_istanbul.replace(hour=4, minute=0, second=0, microsecond=0)
+    if now_istanbul > target:
+        target += timedelta(days=1)
+    return target
+
+
+def get_target_price_fetch() -> pd.Timestamp:
+    """Bugünkü (veya kaçırıldıysa yarınki) fiyat çekim saatini döndürür."""
+    now_istanbul = pd.Timestamp.now(tz="Europe/Istanbul").tz_localize(None)
+    target = now_istanbul.replace(hour=PRICE_FETCH_HOUR, minute=0, second=0, microsecond=0)
     if now_istanbul > target:
         target += timedelta(days=1)
     return target
@@ -52,6 +70,7 @@ def main() -> None:
 
     # 2. Continuous 24/7 loop with laptop sleep/wake protection
     target_time = get_target_4am()
+    price_target = get_target_price_fetch()
     
     while True:
         now_istanbul = pd.Timestamp.now(tz="Europe/Istanbul").tz_localize(None)
@@ -85,6 +104,24 @@ def main() -> None:
                 f"⏳ Sleeping until next 4:00 AM target: {target_time.strftime('%Y-%m-%d %H:%M:%S')} "
                 f"({hours:.2f} hours remaining)."
             )
+
+        # Akşam fiyat çekimi — 04:00 koşusundan BAĞIMSIZ ve çok daha dar kapsamlı.
+        # Sadece yayımlanan GÖP fiyatını alır; tahmin üretmez, pre-forecast'a
+        # dokunmaz, tam ETL koşmaz. Bu yüzden 04:00 koşusunun kurduğu hiçbir şeyi
+        # bozamaz. Hata alırsa döngü devam eder — bu çekim kritik yol üzerinde değil,
+        # sadece geri bildirimi hızlandırıyor.
+        if (price_target - now_istanbul).total_seconds() <= 0:
+            logger.info(f"💰 {PRICE_FETCH_HOUR}:00 price fetch trigger — pulling published day-ahead prices...")
+            try:
+                n = fetch_published_prices()
+                if n:
+                    logger.info("✅ Published prices in DB — model performance can now be shown same day.")
+                else:
+                    logger.warning("⚠️ No published prices returned; will retry at next trigger.")
+            except Exception as e:
+                logger.error(f"Error during scheduled price fetch: {e}")
+            price_target = get_target_price_fetch()
+            logger.info(f"⏳ Next price fetch: {price_target.strftime('%Y-%m-%d %H:%M:%S')}")
 
         # Sleep in short 60-second chunks to safely handle computer sleep/wake events
         sleep_duration = min(60, max(1, int(seconds_remaining)))
