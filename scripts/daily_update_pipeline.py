@@ -69,9 +69,25 @@ logger = logging.getLogger("ETLPipeline")
 # azami fiyat limiti (price cap) regime and would distort the live model.
 HISTORY_START = "2021-01-01"
 
+#: Fiyat modelinin girdisi olan seriler. Bunlardan biri çekilemezse tahmin
+#: üretmek anlamsız — o yüzden Step 16 kapısı sadece bunlara bakar.
+#: Diğerlerinin düşmesi zararsız: ACTIVE_FULLNESS ve WATER_PROVISION geçmişi
+#: EPİAŞ'tan zaten gelmiyor, MACRO düşerse yfinance mevcut DB değerlerini koruyor.
+CORE_STEPS = {"MCP", "SMP", "LOAD_FORECAST", "KGUP", "ACTUAL_GEN", "ACTUAL_CONS", "WEATHER"}
 
-def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optional[str] = None, force_prediction: bool = False) -> None:
-    """Executes the in-memory ETL pipeline for the specified date range or defaults to historical sync."""
+
+def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optional[str] = None, force_prediction: bool = False) -> list:
+    """Executes the in-memory ETL pipeline for the specified date range or defaults to historical sync.
+
+    Dönen değer: başarısız olan adımların listesi (boşsa her şey yolunda).
+
+    Neden dönüş değeri var: kapı kapandığında (çekirdek veri eksik) fonksiyon
+    istisna FIRLATMIYOR, normal dönüyor. Daemon'ın 3 denemeli retry'ı ise sadece
+    istisnada tetikleniyordu. Sonuç: 21 Ağustos 2026'da erişim koptu, kapı doğru
+    şekilde kapandı, ama daemon "başarılı" sayıp 22 saat uykuya geçti ve ertesi
+    günün tahmini üretilmedi. Erişim birkaç saat sonra geri gelmişti.
+    Çağıran taraf artık ne olduğunu görebiliyor ve tekrar deneyebiliyor.
+    """
     logger.info("🚀 Starting In-Memory Direct Database Ingestion Pipeline...")
 
     # Her adım kendi istisnasını yutup devam ediyor. Bu bilinçli — tek bir kaynak
@@ -351,7 +367,6 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
     # (ACTIVE_FULLNESS, WATER_PROVISION geçmişi zaten gelmiyor; MACRO düşerse
     # yfinance mevcut DB değerlerini koruyor). Fiyat modelinin girdisi olan
     # çekirdek seriler düşerse tahmin anlamsızlaşır — kapı sadece onlara bakar.
-    CORE_STEPS = {"MCP", "SMP", "LOAD_FORECAST", "KGUP", "ACTUAL_GEN", "ACTUAL_CONS", "WEATHER"}
     failed_core = CORE_STEPS.intersection(failed_steps)
 
     if failed_core:
@@ -366,6 +381,8 @@ def run_daily_pipeline(start_date_str: Optional[str] = None, end_date_str: Optio
             run_daily_prediction(force=force_prediction)
         except Exception as e:
             logger.error(f"❌ Error during LightGBM daily prediction step: {e}")
+
+    return failed_steps
 
 
 def fetch_published_prices(days_ahead: int = 1) -> int:

@@ -19,7 +19,7 @@ import time
 import logging
 from datetime import timedelta
 import pandas as pd
-from daily_update_pipeline import run_daily_pipeline, fetch_published_prices
+from daily_update_pipeline import run_daily_pipeline, fetch_published_prices, CORE_STEPS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -45,6 +45,14 @@ PRICE_FETCH_HOUR = 15
 #: sonra denemeyi bırakıyoruz — o noktadan sonra zaten 04:00 koşusu yakın.
 PRICE_RETRY_MINUTES = 30
 PRICE_RETRY_UNTIL_HOUR = 22
+
+#: Çekirdek veri çekilemediğinde ETL'in ne sıklıkla tekrar deneneceği.
+#: Kapı (Step 16) eksik veriyle tahmin üretilmesini engelliyor — doğru davranış.
+#: Ama 21 Ağustos 2026'da kapı kapandıktan sonra daemon 22 saat uykuya geçti ve
+#: ertesi günün tahmini hiç üretilmedi; oysa erişim birkaç saat sonra geri
+#: gelmişti. Kapı kapanmak için var, günü kaybetmek için değil.
+ETL_RETRY_MINUTES = 20
+ETL_RETRY_UNTIL_HOUR = 22
 
 
 def get_target_4am() -> pd.Timestamp:
@@ -87,29 +95,43 @@ def main() -> None:
         if seconds_remaining <= 0:
             logger.info("⏰ 4:00 AM Scheduled Trigger (or missed run detected after sleep)! Running daily ETL pipeline...")
             max_attempts = 3
-            success = False
+            failed_core = None
             for attempt in range(1, max_attempts + 1):
                 try:
-                    run_daily_pipeline(force_prediction=True)
-                    success = True
+                    failed = run_daily_pipeline(force_prediction=True)
+                    failed_core = CORE_STEPS.intersection(failed or [])
                     break
                 except Exception as e:
                     logger.error(f"Error during scheduled ETL execution (attempt {attempt}/{max_attempts}): {e}")
                     if attempt < max_attempts:
                         logger.info("⏳ Retrying ETL pipeline in 5 minutes...")
                         time.sleep(300)
-            
-            if not success:
+
+            now_istanbul = pd.Timestamp.now(tz="Europe/Istanbul").tz_localize(None)
+
+            if failed_core is None:
                 logger.error("❌ Daily ETL execution failed after all retry attempts.")
 
-            # Reset target to next 4:00 AM
-            target_time = get_target_4am()
-            now_istanbul = pd.Timestamp.now(tz="Europe/Istanbul").tz_localize(None)
+            # Kapı kapandıysa günü kaybetme: kısa aralıkla tekrar dene. Erişim
+            # sorunları genelde saatler içinde düzeliyor; ertesi 04:00'ı beklemek
+            # o günün tahminini tamamen kaybetmek demek.
+            if failed_core and now_istanbul.hour < ETL_RETRY_UNTIL_HOUR:
+                target_time = now_istanbul + timedelta(minutes=ETL_RETRY_MINUTES)
+                logger.warning(
+                    "↻ Core data missing (%s) — no forecast written. Retrying in %d min.",
+                    ", ".join(sorted(failed_core)), ETL_RETRY_MINUTES)
+            else:
+                if failed_core:
+                    logger.error(
+                        "⚠️ Core data still missing at %02d:00 — giving up for today. "
+                        "Tomorrow's forecast was NOT produced; run the pipeline manually "
+                        "once connectivity is restored.", now_istanbul.hour)
+                target_time = get_target_4am()
+
             seconds_remaining = (target_time - now_istanbul).total_seconds()
-            hours = seconds_remaining / 3600
             logger.info(
-                f"⏳ Sleeping until next 4:00 AM target: {target_time.strftime('%Y-%m-%d %H:%M:%S')} "
-                f"({hours:.2f} hours remaining)."
+                f"⏳ Next ETL run: {target_time.strftime('%Y-%m-%d %H:%M:%S')} "
+                f"({seconds_remaining/3600:.2f} hours remaining)."
             )
 
         # Akşam fiyat çekimi — 04:00 koşusundan BAĞIMSIZ ve çok daha dar kapsamlı.
