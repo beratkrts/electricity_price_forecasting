@@ -94,6 +94,14 @@ Türkiye üç özelliği birlikte taşıyor ve bu kombinasyon nadir:
 
 Üçünün de ölçülmüş serisi elimizde.
 
+**Literatürdeki konumu (21 Ağu 2026'da doğrulandı).** Türkiye'de fiyat tavanının
+etkisini ölçen tek çalışma — *Price spikes, temporary price caps…* (Energy Policy,
+2022) — **1 May 2016 – 31 Tem 2018** verisiyle çalışıyor ve **etkinin istatistiksel
+olarak sıfır** olduğunu buluyor. O dönemde tavan 2.000 TL/MWh'ti ve fiyat ona
+neredeyse hiç değmiyordu: **bağlayıcı değildi.** Bizim dönemimizde saatlerin %15,4'ü
+tavanda. Çalışmanın çerçevesi bu çelişki üzerine kuruluyor: *aynı soru, tavanın
+fiilen bağladığı rejimde.* Ayrıntı ve diğer konumlandırma: `LITERATURE_REVIEW.md`.
+
 ### Araştırma soruları
 
 1. Gözlenen fiyat değişkenliğinin ne kadarı tavan tarafından bastırılıyor?
@@ -130,8 +138,15 @@ göre gruplandı. **Süpervizörle teyit edilmeli, eklenecek olaylar olabilir.**
 
 | Dönem | Ne oldu |
 |---|---|
-| 2021-2022 | Tavan rejimi tırmanışı: 569 → 4.800 TL |
-| 2023 | Tavan indirimleri: 4.800 → 2.600 TL |
+| 2021-2022 | AFL tırmanışı: 569 → 4.800 TL |
+| **1 Nisan 2022** | **AUF (Azami Uzlaştırma Fiyatı) mekanizması devreye girdi** — teknoloji bazlı gelir tavanı: gaz 2.550, ithal kömür 1.800, yenilenebilir 1.700 TL/MWh. **Aynı gün AFL de 1.745 → 2.500'e çıktı**, iki müdahale ayrılamaz |
+| 2023 | AFL indirimleri: 4.800 → 2.600 TL |
+
+**AFL ≠ AUF.** AFL teklif tavanıdır ve PTF'yi keser (sansürün kaynağı). AUF gelir
+tavanıdır, PTF oluştuktan sonra destekleme bedeli havuzu üzerinden işler — PTF'yi
+doğrudan kesmez ama teklif davranışını değiştirir. `silver.price_cap_official`
+**AFL'yi** tutuyor (doğru). AUF serisi henüz derlenmedi. Ayrıntı:
+`LITERATURE_REVIEW.md` §3.
 
 ### Dışsal şoklar
 
@@ -174,7 +189,7 @@ Tez seviyesi hedefleniyorsa bunlar hakem sorusu olur:
 | Eksik | Ne gerekiyor |
 |---|---|
 | Sansür modellenmiyor | **Tobit** veya sansürlü regresyon. Mevcut yaklaşım ("sansürsüzde eğit, her yere tahmin et") savunulabilir ama neden Tobit değil sorusuna cevap gerekir |
-| Nedensellik iddiası yok | Ya kimliklendirme stratejisi (fark-içinde-fark, sentetik kontrol) ya da "bu betimleyicidir" şerhi |
+| Nedensellik iddiası yok | Ya kimliklendirme stratejisi (fark-içinde-fark, sentetik kontrol) ya da "bu betimleyicidir" şerhi. **Gerekçe artık yazılı:** İberya istisnası sentetik kontrolle ölçüldü ama orada donör havuzu vardı (diğer AB piyasaları); Türkiye enterkonneksiyon bakımından fiilen ada, karşılaştırılabilir kontrol birimi yok. Temel-değişken kontrafaktüeli bu yüzden seçildi |
 | Geçiş katsayısı fazla basit | Aylık farklar üzerinde düz OLS, n=30, kontrol yok, otokorelasyon düzeltmesi yok. Gereken: kontroller (termal pay, talep), Newey-West standart hatalar, kısa/uzun vade için ARDL |
 | Literatür konumlandırması yok | **Yapılmadı.** "Kapsamlı güncel çalışma yok" iddiası doğrulanmalı |
 
@@ -182,11 +197,13 @@ Tez seviyesi hedefleniyorsa bunlar hakem sorusu olur:
 
 ## 6. Sıradaki adımlar
 
-1. **Literatür taraması.** Türkiye elektrik fiyatları, tavan fiyat rejimleri,
-   idari yakıt fiyatı üzerine ne yapılmış. Bu, çalışmanın gerekçesini kurar veya
-   çerçeveyi değiştirir. **Devam etmeden önce yapılmalı.**
+1. ~~**Literatür taraması.**~~ **İlk tur yapıldı (21 Ağu 2026) → `LITERATURE_REVIEW.md`.**
+   Sonuç: "kapsamlı güncel çalışma yok" iddiası bu haliyle **yanlış** (tahmin
+   literatürü doygun, Polat & Selçuklu LightGBM+SHAP yapmış), ama düzeltilmiş hali
+   daha güçlü — bkz. o dosyanın §5. Kapanmadı: YÖK tez taraması, Scopus/WoS ve iki
+   paywall'lı temel kaynak eksik (§7).
 2. **Olay listesini süpervizörle teyit et.** §4 veriden çıktı; alan bilgisiyle
-   eklenecekler olabilir.
+   eklenecekler olabilir. **AUF (1 Nisan 2022) yeni eklendi.**
 3. **Her olay için ölçüm tablosunu üret.** §5.1'deki dört madde. Kod hazır,
    sorgular yazılacak.
 4. **Yöntem sağlamlaştırma.** En azından geçiş katsayısına kontroller ve düzgün

@@ -68,3 +68,6 @@ experiments/generators/
 
 # Raporlar (yerel deliverable — GitHub'a gitmez)
 reports/
+
+# Literatür tarama veritabanı — scripts/lit_search.py ile yeniden üretilir
+literature/lit.db
