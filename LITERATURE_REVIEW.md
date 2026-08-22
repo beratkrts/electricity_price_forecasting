@@ -208,10 +208,43 @@ fiyat seviyeleri (MAE seviyeyle ölçeklenir) ve girdi kümeleri farklı. Seviye
 arındırmak için WAPE'e bakılırsa bizim %12,25'e karşı onların %15,3 / %20,1 /
 %19,5 çıkıyor — ama onların 2022'si de bizim 2026'mız da uç rejim.
 
-**Savunulabilir ifade: "onlardan geride değiliz."** "Onlardan iyiyiz" değil.
-Karşılaştırmanın asıl işlevi rakam yarışı değil, §5'teki argümanı kurmak:
-yayımlanmış Türkiye MAE/MAPE'leri kurgu farkı yüzünden ölçüt olarak
-kullanılamaz.
+**Kafa kafaya kıyas (22 Ağu 2026) — `literature/head_to_head.py`.**
+Dönem örtüşmezliği ortak *ham* veriyle aşıldı: onların CSV'si 2018-2023, bizim
+DB'miz 2021-2026, kesişim 2021-2022. Hedef serilerin **birebir aynı** olduğu
+doğrulandı (17.500 ortak saat, fark 0,0000). Aynı test seti (2022, 8.760 saat),
+aynı yeniden eğitim kadansı (30 gün, genişleyen pencere), aynı naive.
+
+| Model | MAE | naive | **rMAE** |
+|---|--:|--:|--:|
+| Onlar — 33 değişken, **2018'den** (3 yıl fazla veri) | 27,10 | 25,90 | **1,046** |
+| Onlar — 33 değişken, 2021'den (eşit geçmiş) | 27,06 | 25,90 | **1,045** |
+| **Biz** — 71 özellik, 2021'den, **ön-tahminler YOK** | **24,69** | 25,90 | **0,953** |
+
+**İki handikap kasıtlı olarak bizim aleyhimize bırakıldı:** (1)
+`gold.kgup_load_pre_forecasts` 2021-2022 için boş, yani ölçülmüş en etkili
+özelliklerimiz (`renewable_pressure_ratio_lag0` ve türevleri) bu koşuda NaN;
+(2) onlara 3 yıl fazla eğitim verisi verildi — ki neredeyse hiç işe yaramıyor
+(27,10 → 27,06).
+
+**Sonuç:** bizim özellik kümemiz **%8,9 daha düşük MAE** veriyor ve **rMAE=1
+eşiğini geçen tek taraf biz**: onlar naive baseline'ı yenemiyor (1,046), biz
+ancak yeniyoruz (0,953).
+
+**Ama bu bir ezici üstünlük değil, ve tek yıllık.** Üç şerh:
+
+1. **2022 ikimiz için de kötü bir test yılı.** Tavan rejiminin en sert dönemi;
+   `CLAUDE.md` `TRAINING_DATA_START`'ı tam da bu yüzden 2023'te tutuyor. Her iki
+   model de kendi konfor alanının dışında, ikisi de naive'e yakın.
+2. **Başka ortak yıl yok.** Bizim ham verimiz 2021'de başladığı için 2021'i test
+   edecek eğitim penceresi kalmıyor. Tek karşılaşma bu.
+3. Bizim canlı dönemimizdeki rMAE 0,756 — buradaki 0,953'ten belirgin iyi.
+   Aradaki fark rejim zorluğu ve eksik ön-tahmin özellikleri.
+
+**Savunulabilir ifade: "aynı test setinde, aynı kadansla, bizim özellik
+kümemiz onlarınkinden iyi çıkıyor (rMAE 0,953 vs 1,046) — ve onların modeli
+naive baseline'ı yenemiyor."** Bu, "onlardan iyiyiz"in ölçülmüş hali.
+Rakam yarışından daha önemli olan §5'teki argüman ise değişmedi: yayımlanmış
+Türkiye MAE/MAPE'leri kurgu farkı yüzünden ölçüt olarak kullanılamaz.
 
 Not: son %20'lik kronolojik testte (test dönemi = 2022) MAE 63,48 çıkıyor;
 eşanlı açık artırma sütunları ve gerçekleşen üretim atılınca 62,2 ve 62,9.

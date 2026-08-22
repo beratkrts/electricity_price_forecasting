@@ -21,6 +21,7 @@ Kullanım:
 import argparse
 
 import lightgbm as lgb
+import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error, r2_score
 from sklearn.model_selection import train_test_split
@@ -104,9 +105,48 @@ def main() -> None:
         mae, r2 = fit_eval(X[tr_m], y[tr_m], X[te_m], y[te_m])
         print(f"   {Y:<11}{f'2018-{Y - 1}':>13}{y[te_m].mean():>9.1f}{mae:>9.2f}{r2:>8.3f}")
 
-    # --- 4) Eşanlı değişkenler atılınca ----------------------------------
+    # --- 4) ADİL KIYAS: rMAE, sık yeniden eğitimle -----------------------
+    # İki düzeltme birden:
+    #  (a) Dönem zorluğu normalize edilsin diye rMAE (Lago et al. naive:
+    #      Pzt/Cmt/Paz → geçen hafta aynı saat, Sal-Cum → dün aynı saat).
+    #      MCP_168 ve MCP_24 sütunları zaten veri setinde var.
+    #  (b) Bizim model her gün yeniden eğitiliyor; onlara "bir kez eğit, tüm
+    #      yılı tahmin et" dayatmak haksızdı. Genişleyen pencere + 30 günde
+    #      bir yeniden eğitim veriyoruz. Bu düzeltme ONLARIN lehine.
+    dow = ts.dt.dayofweek
+    naive = np.where(dow.isin([0, 5, 6]), df.MCP_168, df.MCP_24)
+
+    START, STEP = 365 * 24, 30 * 24
+    idxs, preds = [], []
+    i = START
+    while i < len(X):
+        j = min(i + STEP, len(X))
+        preds.append(lgb.LGBMRegressor(**PARAMS).fit(X[:i], y[:i]).predict(X[i:j]))
+        idxs.append(np.arange(i, j))
+        i = j
+    idx, pr = np.concatenate(idxs), np.concatenate(preds)
+
+    def rmae_row(label, mask=None):
+        k = idx if mask is None else idx[mask]
+        pp = pr if mask is None else pr[mask]
+        mae = mean_absolute_error(y[k], pp)
+        nv = mean_absolute_error(y[k], naive[k])
+        print(f"   {label:<44}{mae:>8.2f}{nv:>8.2f}{mae / nv:>8.3f}")
+
+    print("\n5) ADİL KIYAS — genişleyen pencere, 30 günde bir yeniden eğitim")
+    print(f"   {'':<44}{'MAE':>8}{'naive':>8}{'rMAE':>8}")
+    for Y in sorted(year.unique()):
+        m = year.values[idx] == Y
+        if m.sum() > 2000:
+            rmae_row(f"test {Y} (ort ${y[idx][m].mean():.0f})", m)
+    rmae_row("BİRLEŞİK")
+    print("   " + "-" * 68)
+    print(f"   {'BİZ — canlı model, 2 yıl (METRICS.md §4)':<44}{7.26:>8.2f}{9.60:>8.2f}{0.756:>8.3f}")
+    print("   rMAE < 1 = naive'den iyi. Onların modeli hiçbir yılda 1'in altına inmiyor.")
+
+    # --- 6) Eşanlı değişkenler atılınca ----------------------------------
     n = int(len(X) * 0.8)
-    print("\n4) Son %20 kronolojik test, girdiler kısıtlanınca")
+    print("\n6) Son %20 kronolojik test, girdiler kısıtlanınca")
     for label, cols in [("tüm 33 değişken", []),
                         ("açık artırma çıktıları atıldı", POST_CLEARING),
                         ("+ gerçekleşen üretim atıldı", POST_CLEARING + REALISED_GEN)]:
