@@ -66,9 +66,9 @@ değil **yük** tahmini; Energies 2022 nükleer senaryo modeli; Energies 2022 EV
 şebeke etkileşimi; RSER 2011 Markowitz portföyü. Başlıkta "Türkiye + elektrik"
 geçmesi fiyat oluşumu çalışması olduğu anlamına gelmiyor.
 
-**Hâlâ açık:** Polat & Selçuklu'nun iki SSRN sürümü (4894108, 5472209) — en
-yakın komşu, LightGBM + SHAP + 32 özellik. SSRN 403 veriyor, özeti
-OpenAlex/Crossref/Semantic Scholar'ın hiçbirinde yok. **Erişim gerekiyor.**
+**Kapandı (22 Ağu):** Polat & Selçuklu tam metin **ve kodla** incelendi — bkz.
+§2.1.1. SSRN 5472209 (2025 sürümü) hâlâ okunmadı ama 4894108 ile aynı veri seti
+ve aynı kurguyu kullanıyor.
 
 ### 2.1 Türkiye günlük/saatlik fiyat tahmini — literatür KALABALIK ama SIĞ
 
@@ -83,7 +83,7 @@ OpenAlex/Crossref/Semantic Scholar'ın hiçbirinde yok. **Erişim gerekiyor.**
 | **Arifoğlu & Kandemir (2022)**, MAKÜ İİBF 9(2):1433-1458 ✅tam metin | Eğitim 13.06.2016–04.10.2020 · Doğrulama 05.10.2020–28.02.2021 (3.528 s) | **28 gün** (01–28.03.2021, 672 saat) | 7 dışsal: gün/tatil, RTC(-24s), HPP(-24s), SMP(-24s), LFP, sıcaklık, rüzgar hızı | MAPE: LSTM **8,15** · MLP 8,44 · GRU 8,72 · CNN 9,27 (dönem ort. PTF 228,08 TL) | ❌ |
 | **Özdemir & Yılmaz (2026)**, JISE 10(1):189-200 ✅tam metin | 15.04.2023 07:00 – 29.09.2023 05:00, 4.001 nokta | **25 nokta** (bağımsız test) + 10-kat CV | 11 değişken: RTC, kaynak bazlı üretim, teklif hacmi, eşleşme miktarı, **USD kuru** | EGPR R² 0,908 (CV) / **0,913** (test); test MAE **61,56**, RMSE 87,94 TL | ❌ |
 | Yılan & Beykent (2026), CMC 86(1) — XGBoost ⚠️özet | **sadece 2023**, 8.760 saat | %20 → ≈1.752 saat (bölme biçimi doğrulanamadı) | belirtilmemiş; SHAP → gaz üretimi baskın | MAE **144,8** · RMSE 201,8 TL · R² 0,923 | ❌ |
-| Polat & Selçuklu, SSRN 4894108 / 5472209 ⚠️paywall | **doğrulanamadı** | **doğrulanamadı** | **32 özellik**, kur ve gaz fiyatı dahil; SHAP + merit-order yorumu | LightGBM en iyi; sayılar okunamadı | ? |
+| **Polat & Selçuklu (2024)**, SSRN 4894108 ✅tam metin **+ kod** | Oca 2015–Ara 2022 toplanmış, eksik veri yüzünden **2018-2022**'ye daraltılmış | **%20 RASTGELE** — kronolojik değil (aşağı bak) | 33 değişken: fiyat lag'leri, teklif eğrisi hacimleri, **eşleşen miktar**, kur, kaynak bazlı üretim, **BOTAŞ gaz fiyatı**, sıcaklık | LightGBM: R² 0,950 · MAE **5,981 $/MWh** · RMSE 11,248 · **MAPE %49,6** | ❌ |
 | ESWA 224 (2023) — TEDSE transformer ⚠️özet | **2017–2021** | belirtilmemiş | rejim alt-grupları (Covid) | RMSE 3,14 · R² 0,94 | ❌ (veri tavan öncesi biter) |
 | Şimşek (2024) — *içeriden atıf* | 17.04.2023–16.04.2024, 8.772 s | belirtilmemiş | kaynak bazlı üretim + talep | XGBoost en iyi | ❌ |
 | Demirezen & Çetin (2021) — *içeriden atıf* | 01.01.2019–10.03.2020 | %16 | işlem hacmi kritik çıkıyor | RF en iyi | ❌ |
@@ -110,6 +110,60 @@ OpenAlex/Crossref/Semantic Scholar'ın hiçbirinde yok. **Erişim gerekiyor.**
    fiyatlar 3.000-3.400 TL bandında **düz bir tavana** yaslanıyor ve model bandın
    üstünü tahmin etmeye çalışıyor. PICP'in %80 hedefe karşı **0,737** çıkması
    (yetersiz kapsama) bununla tutarlı.
+
+### 2.1.1 En yakın komşu tam metin + kodla incelendi — üç ciddi sorun
+
+> 22 Ağu 2026. Kullanıcı makaleyi `docs/ssrn-4894108.pdf` olarak sağladı; kod ve
+> veri de açık: `github.com/TheEmgame/EPF-Turkish-Day-Ahead-Market`.
+
+**Polat & Selçuklu (2024)** bu projenin literatürdeki en yakın komşusu: Türkiye
+GÖP, LightGBM, SHAP, kur ve **BOTAŞ gaz fiyatı** dahil 33 değişken, hedef
+USD/MWh. Rapor edilen sonuç LightGBM ile **MAE 5,981 $/MWh, R² 0,950**.
+
+**Bu rakam bizim rakamlarımızla karşılaştırılamaz.** Sebebi üç tanesi de kodla
+doğrulanmış:
+
+**1. Zaman serisine rastgele bölme — sızıntı.** `tuned_hyper.py`:
+
+```python
+df.drop(columns=["Date", "Hour"], inplace=True)      # zaman bilgisi atılıyor
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.20, random_state=35)           # shuffle=False YOK
+```
+
+`sklearn`'ün varsayılanı `shuffle=True`. Yani test saatleri geçmişin içinden
+rastgele seçiliyor ve **komşu saatler eğitim setinde kalıyor**. Özellikler
+arasında `MCP-24`, `MCP-168`, `MCP-672` var; SHAP sıralamasında da ilk sırada
+`MCP_24` çıkıyor. Bir saatin fiyatını, hem dünkü hem bir sonraki saatteki
+fiyatı görerek tahmin etmek gün öncesi tahmini değildir. Eğitim R² 0,996 ile
+test R² 0,950 arasındaki yakınlık da bunun işareti.
+
+**2. Aykırı değerler silinmiş.** Makale "outliers are removed based on
+statistical analysis" diyor. Tavana dayanan saatler ve sıfır fiyatlar tam da
+incelenmesi gereken olgu; silinince model kolay rejimde ölçülmüş oluyor.
+
+**3. Üç değişken açık artırmanın ÇIKTISI.** `SSOV`, `SBOV`, `PISO`, `PIBO`
+teklif eğrisi hacimleri; `MO`/`MB` **eşleşen** teklif miktarları; `TV` işlem
+değeri. Bunlar MCP ile **eşanlı** belirleniyor — piyasa temizlenmeden önce
+bilinmiyorlar. `SSOV` SHAP sıralamasında 8. sırada. Ayrıca kaynak bazlı üretim
+sütunları gerçekleşen üretim, KGÜP değil.
+
+**Yine de değerli iki şey var:**
+
+- **`GASP` (BOTAŞ gaz fiyatı) SHAP'ta 3. sırada** — fiyat lag'lerinden hemen
+  sonra. Bizim gaz tarifesi geçişi hattımızı bağımsız olarak destekliyor;
+  literatürde bu değişkeni kullanan tek çalışma bu.
+- **MAPE %49,6 ile R² 0,950 aynı modelde.** Sıfıra yakın fiyatlarda payda
+  çöküyor. Bu, bizim [[wape-metric-trap-low-prices]] bulgumuzun yayımlanmış
+  bir örneği — ve makale bunu sorun olarak tartışmıyor.
+
+**Bir de tablo hatası:** Tablo 1'de MCP ortalaması 67,449 ama maksimumu 66,630
+görünüyor; dört fiyat sütununda da maksimum ortalamadan küçük. Şekil 7'deki
+saçılım ~265 $/MWh'a kadar gidiyor. Maksimum sütunu hatalı.
+
+**Sonuç:** yayımlanmış Türkiye MAE/MAPE rakamlarıyla kendi modelimizi
+karşılaştırmak **yanlış olur** — kurgular karşılaştırılabilir değil. Bu, §5'teki
+"ikincil yöntemsel katkı" argümanının somut dayanağı.
 
 **Sürücü kapsamı — kimse tam sete sahip değil:**
 
