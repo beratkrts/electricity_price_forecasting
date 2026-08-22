@@ -1,6 +1,6 @@
 # Türkiye elektrik fiyatları — literatür tarama raporu
 
-`python scripts/lit_search.py report` · 2026-08-21
+`python scripts/lit_search.py report` · 2026-08-22
 
 **Havuz:** 3973 iş · **kapsam içi:** 102 (Türkiye ∧ elektrik fiyatı) · 12 tohum · 12 kayıtlı sorgu
 

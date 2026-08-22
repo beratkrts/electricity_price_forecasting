@@ -23,6 +23,53 @@ daha güçlü. Ayrıntı §5'te.
 
 ## 2. Bulunanlar, dört küme
 
+### 2.0 En sağlam Türkiye çalışmaları — grafik taramasının verdiği liste
+
+> 22 Ağu 2026'da eklendi. `scripts/lit_search.py` ile 3.973 işlik havuzdan
+> süzülen 102 kapsam içi çalışmanın (77'sinin başlığında Türkiye geçiyor)
+> en güçlü 20'si tek tek incelendi. Tam liste: `literature/search_report.md`.
+
+**Alanın ağırlık merkezi burası — ve tahmin değil.** En sağlam Türkiye
+çalışmaları *yenilenebilirin fiyatı düşürmesi* (merit-order) üzerine, ağırlıkla
+**Energy Policy**'de, ağırlıkla **kantil regresyonla**:
+
+| Çalışma | Veri dönemi | Yöntem | Ne buluyor | Tavan? |
+|---|---|---|---|:-:|
+| **Sirin & Yılmaz 2020**, Energy Policy 144 | 2016-2019, saatlik | Kantil regresyon | GÖP'te rüzgar ve nehir hidro için anlamlı negatif merit-order; etki kantile göre değişiyor. YEKDEM ödeme mekanizmasına bağlıyor | ✖ |
+| **Sirin & Yılmaz 2021**, Energy Policy | ≈2016-2019 | Kantil + sıralı lojistik | **Dengeleme piyasası (SMF)** — GÖP değil. SMF düşüyor, sistem dengesizliği değişiyor | ✖ |
+| **Energy Policy 2019** (rüzgar + nehir hidro) | **2012-2017** | Saatlik GÖP | İki kaynak aynı teşviki alıyor ama fiyat ve oynaklık etkileri farklı → teşvik ayrıştırılmalı | ✖ |
+| **Gökgöz & Yücel 2024**, Utilities Policy 88 | **Oca 2019 – Ara 2022** | 9 kantil, doğrusal + doğrusal olmayan | Değişken yenilenebilir oynaklığı **artırıyor**; dağıtılabilir yenilenebilir gece hariç azaltıyor | ✖ |
+| **IJEEP 2024** | 2014-2020, saatlik | Çoklu doğrusal regresyon | Merit-order kazancı **YEKDEM maliyetinden küçük** → perakende maliyet net olarak artıyor | ✖ |
+| **Energy Strategy Reviews 2019** — fiyat sıçramaları | **2012-2015** | Sıçrama = ortalamadan 2σ; GÖP vs gerçek zamanlı sapma | Sapma oranlarının %60'ı ±%20 bandında; sıçramaların %56,9'u planlama/arz sorunlarından | ✖ |
+| **Renewable Energy 2022** — veri frekansı | 20 Şub 2019 – 26 Mar 2021 | ML vs zaman serisi ekonometrisi, günlük + haftalık | ML ekonometriyi yeniyor; **yüksek frekans performansı artırıyor**; pandemi performansı düşürüyor | ✖ |
+| **Energy Policy 2018** — ensemble | raporlanmamış | Ensemble tahmin, piyasa seviyesi açık artırma verisi | Gelişmekte olan piyasada hedging kısıtlı → tahmin risk yönetiminin ana aracı. *Çerçeve olarak değerli* | ✖ |
+
+**Üç sonuç:**
+
+1. **Alanın en sağlam işleri 2022'de bitiyor.** Yukarıdaki sekiz çalışmanın en
+   günceli Gökgöz & Yücel 2024, verisi Aralık 2022'de kapanıyor. 2023 tavan
+   indirimleri, 2025 kuraklığı ve **2026 hidro çöküşü akademik olarak hiç
+   işlenmemiş.** Kapsam içi 102 çalışmanın tamamında durum aynı.
+
+2. **Sekizinde sekizi tavanı ele almıyor.** Fiyat sıçramalarını inceleyen tek
+   çalışma (ESR 2019) bile **2012-2015** dönemine bakıyor — yani tavanın
+   bağlayıcı olmadığı yıllara. Sıçramayı "2σ sapma" diye tanımlıyor; tavanın
+   sıçramayı fiziksel olarak kestiği bir rejimde bu tanım çalışmaz.
+
+3. **Yöntem merkezi kantil regresyon.** Alanın kabul görmüş aracı bu. Bizim
+   P10/P50/P90 kantil modelimiz literatürle **aynı ailede** — bu, yöntem
+   bölümünde konumlandırma avantajı. Farkımız kantili tahmin için değil,
+   *sansürlü rejimde karşı-olgusal üretmek* için kullanmamız.
+
+**Elenenler (ilk 20 içinden 6'sı):** PLoS ONE 2017 ve Electronics 2022 fiyat
+değil **yük** tahmini; Energies 2022 nükleer senaryo modeli; Energies 2022 EV
+şebeke etkileşimi; RSER 2011 Markowitz portföyü. Başlıkta "Türkiye + elektrik"
+geçmesi fiyat oluşumu çalışması olduğu anlamına gelmiyor.
+
+**Hâlâ açık:** Polat & Selçuklu'nun iki SSRN sürümü (4894108, 5472209) — en
+yakın komşu, LightGBM + SHAP + 32 özellik. SSRN 403 veriyor, özeti
+OpenAlex/Crossref/Semantic Scholar'ın hiçbirinde yok. **Erişim gerekiyor.**
+
 ### 2.1 Türkiye günlük/saatlik fiyat tahmini — literatür KALABALIK ama SIĞ
 
 > **Düzeltme (21 Ağu 2026, aynı gün).** Bu bölümün ilk hali "alan doygun" diyordu.
