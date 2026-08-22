@@ -1,27 +1,44 @@
 # Literatür Taraması — Türkiye elektrik fiyatları, fiyat tavanı, idari yakıt fiyatı
 
-**Tarih:** 21 Ağustos 2026
+**Tarih:** 21-22 Ağustos 2026
 **Amaç:** `EVENT_IMPACT_STUDY.md` §6.1 — çerçevenin katkı olup olmadığını doğrulamak
-**Durum:** İlk tur tamamlandı. **Kapanmadı** — bkz. §7.
+**Durum:** İki tur yapıldı (web araması → alıntı grafiği). **Kapanmadı** — bkz. §7.
 
 ---
 
 ## 1. Bu taramanın ne olduğu ve ne olmadığı
 
-Web araması ile yapıldı; Scopus / Web of Science / Google Scholar üzerinden
-sistematik bir tarama **değil**. İki merkezi kaynak (ScienceDirect, SSRN) tam
-metin vermedi (HTTP 403), özetlerinden ikincil kaynaklar üzerinden okundu.
+**İki tur yapıldı ve ikincisi birincisini büyük ölçüde geçersiz kıldı.**
 
-Bu yüzden aşağıdaki sonuç **yönlendirici**, kesin değil. Tez seviyesi için §7'deki
-eksikler kapatılmalı. Yine de tek bir amacı zaten karşılıyor: *"Türkiye elektrik
-fiyatları üzerine kapsamlı güncel çalışma yok"* iddiasını test etmek.
+*Birinci tur (21 Ağu):* serbest web araması. Tekrar üretilemiyordu, her sorgu
+başka sonuç veriyordu ve "hangisi bakmaya değer" sorusunu cevaplamıyordu.
+
+*İkinci tur (22 Ağu):* alıntı grafiği ile snowball — `scripts/lit_search.py`,
+kaynak OpenAlex. 12 doğrulanmış tohumdan geri (kaynakçalar) ve ileri (atıf
+yapanlar) iki seviye yürüdü. **Havuzun 3.581/3.973'ü graftan geldi, sadece
+380'i anahtar kelimeden** — kapsamı asıl veren grafik. Her sorgu, tarihi,
+sonuç sayısı ve her eleme kararı `literature/lit.db`'ye yazıldı (PRISMA);
+tarama aylar sonra tekrar koşulup **farkı** gösterebilir.
+
+**Yine de Scopus / Web of Science / Google Scholar taraması yapılmadı**, YÖK tez
+taraması da yok. OpenAlex kapsamı geniştir ama Türkçe yerel yayınları eksik
+görebilir. Bu yüzden aşağıdaki sonuç **güçlü ama kesin değil**; §7'deki eksikler
+tez seviyesi için kapatılmalı.
+
+Tam metin erişimi kısmen çözüldü: Polat & Selçuklu (SSRN 4894108) kullanıcı
+tarafından sağlandı ve **kodu/verisiyle birlikte** incelendi (§2.1.1); Elsevier
+makalelerinin çoğu hâlâ paywall arkasında ve özetleri OpenAlex/Crossref/Semantic
+Scholar'ın hiçbirinde yok.
 
 **Sonuç önden:** iddia **bu haliyle yanlış**, ama düzeltilmiş bir hali doğru ve
 daha güçlü. Ayrıntı §5'te.
 
 ---
 
-## 2. Bulunanlar, dört küme
+## 2. Bulunanlar
+
+§2.0 alanın en sağlam işlerini sıralar; §2.1-2.4 dört tematik
+kümeyi ayrı ayrı ele alır.
 
 ### 2.0 En sağlam Türkiye çalışmaları — grafik taramasının verdiği liste
 
@@ -35,9 +52,9 @@ daha güçlü. Ayrıntı §5'te.
 
 | Çalışma | Veri dönemi | Yöntem | Ne buluyor | Tavan? |
 |---|---|---|---|:-:|
-| **Sirin & Yılmaz 2020**, Energy Policy 144 | 2016-2019, saatlik | Kantil regresyon | GÖP'te rüzgar ve nehir hidro için anlamlı negatif merit-order; etki kantile göre değişiyor. YEKDEM ödeme mekanizmasına bağlıyor | ✖ |
-| **Sirin & Yılmaz 2021**, Energy Policy | ≈2016-2019 | Kantil + sıralı lojistik | **Dengeleme piyasası (SMF)** — GÖP değil. SMF düşüyor, sistem dengesizliği değişiyor | ✖ |
-| **Energy Policy 2019** (rüzgar + nehir hidro) | **2012-2017** | Saatlik GÖP | İki kaynak aynı teşviki alıyor ama fiyat ve oynaklık etkileri farklı → teşvik ayrıştırılmalı | ✖ |
+| **Şirin & Yılmaz 2020**, Energy Policy 144 | 2016-2019, saatlik | Kantil regresyon | GÖP'te rüzgar ve nehir hidro için anlamlı negatif merit-order; etki kantile göre değişiyor. YEKDEM ödeme mekanizmasına bağlıyor | ✖ |
+| **Şirin & Yılmaz 2021**, Energy Policy | ≈2016-2019 | Kantil + sıralı lojistik | **Dengeleme piyasası (SMF)** — GÖP değil. SMF düşüyor, sistem dengesizliği değişiyor | ✖ |
+| **Acar, Selçuk & Daştan 2019**, Energy Policy | **2012-2017** | Saatlik GÖP | İki kaynak aynı teşviki alıyor ama fiyat ve oynaklık etkileri farklı → teşvik ayrıştırılmalı | ✖ |
 | **Gökgöz & Yücel 2024**, Utilities Policy 88 | **Oca 2019 – Ara 2022** | 9 kantil, doğrusal + doğrusal olmayan | Değişken yenilenebilir oynaklığı **artırıyor**; dağıtılabilir yenilenebilir gece hariç azaltıyor | ✖ |
 | **IJEEP 2024** | 2014-2020, saatlik | Çoklu doğrusal regresyon | Merit-order kazancı **YEKDEM maliyetinden küçük** → perakende maliyet net olarak artıyor | ✖ |
 | **Energy Strategy Reviews 2019** — fiyat sıçramaları | **2012-2015** | Sıçrama = ortalamadan 2σ; GÖP vs gerçek zamanlı sapma | Sapma oranlarının %60'ı ±%20 bandında; sıçramaların %56,9'u planlama/arz sorunlarından | ✖ |
@@ -49,7 +66,9 @@ daha güçlü. Ayrıntı §5'te.
 1. **Alanın en sağlam işleri 2022'de bitiyor.** Yukarıdaki sekiz çalışmanın en
    günceli Gökgöz & Yücel 2024, verisi Aralık 2022'de kapanıyor. 2023 tavan
    indirimleri, 2025 kuraklığı ve **2026 hidro çöküşü akademik olarak hiç
-   işlenmemiş.** Kapsam içi 102 çalışmanın tamamında durum aynı.
+   işlenmemiş.** (İncelenen 20 çalışmanın hepsinde durum böyle; kapsam içi
+   102'nin tamamı tek tek okunmadı, ama yayın yıllarına bakıldığında 2023
+   sonrası veri kullanan başka çalışma görünmüyor.)
 
 2. **Sekizinde sekizi tavanı ele almıyor.** Fiyat sıçramalarını inceleyen tek
    çalışma (ESR 2019) bile **2012-2015** dönemine bakıyor — yani tavanın
@@ -111,7 +130,35 @@ ve aynı kurguyu kullanıyor.
    üstünü tahmin etmeye çalışıyor. PICP'in %80 hedefe karşı **0,737** çıkması
    (yetersiz kapsama) bununla tutarlı.
 
-### 2.1.1 En yakın komşu tam metin + kodla incelendi — üç ciddi sorun
+**Sürücü kapsamı — kimse tam sete sahip değil:**
+
+| Sürücü | Akpınar | Arifoğlu | Özdemir | Polat & S. | **Bu proje** |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Takvim / tatil | ✔ | ✔ | ✖ | ✔ | ✔ |
+| Fiyat lag/rolling | ✔ | ✖ | ✖ | ✔ | ✔ |
+| Talep (gerçekleşen / tahmin) | ✖ | ✔ | ✔ | ✔ | ✔ |
+| Kaynak bazlı üretim | ✔ (eşzamanlı) | kısmi (hidro) | ✔ (eşzamanlı) | ✔ | ✔ (KGÜP + ön-tahmin) |
+| Hava (sıcaklık/rüzgar) | ✖ | ✔ | ✖ | ? | ✔ (26 bölge ağırlıklı) |
+| Kur (USD/TRY) | ✖ | ✖ | ✔ | ✔ | ✔ |
+| **Gaz maliyeti** | ✖ | ✖ | ✖ | ✔ (piyasa gazı) | ✔ (**BOTAŞ idari tarifesi**) |
+| **Fiyat tavanı** | ✖ | ✖ | ✖ | ✖ | ✔ (`silver.mcp_with_cap`) |
+
+**Bunun anlamı — ilk halinden farklı:**
+
+- "Türkiye PTF'sini tahmin ettik / ML karşılaştırdık" hâlâ bir tez katkısı **değil**.
+  Bu kadar çok çalışma varken n+1'inci karşılaştırma kimseyi ilgilendirmiyor.
+- **Ama "alan doygun" demek de yanlıştı.** Alan kalabalık ve sığ. Kimse tavanı
+  modellemiyor, kimse idari gaz tarifesini kullanmıyor, test setleri 25 noktadan
+  60 güne kadar değişiyor.
+- Dolayısıyla projenin **operasyonel kurgusu** (730 günlük walk-forward, tahmin
+  anında gerçekten mevcut olan girdiler, T+1 için ön-tahmin alt modelleri, sansür
+  farkındalığı) literatürdekilerin çoğundan **daha sağlam** — ve bu, tezde
+  *ikincil bir yöntemsel katkı* olarak söylenebilir. Birincil katkı değil;
+  birincil katkı §5'teki dört madde.
+- Yön değişikliği yine de **doğru**: değerli olan tahmin performansı değil,
+  tavan + idari gaz tarifesi ekseni.
+
+### 2.1.1 En yakın komşu: tam metin, kod, tekrar üretim ve kafa kafaya kıyas
 
 > 22 Ağu 2026. Kullanıcı makaleyi `docs/ssrn-4894108.pdf` olarak sağladı; kod ve
 > veri de açık: `github.com/TheEmgame/EPF-Turkish-Day-Ahead-Market`.
@@ -146,13 +193,13 @@ var; ama sızıntıyı gösteren şey bölme yönteminin ta kendisi.
 statistical analysis" diyor. Tavana dayanan saatler ve sıfır fiyatlar tam da
 incelenmesi gereken olgu; silinince model kolay rejimde ölçülmüş oluyor.
 
-**3. Üç değişken açık artırmanın ÇIKTISI.** `SSOV`, `SBOV`, `PISO`, `PIBO`
+**3. Yedi değişken açık artırmanın ÇIKTISI.** `SSOV`, `SBOV`, `PISO`, `PIBO`
 teklif eğrisi hacimleri; `MO`/`MB` **eşleşen** teklif miktarları; `TV` işlem
 değeri. Bunlar MCP ile **eşanlı** belirleniyor — piyasa temizlenmeden önce
 bilinmiyorlar. `SSOV` SHAP sıralamasında 8. sırada. Ayrıca kaynak bazlı üretim
 sütunları gerçekleşen üretim, KGÜP değil.
 
-**Tekrar üretildi ve sökülDü (22 Ağu 2026).** Yazarların kendi verisi ve kendi
+**Tekrar üretildi ve söküldü (22 Ağu 2026).** Yazarların kendi verisi ve kendi
 hiperparametreleriyle koştuk — `literature/replicate_polat_selcuklu.py`.
 Makalenin rakamı **birebir çıktı** (MAE 5,981 · R² 0,950), yani kurgu doğru
 anlaşılmış.
@@ -257,55 +304,37 @@ karıştırmamak için yukarıdaki yıl-içi tablo kullanılmalı.
   sonra. Bizim gaz tarifesi geçişi hattımızı bağımsız olarak destekliyor;
   literatürde bu değişkeni kullanan tek çalışma bu.
 - **MAPE %49,6 ile R² 0,950 aynı modelde.** Sıfıra yakın fiyatlarda payda
-  çöküyor. Bu, bizim [[wape-metric-trap-low-prices]] bulgumuzun yayımlanmış
+  çöküyor. Bu, bizim WAPE/MAPE tuzağı bulgumuzun (`METRICS.md` §2) yayımlanmış
   bir örneği — ve makale bunu sorun olarak tartışmıyor.
 
 **Bir de tablo hatası:** Tablo 1'de MCP ortalaması 67,449 ama maksimumu 66,630
 görünüyor; dört fiyat sütununda da maksimum ortalamadan küçük. Şekil 7'deki
 saçılım ~265 $/MWh'a kadar gidiyor. Maksimum sütunu hatalı.
 
-**Sonuç:** yayımlanmış Türkiye MAE/MAPE rakamlarıyla kendi modelimizi
-karşılaştırmak **yanlış olur** — kurgular karşılaştırılabilir değil. Bu, §5'teki
-"ikincil yöntemsel katkı" argümanının somut dayanağı.
+**Sonuç — iki ayrı şey, karıştırılmamalı:**
 
-**Sürücü kapsamı — kimse tam sete sahip değil:**
+1. **Yayımlanmış rakamla kıyas yanlış olur.** Onların 5,981'i ile bizim 7,27'mizi
+   yan yana koymak anlamsız: kurgular karşılaştırılabilir değil. Bu, §5'teki
+   "ikincil yöntemsel katkı" argümanının somut dayanağı.
+2. **Ama özellik kümeleriyle kıyas yapılabilir** — yeter ki ikisi de aynı test
+   setinde, aynı kurguyla koşsun. Yukarıdaki kafa kafaya deney tam olarak bunu
+   yapıyor ve sonucu bizim lehimize (rMAE 0,953 vs 1,046).
 
-| Sürücü | Akpınar | Arifoğlu | Özdemir | Polat & S. | **Bu proje** |
-|---|:-:|:-:|:-:|:-:|:-:|
-| Takvim / tatil | ✔ | ✔ | ✖ | ✔ | ✔ |
-| Fiyat lag/rolling | ✔ | ✖ | ✖ | ✔ | ✔ |
-| Talep (gerçekleşen / tahmin) | ✖ | ✔ | ✔ | ✔ | ✔ |
-| Kaynak bazlı üretim | ✔ (eşzamanlı) | kısmi (hidro) | ✔ (eşzamanlı) | ✔ | ✔ (KGÜP + ön-tahmin) |
-| Hava (sıcaklık/rüzgar) | ✖ | ✔ | ✖ | ? | ✔ (26 bölge ağırlıklı) |
-| Kur (USD/TRY) | ✖ | ✖ | ✔ | ✔ | ✔ |
-| **Gaz maliyeti** | ✖ | ✖ | ✖ | ✔ (piyasa gazı) | ✔ (**BOTAŞ idari tarifesi**) |
-| **Fiyat tavanı** | ✖ | ✖ | ✖ | ✖ | ✔ (`silver.mcp_with_cap`) |
-
-**Bunun anlamı — ilk halinden farklı:**
-
-- "Türkiye PTF'sini tahmin ettik / ML karşılaştırdık" hâlâ bir tez katkısı **değil**.
-  Bu kadar çok çalışma varken n+1'inci karşılaştırma kimseyi ilgilendirmiyor.
-- **Ama "alan doygun" demek de yanlıştı.** Alan kalabalık ve sığ. Kimse tavanı
-  modellemiyor, kimse idari gaz tarifesini kullanmıyor, test setleri 25 noktadan
-  60 güne kadar değişiyor.
-- Dolayısıyla projenin **operasyonel kurgusu** (730 günlük walk-forward, tahmin
-  anında gerçekten mevcut olan girdiler, T+1 için ön-tahmin alt modelleri, sansür
-  farkındalığı) literatürdekilerin çoğundan **daha sağlam** — ve bu, tezde
-  *ikincil bir yöntemsel katkı* olarak söylenebilir. Birincil katkı değil;
-  birincil katkı §5'teki dört madde.
-- Yön değişikliği yine de **doğru**: değerli olan tahmin performansı değil,
-  tavan + idari gaz tarifesi ekseni.
+Yani "karşılaştırılamaz" olan onların *yayımladığı sayı*, modelin kendisi değil.
 
 ### 2.2 Türkiye piyasa yapısı, oynaklık, merit-order
 
 | Çalışma | Kapsam |
 |---|---|
-| *Merit-order of dispatchable and variable renewable energy sources in Turkey's DAM* (Energy Strategy Reviews, 2024) | Kantil regresyon, 9 kantil, **Oca 2019 – Ara 2022**. Yenilenebilirin PTF'yi düşürdüğü sonucu |
 | *Measuring the long-term impact of wind, run-of-river, solar on MCP* (Renewable Energy, 2024) | Uzun dönem merit-order |
 | *Türkiye Enerji Piyasasında Yapısal Kırılmalar ve Oynaklık Modellemesi* (ULİSBUD) | ARMA(7,7)-EGARCH(1,1), **1 Tem 2015 – 31 Ara 2022** günlük ağırlıklı PTF |
 | *Makroekonomik değişkenler ile enerji piyasaları* (DergiPark) | ARDL + Hacker–Hatemi-J bootstrap nedensellik, PTF bağımlı |
 | *An Assessment of Electricity Markets in Turkey: Price Mechanisms, Regulations, and Methods* (Springer, 2022) | Betimleyici kitap bölümü |
 | Enerji Uzmanları Derneği, *Organize Toptan Elektrik Piyasalarında Fiyat Limitleri* | **Kurumsal referans**: AFL nasıl belirleniyor — tepe santral sabit maliyet geri kazanımı + VoLL'un ≥%12,5'i, DUY dayanağı |
+
+(Gökgöz & Yücel 2024 ve Şirin & Yılmaz'ın iki makalesi **§2.0'da** ele alındı,
+burada tekrarlanmıyor. Not: Gökgöz & Yücel'in dergisi **Utilities Policy 88**'dir;
+bu belgenin ilk sürümünde yanlışlıkla "Energy Strategy Reviews" yazılmıştı.)
 
 **Ortak sınır:** hemen hepsi **2022 sonunda bitiyor**. 2023 tavan indirimleri, 2024-2025
 kuraklık, **2026 hidro çöküşü** akademik literatürde yok. Sadece gri literatürde var
@@ -464,7 +493,7 @@ Bunu dört gözlem taşıyor:
 ön-tahmin alt modelleri) Türkiye tahmin literatüründeki örneklerin çoğundan daha
 sağlam. Bu bir *tez katkısı* değil ama **yöntem bölümünde savunma** olarak
 kullanılır: "neden yayımlanmış MAPE rakamlarıyla karşılaştırma yapmıyoruz"
-sorusunun cevabı burada. Karşılaştırılabilir değiller — §2.1.
+sorusunun cevabı burada. Karşılaştırılabilir değiller — §2.1 ve §2.1.1.
 
 ---
 
@@ -489,8 +518,9 @@ değil.**
 
 | Eksik | Ne gerekiyor |
 |---|---|
-| Veritabanı taraması yok | Scopus / WoS / Google Scholar üzerinden anahtar kelime + atıf zinciri. Web araması ABD odaklı, Türkçe akademik yayını eksik görüyor |
-| İki temel kaynak okunmadı | Energy Policy S0301421522000416 ve SSRN 5472209 tam metinleri (403). Üniversite erişimi veya yazar kopyası gerekli |
+| Scopus / WoS taraması yok | Atıf zinciri **yapıldı** (OpenAlex, 3.973 iş — `scripts/lit_search.py`), ama Scopus/WoS ile çapraz kontrol edilmedi. OpenAlex Türkçe yerel yayınları eksik görebilir |
+| İki temel kaynak okunmadı | Energy Policy S0301421522000416 (Türkiye tavan çalışması) ve SSRN 5472209 tam metinleri. Üniversite erişimi gerekli. *SSRN 4894108 okundu — §2.1.1* |
+| Elsevier özetleri erişilemiyor | Kapsam içi işlerin bir kısmının özeti OpenAlex/Crossref/Semantic Scholar'ın üçünde de yok; o işlerin kapsam kararı yalnızca grafik yakınlığına dayanıyor (`search_report.md`'de "Belirsiz" listesi) |
 | YÖK tez taraması yok | Türkiye'de bu konuda **yazılmış tezler** taranmadı. En muhtemel örtüşme kaynağı burası |
 | EPDK / EPİAŞ resmî raporları taranmadı | Kurumların kendi piyasa gelişim raporları — hem veri hem konumlandırma |
 | Tobit + elektrik tavanı için ikinci tur arama | "Bulunamadı" sonucu tek turlu aramaya dayanıyor, zayıf |
@@ -504,11 +534,12 @@ değil.**
 - ✅ Akpınar, K.N. (2026), *Probabilistic forecasting of short-term electricity prices in the Turkish day-ahead market*, **International Advanced Researches and Engineering Journal 10(1): 021-027**. DOI [10.35860/iarej.1820591](https://doi.org/10.35860/iarej.1820591) · [PDF](https://dergipark.org.tr/en/download/article-file/5406461)
 - ✅ Arifoğlu, A. & Kandemir, T. (2022), *Electricity Price Forecasting in Turkish Day-Ahead Market via Deep Learning Techniques*, **MAKÜ İİBF Dergisi 9(2): 1433-1458**. DOI [10.30798/makuiibf.1097686](https://doi.org/10.30798/makuiibf.1097686) · [PDF](https://dergipark.org.tr/en/download/article-file/2349722)
 - ✅ Özdemir, V. & Yılmaz, M. (2026), *Modelling Turkey's Hourly Electricity Market Clearing Prices Using Exponential Gaussian Process Regression*, **Journal of Innovative Science and Engineering 10(1): 189-200**. DOI [10.38088/jise.1738364](https://doi.org/10.38088/jise.1738364)
-- Gökgöz, F. & Yücel, Ö. (2024), *Merit-order of dispatchable and variable renewable energy sources in Turkey's day-ahead electricity market*, **Utilities Policy 88** — Oca 2019–Ara 2022, kantil regresyon, tavan yok. [RePEc kaydı](https://ideas.repec.org/a/eee/juipol/v88y2024ics0957178724000511.html)
-
-- [Polat & Selçuklu, *Impact of Market Factors on Day-Ahead Electricity Prices: Explainable ML Analysis of the Turkish Market* (SSRN 5472209)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5472209)
-- [Polat & Selçuklu, *Explainable Machine Learning Analysis…* (SSRN 4894108)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4894108)
-- [*Merit-order of dispatchable and variable renewable energy sources in Turkey's day-ahead electricity market* (Energy Strategy Reviews, 2024)](https://www.sciencedirect.com/science/article/abs/pii/S0957178724000511)
+- ✅ Polat, Ö. & Selçuklu, S. (2024), *Explainable Forecast of Electricity Market Price Using Machine Learning Algorithms: A Case Study of the Turkish Day-Ahead Market*, **SSRN 4894108** — tam metin `docs/ssrn-4894108.pdf`, kod+veri [github.com/TheEmgame/EPF-Turkish-Day-Ahead-Market](https://github.com/TheEmgame/EPF-Turkish-Day-Ahead-Market). [SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4894108)
+- Polat, Ö. & Selçuklu, S. (2025), *Impact of Market Factors on Day-Ahead Electricity Prices…*, **SSRN 5472209** — 4894108'in güncel sürümü, okunmadı. [SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5472209)
+- Gökgöz, F. & Yücel, Ö. (2024), *Merit-order of dispatchable and variable renewable energy sources in Turkey's day-ahead electricity market*, **Utilities Policy 88**, 101758 — Oca 2019–Ara 2022, 9 kantil, tavan yok. [DOI](https://doi.org/10.1016/j.jup.2024.101758)
+- Şirin, S.M. & Yılmaz, B.N. (2020), *Variable renewable energy technologies in the Turkish electricity market: Quantile regression analysis of the merit-order effect*, **Energy Policy 144** — 2016-2019. [DOI](https://doi.org/10.1016/j.enpol.2020.111660)
+- Şirin, S.M. & Yılmaz, B.N. (2021), *The impact of variable renewable energy technologies on electricity markets: An analysis of the Turkish balancing market*, **Energy Policy** — dengeleme piyasası (SMF). [DOI](https://doi.org/10.1016/j.enpol.2020.112093)
+- Acar, B., Selçuk, O. & Daştan, S.A. (2019), *The merit order effect of wind and river type hydroelectricity generation on Turkish electricity prices*, **Energy Policy** — 2012-2017. [DOI](https://doi.org/10.1016/j.enpol.2019.07.006)
 - [*Measuring the long-term impact of wind, run-of-river, solar renewable energy alternatives on market clearing prices* (Renewable Energy, 2024)](https://www.sciencedirect.com/science/article/abs/pii/S0960148124023607)
 - [*Electricity price estimation using deep learning approaches: Turkish markets in normal and Covid-19 periods* (ESWA, 2023)](https://www.sciencedirect.com/science/article/abs/pii/S0957417423005286)
 - [*Electricity Price Forecasting in Turkish Day-Ahead Market via Deep Learning Techniques* (MAKÜ İİBF)](https://dergipark.org.tr/en/pub/makuiibf/issue/69071/1097686)
