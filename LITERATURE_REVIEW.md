@@ -189,11 +189,29 @@ kalıyor; kalan fark tamamen bölme yönteminden geliyor:
 | 2022 | 2018-21 | 147,5 | **60,18** | **−0,720** |
 
 **İki sonuç.** (a) Makalenin karşılaştırılabilir rakamı 5,98 değil, durağan
-yıllarda **7-11 $/MWh**. Bu, bizim canlı modelimizin USD MAE'siyle (~9,5) aynı
-bant — yani onlardan geride değiliz, karşılaştırma kurgu yüzünden çarpıktı.
-(b) **2022'de R² −0,720**: ortalamayı tahmin etmekten kötü. Tavanlı kriz rejimi
-2018-2021'den öğrenilemiyor. Sızıntı düzeltilince modelin asıl kırılganlığı
-görünüyor — ve o kırılganlık tam da bu çalışmanın konusu.
+yıllarda **7-11 $/MWh**. (b) **2022'de R² −0,720**: ortalamayı tahmin etmekten
+kötü. Tavanlı kriz rejimi 2018-2021'den öğrenilemiyor. Sızıntı düzeltilince
+modelin asıl kırılganlığı görünüyor — ve o kırılganlık tam da bu çalışmanın konusu.
+
+**Kendi modelimizle kıyas — dikkatli yapılmalı.** `gold.ptf_predictions_daily`,
+17.736 saat (12 Ağu 2024 – 23 Ağu 2026): **MAE 7,27 $/MWh · WAPE %12,25**
+(ort. gerçekleşen 59,36 $). Yıl bazında:
+
+| Yıl | Saat | Ort. gerçek | MAE | BIAS | WAPE | P10-P90 kapsama |
+|---|--:|--:|--:|--:|--:|--:|
+| 2024 (kısmi) | 3.408 | 71,07 | 5,57 | +1,05 | %7,8 | %74,5 |
+| 2025 | 8.760 | 66,42 | 6,50 | +0,81 | %9,8 | %75,0 |
+| 2026 (Ağu'a kadar) | 5.568 | 41,11 | **9,51** | +2,98 | **%23,1** | %65,9 |
+
+Bu iki rakam **aynı bantta ama aynı deney değil**: dönemler (2019-21 vs 2024-26),
+fiyat seviyeleri (MAE seviyeyle ölçeklenir) ve girdi kümeleri farklı. Seviyeden
+arındırmak için WAPE'e bakılırsa bizim %12,25'e karşı onların %15,3 / %20,1 /
+%19,5 çıkıyor — ama onların 2022'si de bizim 2026'mız da uç rejim.
+
+**Savunulabilir ifade: "onlardan geride değiliz."** "Onlardan iyiyiz" değil.
+Karşılaştırmanın asıl işlevi rakam yarışı değil, §5'teki argümanı kurmak:
+yayımlanmış Türkiye MAE/MAPE'leri kurgu farkı yüzünden ölçüt olarak
+kullanılamaz.
 
 Not: son %20'lik kronolojik testte (test dönemi = 2022) MAE 63,48 çıkıyor;
 eşanlı açık artırma sütunları ve gerçekleşen üretim atılınca 62,2 ve 62,9.
