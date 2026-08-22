@@ -83,7 +83,7 @@ ve aynı kurguyu kullanıyor.
 | **Arifoğlu & Kandemir (2022)**, MAKÜ İİBF 9(2):1433-1458 ✅tam metin | Eğitim 13.06.2016–04.10.2020 · Doğrulama 05.10.2020–28.02.2021 (3.528 s) | **28 gün** (01–28.03.2021, 672 saat) | 7 dışsal: gün/tatil, RTC(-24s), HPP(-24s), SMP(-24s), LFP, sıcaklık, rüzgar hızı | MAPE: LSTM **8,15** · MLP 8,44 · GRU 8,72 · CNN 9,27 (dönem ort. PTF 228,08 TL) | ❌ |
 | **Özdemir & Yılmaz (2026)**, JISE 10(1):189-200 ✅tam metin | 15.04.2023 07:00 – 29.09.2023 05:00, 4.001 nokta | **25 nokta** (bağımsız test) + 10-kat CV | 11 değişken: RTC, kaynak bazlı üretim, teklif hacmi, eşleşme miktarı, **USD kuru** | EGPR R² 0,908 (CV) / **0,913** (test); test MAE **61,56**, RMSE 87,94 TL | ❌ |
 | Yılan & Beykent (2026), CMC 86(1) — XGBoost ⚠️özet | **sadece 2023**, 8.760 saat | %20 → ≈1.752 saat (bölme biçimi doğrulanamadı) | belirtilmemiş; SHAP → gaz üretimi baskın | MAE **144,8** · RMSE 201,8 TL · R² 0,923 | ❌ |
-| **Polat & Selçuklu (2024)**, SSRN 4894108 ✅tam metin **+ kod** | Oca 2015–Ara 2022 toplanmış, eksik veri yüzünden **2018-2022**'ye daraltılmış | **%20 RASTGELE** — kronolojik değil (aşağı bak) | 33 değişken: fiyat lag'leri, teklif eğrisi hacimleri, **eşleşen miktar**, kur, kaynak bazlı üretim, **BOTAŞ gaz fiyatı**, sıcaklık | LightGBM: R² 0,950 · MAE **5,981 $/MWh** · RMSE 11,248 · **MAPE %49,6** | ❌ |
+| **Polat & Selçuklu (2024)**, SSRN 4894108 ✅tam metin **+ kod** | Oca 2015–Ara 2022 toplanmış, eksik veri yüzünden **2018-2022**'ye daraltılmış | **%20 RASTGELE** — kronolojik değil (aşağı bak) | 33 değişken: fiyat lag'leri, teklif eğrisi hacimleri, **eşleşen miktar**, kur, kaynak bazlı üretim, **BOTAŞ gaz fiyatı**, sıcaklık | LightGBM **test** (Tablo 4): R² 0,950 · MAE **5,981 $/MWh** · RMSE 11,248 · **MAPE %49,6** — *eğitim* (Tablo 3): R² 0,996 · MAE 2,265 | ❌ |
 | ESWA 224 (2023) — TEDSE transformer ⚠️özet | **2017–2021** | belirtilmemiş | rejim alt-grupları (Covid) | RMSE 3,14 · R² 0,94 | ❌ (veri tavan öncesi biter) |
 | Şimşek (2024) — *içeriden atıf* | 17.04.2023–16.04.2024, 8.772 s | belirtilmemiş | kaynak bazlı üretim + talep | XGBoost en iyi | ❌ |
 | Demirezen & Çetin (2021) — *içeriden atıf* | 01.01.2019–10.03.2020 | %16 | işlem hacmi kritik çıkıyor | RF en iyi | ❌ |
@@ -135,8 +135,12 @@ X_train, X_test, y_train, y_test = train_test_split(
 rastgele seçiliyor ve **komşu saatler eğitim setinde kalıyor**. Özellikler
 arasında `MCP-24`, `MCP-168`, `MCP-672` var; SHAP sıralamasında da ilk sırada
 `MCP_24` çıkıyor. Bir saatin fiyatını, hem dünkü hem bir sonraki saatteki
-fiyatı görerek tahmin etmek gün öncesi tahmini değildir. Eğitim R² 0,996 ile
-test R² 0,950 arasındaki yakınlık da bunun işareti.
+fiyatı görerek tahmin etmek gün öncesi tahmini değildir.
+
+*Dayanak kodun kendisidir, eğitim/test farkı değil.* Aksine o fark büyük:
+LightGBM eğitimde MAE 2,265 · MSE 10,944, testte MAE 5,981 · MSE 126,528 —
+MAE 2,6 kat, MSE on kattan fazla açılıyor. Yani ayrıca ciddi bir aşırı-uyum
+var; ama sızıntıyı gösteren şey bölme yönteminin ta kendisi.
 
 **2. Aykırı değerler silinmiş.** Makale "outliers are removed based on
 statistical analysis" diyor. Tavana dayanan saatler ve sıfır fiyatlar tam da
