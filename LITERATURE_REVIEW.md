@@ -152,6 +152,54 @@ değeri. Bunlar MCP ile **eşanlı** belirleniyor — piyasa temizlenmeden önce
 bilinmiyorlar. `SSOV` SHAP sıralamasında 8. sırada. Ayrıca kaynak bazlı üretim
 sütunları gerçekleşen üretim, KGÜP değil.
 
+**Tekrar üretildi ve sökülDü (22 Ağu 2026).** Yazarların kendi verisi ve kendi
+hiperparametreleriyle koştuk — `literature/replicate_polat_selcuklu.py`.
+Makalenin rakamı **birebir çıktı** (MAE 5,981 · R² 0,950), yani kurgu doğru
+anlaşılmış.
+
+*Önce: "test seti" nedir?* Rastgele bölmede bir dönem değil, 2018-2022 boyunca
+dağılmış saatler:
+
+- Test saatlerinin **%96,1'inin en az bir komşu saati eğitim setinde**
+- **%63,8'inin her iki komşu saati de** eğitimde
+- Bir test saatinin **aynı gününden ortalama 18,4/24 saat** eğitimde
+
+Yani model, tahmin ettiği saatin hem öncesini hem sonrasını görmüş oluyor.
+Sorulan soru "yarını ne kadar iyi tahmin eder" değil, "ezberlediği serideki
+deliği ne kadar iyi doldurur".
+
+*Sızıntı ne kadar şişiriyor?* Aynı yıl içinde bölersek rejim kayması devre dışı
+kalıyor; kalan fark tamamen bölme yönteminden geliyor:
+
+| Yıl | ort. MCP | rastgele MAE | kronolojik MAE | kat |
+|---|--:|--:|--:|--:|
+| 2018 | 47,4 | 3,45 | 4,79 | 1,4× |
+| 2019 | 46,0 | 3,78 | 4,41 | 1,2× |
+| 2020 | 40,1 | 2,74 | 4,38 | 1,6× |
+| 2021 | 55,6 | 3,71 | **13,64** | **3,7×** |
+| 2022 | 147,5 | 15,44 | 37,18 | 2,4× |
+
+*Dürüst kurgu ne veriyor?* Geçmişle eğit, sonraki yılı tahmin et:
+
+| Test yılı | Eğitim | ort. MCP | MAE | R² |
+|---|---|--:|--:|--:|
+| 2019 | 2018 | 46,0 | **7,03** | 0,529 |
+| 2020 | 2018-19 | 40,1 | **8,06** | 0,160 |
+| 2021 | 2018-20 | 55,6 | **10,83** | 0,260 |
+| 2022 | 2018-21 | 147,5 | **60,18** | **−0,720** |
+
+**İki sonuç.** (a) Makalenin karşılaştırılabilir rakamı 5,98 değil, durağan
+yıllarda **7-11 $/MWh**. Bu, bizim canlı modelimizin USD MAE'siyle (~9,5) aynı
+bant — yani onlardan geride değiliz, karşılaştırma kurgu yüzünden çarpıktı.
+(b) **2022'de R² −0,720**: ortalamayı tahmin etmekten kötü. Tavanlı kriz rejimi
+2018-2021'den öğrenilemiyor. Sızıntı düzeltilince modelin asıl kırılganlığı
+görünüyor — ve o kırılganlık tam da bu çalışmanın konusu.
+
+Not: son %20'lik kronolojik testte (test dönemi = 2022) MAE 63,48 çıkıyor;
+eşanlı açık artırma sütunları ve gerçekleşen üretim atılınca 62,2 ve 62,9.
+Yani o dönemde asıl belirleyici sızıntı değil rejim kayması — ikisini
+karıştırmamak için yukarıdaki yıl-içi tablo kullanılmalı.
+
 **Yine de değerli iki şey var:**
 
 - **`GASP` (BOTAŞ gaz fiyatı) SHAP'ta 3. sırada** — fiyat lag'lerinden hemen
