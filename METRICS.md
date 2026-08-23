@@ -27,14 +27,38 @@ Aynı sorun MAPE'te daha şiddetli (`Σ|hata/gerçek|`) — sıfır fiyatta tan�
 |---|---|---|---|
 | **MAE** | `mean(\|tahmin − gerçek\|)` | Ortalama hata, $ cinsinden | Rejimden bağımsız, yorumlanabilir. Ana karar metriği. |
 | **BIAS** | `mean(tahmin − gerçek)` | Sistematik sapma yönü | MAE yönü gizler. Şubat 2026'daki +$9.22 sadece burada görünür. |
-| **rMAE** | `MAE_model / MAE_naive` | Naive'e göre kazanç | **Literatürle kıyaslanabilir tek metrik.** Rejimden bağımsız. |
+| **rMAE** | `MAE_model / MAE_naive` | Naive'e göre kazanç | Rejimden bağımsız. Literatürle kıyaslanabilir — **ama ancak hangi naive olduğu söylenirse**, aşağı bak. |
 | **sMAPE** | `mean(2·\|hata\| / (\|tahmin\|+\|gerçek\|))` | Simetrik yüzde hata | MAPE'in sıfır patlaması yok. Ama tanımsız ortalama/sonsuz varyans — destekleyici, tek başına değil. |
 | **WAPE** | `Σ\|hata\| / Σ\|gerçek\|` | Ağırlıklı yüzde | Geriye dönük süreklilik için tut, **karar verme.** |
 | **P10-P90 kapsama** | `mean(p10 ≤ gerçek ≤ p90)` | Belirsizlik bandı kalibrasyonu | Nominal %80 olmalı. Ucuz dilimde %43'e düşüyor — nokta tahmininden bağımsız bir arıza. |
 
-**Naive tanımı (Lago et al. standardı):** Pzt/Cmt/Paz → geçen hafta aynı saat; Sal-Cum → dün aynı saat.
+### Naive tanımı — HANGİSİ olduğu mutlaka yazılmalı
 
-**Yorum eşikleri:** rMAE < 1.0 naive'den iyi. İyi EPF modelleri literatürde kabaca **0.5-0.8**.
+Lago, Marcjasz, De Schutter & Weron (2021), *Applied Energy* 293:116983, §5.4.2,
+denklem (8) üç naive tanımlıyor:
+
+| | Tanım | Not |
+|---|---|---|
+| **naive-1** | `p[d-1, h]` — dün aynı saat | Haftalık mevsimselliği kaçırıyor |
+| **naive-2** | `p[d-7, h]` — geçen hafta aynı saat | **Makalenin rMAE'si BUDUR** |
+| **naive-3** | Sal-Cum → `p[d-1,h]` · Cmt/Paz/Pzt → `p[d-7,h]` | **Bu dosyanın kullandığı** |
+
+Makale açık: *"for the remainder of the article we will use rMAE to explicitly
+refer to the rMAE based on p̂(naive,2)"*. Gerekçesi: hesaplaması daha kolay ve
+haftalık etkiyi yakalıyor.
+
+> **⚠️ Bu dosyadaki rMAE değerleri naive-3 tabanlıdır, makaleninki naive-2.**
+> İkisi farklı sayı üretir. Literatürdeki rMAE rakamlarıyla (iyi EPF modelleri
+> için ~0.5-0.8) doğrudan kıyaslamadan önce naive-2 ile yeniden hesapla.
+> Hazır uygulama: `src.eval.lago_protocol.naive_forecast(prices, variant=2)`.
+> Ölçüm defteri: `experiments/notebooks/07_lago_protocol/`.
+>
+> Makale şunu da söylüyor: *modellerin birbirine göre sıralaması* naive
+> seçiminden bağımsız. Yani naive-3 ile "A, B'den iyi" demek geçerli;
+> geçersiz olan, mutlak rMAE'yi literatür eşiğiyle kıyaslamak.
+
+**Yorum eşikleri:** rMAE < 1.0 naive'den iyi. İyi EPF modelleri literatürde
+kabaca **0.5-0.8** (bu aralık **naive-2** içindir).
 
 ---
 
@@ -50,11 +74,13 @@ Tek bir toplam sayı yanıltıcı — genel WAPE'in ~%88'i $60 üstü saatlerden
 
 ## 4. Mevcut baseline (canlı model, `gold.ptf_predictions_daily`)
 
-| Dönem | n | MAE | Naive MAE | **rMAE** | sMAPE | WAPE |
+| Dönem | n | MAE | Naive-3 MAE | **rMAE (naive-3)** | sMAPE | WAPE |
 |---|---|---|---|---|---|---|
 | Durağan (2025-09 → 2026-01) | 3.672 | 5.65 | 8.02 | **0.705** | %12.0 | %8.4 |
 | Kriz (2026-02 → 2026-06) | 3.528 | 10.54 | 13.14 | **0.802** | %61.8 | %36.4 |
 | Tümü (2 yıl) | 17.520 | 7.26 | 9.60 | **0.756** | %23.5 | %12.2 |
+
+**Not:** Bu sütun **naive-3** tabanlı; makalenin naive-2 rMAE'siyle aynı şey değil (yukarı bak).
 
 **Kritik okuma:** Kriz döneminde WAPE %8.4 → %36.4 (4.3 kat) fırlarken rMAE 0.705 → 0.802 (%14) kıpırdıyor. Piyasa zorlaştı, naive de zorlandı, model orantısını korudu. **Yeni modeller bu tabloyu yenmek zorunda — özellikle rMAE sütununu.**
 
@@ -73,11 +99,14 @@ WITH b AS (
   JOIN public.raw_mcp_hourly m  ON m.ts  = p.target_ts
   LEFT JOIN public.raw_mcp_hourly n1 ON n1.ts = p.target_ts - INTERVAL '1 day'
   LEFT JOIN public.raw_mcp_hourly n7 ON n7.ts = p.target_ts - INTERVAL '7 day'),
+-- naive-3: Cmt/Paz/Pzt -> gecen hafta, Sal-Cum -> dun. Makalenin rMAE'si
+-- naive-2 (her zaman nv7); onu istersen asagidaki CASE'i `nv7` ile degistir.
 c AS (SELECT *, CASE WHEN dow IN (1,6,0) THEN nv7 ELSE nv1 END naive FROM b)
 SELECT COUNT(*) n,
   ROUND(AVG(ABS(pred-px))::numeric, 2)                                    "MAE",
   ROUND(AVG(pred-px)::numeric, 2)                                         "BIAS",
-  ROUND((AVG(ABS(pred-px))/NULLIF(AVG(ABS(naive-px)),0))::numeric, 3)     "rMAE",
+  ROUND((AVG(ABS(pred-px))/NULLIF(AVG(ABS(naive-px)),0))::numeric, 3)     "rMAE_naive3",
+  ROUND((AVG(ABS(pred-px))/NULLIF(AVG(ABS(nv7-px)),0))::numeric, 3)       "rMAE_naive2",
   ROUND((100*AVG(2*ABS(pred-px)/NULLIF(ABS(pred)+ABS(px),0)))::numeric,1) "sMAPE%",
   ROUND((100*SUM(ABS(pred-px))/NULLIF(SUM(px),0))::numeric, 1)            "WAPE%",
   ROUND((100.0*AVG(((px BETWEEN p10 AND p90))::int))::numeric, 1)         "kapsama%"
