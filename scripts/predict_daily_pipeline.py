@@ -293,12 +293,14 @@ def run_daily_prediction(force: bool = False):
             df_extended.loc[next_24h_index, 'temperature_c'] = df_raw['temperature_c'].tail(24).values
 
     # --- ADIM 5c: Pre-Forecast (Rüzgar/Güneş/Tüketim) tahminlerini enjekte et ---
-    from src.features.pre_forecasters import fetch_openmeteo_wind_history, build_pre_forecast_features, train_and_predict_pre_forecasters
+    from src.features.pre_forecasters import load_wind_features, build_pre_forecast_features, train_and_predict_pre_forecasters, assert_wind_available
     
     try:
         min_date = df_raw.index.min().strftime('%Y-%m-%d')
         max_date = df_raw.index.max().strftime('%Y-%m-%d')
-        df_wind = fetch_openmeteo_wind_history(min_date, max_date)
+        # Arşiv + forecast: arşiv API'si yarını veremez, tahmin ise HER ZAMAN
+        # yarın için üretiliyor (04:00 tetikleme, hedef T+1).
+        df_wind = load_wind_features(min_date, max_date)
         
         # Pre-forecaster özellikleri (eğitim verisi)
         df_pre_feat = build_pre_forecast_features(df_raw, df_wind)
@@ -313,7 +315,12 @@ def run_daily_prediction(force: bool = False):
                 future_window = future_window.drop(columns=overlap_cols)
         future_pre_full = build_pre_forecast_features(future_window, df_wind)
         future_pre_df = future_pre_full.loc[next_24h_index].copy()
-        
+
+        # Yarının rüzgar hızı yoksa yazma. Değiştirilemez tabloya yanlış satır
+        # yazmaktansa koşuyu durdurmak yeğ; LightGBM NaN'ı yutup sessizce
+        # otoregresif gecikmeye yaslanıyordu.
+        assert_wind_available(future_pre_df, next_24h_index, context="tomorrow's pre-forecast")
+
         # Pre-forecast tahmin et
         preds_df = train_and_predict_pre_forecasters(train_pre_df, future_pre_df)
         

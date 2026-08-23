@@ -13,7 +13,7 @@ from db.connection import get_db_engine
 from sqlalchemy import text
 from src.features.pre_forecasters import (
     create_pre_forecasts_schema_if_not_exists,
-    fetch_openmeteo_wind_history,
+    load_wind_features,
     build_pre_forecast_features,
     train_and_predict_pre_forecasters
 )
@@ -32,7 +32,9 @@ def run_pre_forecasts_backfill(num_days: int = 730, df_raw: Optional[pd.DataFram
     # Open-Meteo rüzgar verisini çek
     min_date = df_raw.index.min().strftime('%Y-%m-%d')
     max_date = df_raw.index.max().strftime('%Y-%m-%d')
-    df_wind = fetch_openmeteo_wind_history(min_date, max_date)
+    # Backfill'in son günü df_raw'ın son günü; akşam fiyat çekimi sayesinde bu
+    # YARIN olabiliyor. Arşiv API'si yarını veremediği için forecast da lazım.
+    df_wind = load_wind_features(min_date, max_date)
     
     # Feature'ları oluştur
     df_feat = build_pre_forecast_features(df_raw, df_wind)

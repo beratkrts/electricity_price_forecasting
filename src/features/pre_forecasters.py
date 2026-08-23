@@ -9,6 +9,14 @@ from db.connection import get_db_engine
 
 logger = logging.getLogger("PreForecasters")
 
+# Rüzgar santrallerinin yoğunlaştığı üç il. İki fonksiyon da bunu kullanıyor.
+CITY_COORDS = {
+    'izmir': {'lat': 38.41, 'lon': 27.14},
+    'canakkale': {'lat': 40.15, 'lon': 26.40},
+    'balikesir': {'lat': 39.64, 'lon': 27.88},
+}
+WIND_COLS = [f'wind_{c}' for c in CITY_COORDS]
+
 def fetch_openmeteo_wind_history(start_date_str, end_date_str):
     engine = get_db_engine()
     with engine.connect() as conn:
@@ -30,11 +38,7 @@ def fetch_openmeteo_wind_history(start_date_str, end_date_str):
 
     if fetch_start_date < end_date_str:
         logger.info(f"Fetching missing Open-Meteo wind data from {fetch_start_date} to {end_date_str}...")
-        cities = {
-            'izmir': {'lat': 38.41, 'lon': 27.14},
-            'canakkale': {'lat': 40.15, 'lon': 26.40},
-            'balikesir': {'lat': 39.64, 'lon': 27.88}
-        }
+        cities = CITY_COORDS
         df_weather = None
         failed_cities = []
         for city, coords in cities.items():
@@ -95,6 +99,106 @@ def fetch_openmeteo_wind_history(start_date_str, end_date_str):
     else:
         df_all_wind.index = df_all_wind.index.tz_convert('Europe/Istanbul')
     return df_all_wind
+
+def fetch_openmeteo_wind_forecast(past_days: int = 2, forecast_days: int = 3):
+    """Yarının rüzgar hızı — ARŞİV API'si bunu veremez.
+
+    `archive-api.open-meteo.com` yapısı gereği yalnızca geçmişi döndürüyor;
+    yarın istenince açıkça reddediyor:
+        "Parameter 'end_date' is out of allowed range from 1940-01-01 to <bugün>"
+
+    Tahmin sabah 04:00'te üretiliyor ve hedefi ERTESİ GÜN. O saatte yarının
+    KGÜP'ü ve yük tahmini yayımlanmamış oluyor (GÖP öğlene kadar açık) — zaten
+    ön-tahmincilerin varlık sebebi bu. Ama METEOROLOJİ tahmini geleceğe bakar
+    ve 04:00'te elimizdedir. Ön-tahmincinin sahip olabileceği tek geleceğe
+    dönük sinyal budur; arşiv API'si kullanıldığı sürece yarının rüzgar hızı
+    NaN kalıyor ve LightGBM sessizce 14 günlük otoregresif gecikmeye
+    yaslanıyor (ölçüm: her gün ortalama ~4.000 MW düşük tahmin).
+
+    DB'YE YAZILMAZ. `raw_wind_history_hourly`'nin MAX(ts)'i arşiv çekiminin
+    nereden başlayacağını belirliyor; oraya yarını yazmak bugünün reanaliz
+    verisinin kalıcı olarak atlanmasına yol açardı.
+    """
+    frames, failed = None, []
+    for city, coords in CITY_COORDS.items():
+        url = (f"https://api.open-meteo.com/v1/forecast?latitude={coords['lat']}"
+               f"&longitude={coords['lon']}&hourly=wind_speed_100m"
+               f"&past_days={past_days}&forecast_days={forecast_days}"
+               f"&timezone=Europe%2FIstanbul")
+        try:
+            data = httpx.get(url, timeout=30.0).json()
+            if 'hourly' not in data:
+                failed.append(city)
+                continue
+            idx = pd.to_datetime(data['hourly']['time']).tz_localize(
+                'Europe/Istanbul', ambiguous='infer', nonexistent='shift_forward')
+            s = pd.Series(data['hourly']['wind_speed_100m'], index=idx, name=f'wind_{city}')
+            frames = s.to_frame() if frames is None else frames.join(s, how='outer')
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Open-Meteo wind FORECAST failed for %s: %s", city, exc)
+            failed.append(city)
+
+    if failed:
+        logger.warning("Wind forecast failed for %d/%d cities (%s)",
+                       len(failed), len(CITY_COORDS), ", ".join(failed))
+    return frames
+
+
+def load_wind_features(start_date_str, end_date_str, with_forecast: bool = True):
+    """Arşiv (geçmiş reanaliz) + forecast (bugünün kalanı ve yarın).
+
+    Arşiv önceliklidir: bir saat için reanaliz varsa o kullanılır, forecast
+    yalnızca arşivin ulaşamadığı saatleri doldurur.
+    """
+    # Arşivden ASLA bugünden ötesi istenmemeli: API 400 döndürüyor, üç şehir de
+    # düşmüş sayılıyor ve "hepsi düştü" koruması yanlış yere tetikleniyor.
+    # `end_date_str` çoğu çağrıda df_raw'ın son günü = akşam fiyat çekimi
+    # sayesinde YARIN olabiliyor.
+    today = pd.Timestamp.now(tz='Europe/Istanbul').strftime('%Y-%m-%d')
+    archive_end = min(end_date_str, today)
+    hist = fetch_openmeteo_wind_history(start_date_str, archive_end)
+    if not with_forecast:
+        return hist
+    fc = fetch_openmeteo_wind_forecast()
+    if fc is None or fc.empty:
+        logger.warning("Wind forecast unavailable; falling back to archive only.")
+        return hist
+    if hist is None or hist.empty:
+        return fc
+    gap = fc[~fc.index.isin(hist.index)]
+    if gap.empty:
+        return hist
+    logger.info("Wind: archive %s → %s, forecast adds %d hours (to %s)",
+                hist.index.min().date(), hist.index.max(), len(gap), gap.index.max())
+    return pd.concat([hist, gap]).sort_index()
+
+
+def assert_wind_available(df_features, target_index, context: str = ""):
+    """Hedef saatlerde rüzgar hızı yoksa SESSİZCE DEVAM ETME.
+
+    `gold.kgup_load_pre_forecasts` değiştirilemez (ON CONFLICT ... WHERE ... IS
+    NULL). Rüzgar hızı NaN iken hesaplanan satır kalıcı olarak yanlış kalır ve
+    ancak elle DELETE ile düzelir. LightGBM NaN'ı kendi hallettiği için bu hata
+    çökme olarak değil, sessiz bir kalite kaybı olarak görünüyordu.
+    """
+    present = [c for c in WIND_COLS if c in df_features.columns]
+    missing_cols = [c for c in WIND_COLS if c not in df_features.columns]
+    if not present:
+        raise RuntimeError(
+            f"Wind speed columns absent for {context or 'target hours'} "
+            f"({', '.join(missing_cols)}). Refusing to write immutable pre-forecasts.")
+    sub = df_features.reindex(target_index)[present]
+    if sub.isna().all(axis=None):
+        raise RuntimeError(
+            f"Wind speed is entirely missing for {context or 'target hours'} "
+            f"({target_index.min()} → {target_index.max()}). The archive API cannot "
+            "return future dates — use load_wind_features(), which merges the "
+            "forecast API. Refusing to write immutable pre-forecasts.")
+    n_bad = int(sub.isna().all(axis=1).sum())
+    if n_bad:
+        logger.warning("Wind speed missing for %d/%d target hours (%s)",
+                       n_bad, len(sub), context)
+
 
 def build_pre_forecast_features(df_raw, df_wind):
     df = df_raw.copy()
