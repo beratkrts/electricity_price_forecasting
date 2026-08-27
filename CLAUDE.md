@@ -1,5 +1,14 @@
 # CLAUDE.md - Enerji Fiyat Tahmini Projesi
 
+## Bu repo SADECE canlı sistem
+
+27 Ağustos 2026'da repo ikiye ayrıldı: bu repo **yalnızca** dashboard'u besleyen
+model/ETL/DB/API'yi tutuyor. Tüm deneyler, backtest'ler, literatür taraması ve
+kriz/olay istihbarat araştırması `../electricity_price_forecasting_in_turkish_day_ahead_market` kardeş
+reposuna taşındı — **aynı PostgreSQL veritabanına bağlanıyor**, ayrı git
+geçmişi var. Yeni bir model mimarisi/özellik denemesi, backtest, notebook
+analizi vb. istenirse önce oraya bak/oraya yaz, bu repoya deneysel kod ekleme.
+
 ## Proje Özeti
 
 Türkiye elektrik piyasası (EPİAŞ) Gün Öncesi Piyasa Takas Fiyatı (PTF/MCP) tahmini için uçtan uca AI/ML pipeline'ı.
@@ -7,7 +16,7 @@ Her gün saat 04:00'te (Europe/Istanbul) 14+ veri kaynağından veri çeker, Lig
 
 **Proje aşaması (14 Ağustos 2026):** Fiyat modeli geliştirmesi kapandı — `lgb_lag0_v2` canlı
 şampiyon, 24 saatlik ayrı model deneyi reddedildi (%16.00 vs %15.92 WAPE, 700 kat maliyet).
-Aktif çalışma **kriz/olay istihbarat sistemine** kaydı: bkz. `CRISIS_ANALYSIS_PLAN.md`.
+Aktif çalışma **kriz/olay istihbarat sistemine** kaydı: bkz. deney reposundaki `CRISIS_ANALYSIS_PLAN.md`.
 Ham veri bu nedenle 2021'e kadar çekildi; **modelin eğitim penceresi 2023'te sabit kaldı.**
 
 ## Teknoloji Stack
@@ -39,16 +48,13 @@ enerji_fiyat_tahmini/
 │
 ├── src/
 │   ├── models/
-│   │   ├── lightgbm_model.py   # LightGBMForecaster sınıfı (canlı)
-│   │   ├── epnet.py            # [DENEYSEL] CNN+LSTM/GRU/BiLSTM modelleri
-│   │   └── cqr_calibrator.py   # [DENEYSEL] Conformalized Quantile Regression
+│   │   └── lightgbm_model.py   # LightGBMForecaster sınıfı (canlı, TEK model)
 │   ├── features/
 │   │   ├── feature_engineering.py  # 65+ feature (base/core/full/robust)
 │   │   ├── pre_forecasters.py  # Yük/Güneş/Rüzgar alt-modelleri
 │   │   └── holidays.py         # Türkiye resmi tatilleri
-│   ├── routing/
-│   │   ├── model_router.py     # [DENEYSEL] Rejim bazlı model yönlendirme
-│   │   └── regime_detector.py  # [DENEYSEL] NORMAL/CRASH/VOLATILE rejim tespiti
+│   ├── data_ingestion/
+│   │   └── api_trials/         # İsme rağmen CANLI — EPİAŞ custom REST (dam/su/gaz/hava)
 │   └── utils/
 │       └── fallback_logger.py  # Fallback log yardımcısı
 │
@@ -73,10 +79,9 @@ enerji_fiyat_tahmini/
 │   ├── city_coordinates.json   # 26 bölge koordinatları + tüketim ağırlıkları
 │   └── city_percentages.json   # 81 il elektrik tüketim yüzdeleri
 │
-├── eda/                        # [GIT-DIŞI] Notebook'lar ve EDA scriptleri
 ├── data/                       # [GIT-DIŞI] Ham JSON verileri (2024-01 ~ 2024-08)
 ├── logs/                       # [GIT-DIŞI] daily_update.log, anomalies.log
-├── docs/                       # [GIT-DIŞI] Proje dokümanları
+├── docs/                       # DB/docker mimari rehberleri (canlıya özel, tracked)
 │
 ├── docker-compose.yml          # 3 servis: db, app, dashboard
 ├── Dockerfile                  # Python 3.11-slim + PyTorch CPU
@@ -205,29 +210,25 @@ docker compose up --build -d
 - **`LightGBMForecaster`'a params geçerken:** `deterministic` / `force_col_wise` /
   `random_state` `setdefault` ile korunur. Hiperparametreler kasıtlı olarak birleştirilmez.
 
-## Canlıda KULLANILMAYAN (Deneysel) Modüller
+## Deneysel modüller artık bu repoda DEĞİL
 
-| Modül | Durum | Açıklama |
-|-------|-------|----------|
-| `src/models/epnet.py` | Deneysel | CNN+LSTM/GRU/BiLSTM neural network. Backtest'lerde test edildi, canlıya alınmadı. |
-| `src/models/cqr_calibrator.py` | Deneysel | CQR kalibratörü. P10/P90 bounds LightGBM'in native quantile'ı ile üretiliyor. |
-| `src/routing/model_router.py` | Deneysel | Rejim bazlı EPNet/LightGBM ensemble. Canlıda sadece LightGBM kullanılıyor. |
-| `src/routing/regime_detector.py` | Deneysel | NORMAL/CRASH/VOLATILE piyasa rejim tespiti. Canlıya entegre değil. |
-| `scripts/run_*_backtest.py` | Deneysel | Çeşitli backtest senaryoları. |
-| `scripts/fast_cqr_update.py` | Deneysel | CQR model güncelleme scripti. |
-| `scripts/backfill_*_experimental*.py` | Deneysel | Deneysel tahmin backfill scriptleri. |
+`src/models/epnet.py`, `src/models/cqr_calibrator.py`, `src/routing/`,
+`src/eval/lago_protocol.py`, `experiments/`, `literature/`, `src/crisis/` ve
+tüm backtest/deney scriptleri `../electricity_price_forecasting_in_turkish_day_ahead_market` reposuna
+taşındı (27 Ağustos 2026). Canlıda hâlâ sadece LightGBM (`lgb_lag0_v2`)
+kullanılıyor — bu değişmedi, sadece kod nerede yaşıyor değişti.
 
 ## Dokümantasyon
 
 | Dosya | İçerik |
 |-------|--------|
-| `CLAUDE.md` | Bu dosya — proje rehberi |
-| `ISSUES.md` | Tespit edilen sorunlar ve iyileştirme önerileri |
-| `EXPERIMENT_REPORT.md` | Tüm model deneylerinin sonuç tabloları ve karşılaştırması |
-| `EXPERIMENT_WORKFLOW.md` | Sistematik deney çalışma rehberi ve repo temizleme planı |
-| `CRISIS_ANALYSIS_PLAN.md` | **Yeni aşama:** kriz/olay istihbarat sistemi — tasarım ve fizibilite |
-| `LOW_PRICE_REGIME_ANALYSIS.md` | 2026 bahar fiyat çöküşü teşhisi — hidro rejim kırılması, tekrar üretilebilir SQL + notebook planı |
-| `METRICS.md` | **Metrik rehberi** — çekirdek set (MAE/BIAS/rMAE/sMAPE/WAPE/kapsama), naive baseline, hazır SQL. Model kararı tek metriğe dayanmaz. |
+| `CLAUDE.md` | Bu dosya — proje rehberi (sadece canlı sistem) |
+| `ISSUES.md` | Tespit edilen sorunlar ve iyileştirme önerileri (canlı koda dair) |
+
+Deney raporları, metrik rehberi, kriz analiz planı ve tüm model deney
+sonuçları (`EXPERIMENT_REPORT.md`, `EXPERIMENT_WORKFLOW.md`,
+`CRISIS_ANALYSIS_PLAN.md`, `LOW_PRICE_REGIME_ANALYSIS.md`, `METRICS.md`,
+`LITERATURE_REVIEW.md` vb.) artık `../electricity_price_forecasting_in_turkish_day_ahead_market` reposunda.
 
 ## Model Versiyonları
 
