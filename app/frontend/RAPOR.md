@@ -1,8 +1,8 @@
 # EPİAŞ PTF Enerji Fiyat Tahminleme Dashboard ve Mimari Raporu (Son Güncel Sürüm)
 
-**Hazırlanma Tarihi:** 31 Temmuz 2026  
+**Hazırlanma Tarihi:** 31 Temmuz 2026 · **Güncellenme Tarihi:** 27 Ağustos 2026  
 **Proje Adı:** EPİAŞ Piyasa Takas Fiyatı (PTF) Gelecek Fiyat Tahminleme ve Karar Destek Dashboard'u  
-**Proje Durumu:** ℹ️ Demo Modu (Model Eğitimi ve Veri Simülasyonu Aşamasında - Gerçek API ve PostgreSQL Veritabanı Entegrasyonuna Tam Hazır Altyapı)  
+**Proje Durumu:** ✅ Üretimde — gerçek EPİAŞ API + PostgreSQL veritabanı ile canlı çalışıyor (demo/simülasyon modu yok)  
 **Ana Hedef:** Sadece ve Yalnızca EPİAŞ Piyasa Takas Fiyatı (PTF) Tahmini, Model Karşılaştırması ve Veritabanı İncelemesi  
 
 ---
@@ -56,9 +56,9 @@ Projemizin operasyonel zaman akışı şu şekildedir:
 ```
 
 1. **Sabah ETL'inin (04:00 AM) Amacı**:
-   - 31 Temmuz sabahı çalışarak 30 Temmuz (D-1) gününün tamamen kesinleşmiş 24 saatlik piyasa gerçekleşmelerini (PTF, SMF, Üretim/Tüketim) veritabanına işler.
+   - Sabah çalışarak bir önceki günün (D-1) tamamen kesinleşmiş 24 saatlik piyasa gerçekleşmelerini (PTF, SMF, Üretim/Tüketim) veritabanına işler.
 2. **Sabah Tahmini ve Yayınlama**:
-   - `src/models/epnet.py` (CNN+LSTM), `LightGBM` ve `Hibrit Model` bu verilerle çalışarak **1 Ağustos'un (D+1)** 24 saatlik PTF fiyatlarını tahmin eder ve piyasa teklifleri kapanmadan önce yayımlar.
+   - Canlı model **tek başına LightGBM** (3 ayrı quantile başlığı: P10/P50/P90, `src/models/lightgbm_model.py`) — bu verilerle çalışarak **D+1** gününün 24 saatlik PTF fiyatlarını (ve belirsizlik aralığını) tahmin eder, piyasa teklifleri kapanmadan önce yayımlar. EPNet (CNN+LSTM) ve hibrit model denemeleri backtest'lerde LightGBM'i geçemedi, canlıya hiç alınmadı — kodları artık bu repoda bile değil, kardeş deney reposuna taşındı.
 3. **EPİAŞ İlanı ve Doğrulama**:
    - EPİAŞ saat **14:15'te** gerçekleşen resmi PTF'yi ilan ettiğinde, sabah yaptığımız kilitli tahmin ile gerçek fiyatlar **Tahmin Kıyaslama** sayfasında kıyaslanarak Hata Payı (MAPE %) ve Kesişim Pinglemesi anında görüntülenir.
 

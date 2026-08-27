@@ -23,9 +23,8 @@ Sistem, profesyonel bir veri mimarisi standartlarına uygun olarak 4 temel ayakt
 
 ### 2. 🧠 Yapay Zeka (AI) Modellemesi
 
-- **LightGBM:** Geçmiş fiyat gecikmeleri (Lags), tatil günleri, döviz kurları, sıcaklık tahminleri ve arz-talep oranları gibi onlarca özelliği kullanan optimize edilmiş model.
-- **Hedef Dönüşümü (Target Transformation):** Fiyat volatilitesini (dalgalanmasını) yönetmek için Hareketli Ağırlıklı Ortalama (MWA - Residual Learning) ve baz modelleme stratejileri içerir.
-- **Sabitlik (Reproducibility):** Model, farklı ortamlarda milimetrik olarak aynı sonuçları üretecek şekilde deterministik olarak yapılandırılmıştır.
+- **LightGBM (3-head quantile):** Geçmiş fiyat gecikmeleri (Lags), tatil günleri, döviz kurları, sıcaklık tahminleri ve arz-talep oranları gibi 65+ özellik kullanan, P10/P50/P90 quantile'larını ayrı ayrı üreten optimize edilmiş model (log1p gibi hedef dönüşümü kullanılmaz).
+- **Sabitlik (Reproducibility):** Model, farklı ortamlarda milimetrik olarak aynı sonuçları üretecek şekilde deterministik olarak yapılandırılmıştır. Her gün sıfırdan yeniden eğitilir, diske kaydedilmez.
 
 ### 3. ⚙️ FastAPI Backend Sunucusu
 
@@ -80,6 +79,11 @@ Bu komut ile:
 - `scripts/`: Günlük veri çekme, ETL, ve tahmin işlemlerini yürüten Python boru hatları (pipeline).
 - `src/`: Veritabanı (SQLAlchemy) bağlantıları ve Makine Öğrenmesi (LightGBM) sınıflarının çekirdek kodları.
 - `docs/`: Mimari planlar ve veri sözlüğü (Data Dictionary) gibi teknik dokümantasyonlar.
+
+Bu repo **sadece canlı sistemi** (dashboard/ETL/model/API) içerir. Model
+deneyleri, backtest'ler, literatür taraması ve kriz/olay istihbarat araştırması
+`../electricity_price_forecasting_in_turkish_day_ahead_market` kardeş
+reposunda — aynı PostgreSQL veritabanına bağlanır, ayrı git geçmişi vardır.
 
 ---
 
