@@ -1,3 +1,4 @@
+import time
 import pandas as pd
 import numpy as np
 import httpx
@@ -125,18 +126,32 @@ def fetch_openmeteo_wind_forecast(past_days: int = 2, forecast_days: int = 3):
                f"&longitude={coords['lon']}&hourly=wind_speed_100m"
                f"&past_days={past_days}&forecast_days={forecast_days}"
                f"&timezone=Europe%2FIstanbul")
-        try:
-            data = httpx.get(url, timeout=30.0).json()
-            if 'hourly' not in data:
-                failed.append(city)
-                continue
-            idx = pd.to_datetime(data['hourly']['time']).tz_localize(
-                'Europe/Istanbul', ambiguous='infer', nonexistent='shift_forward')
-            s = pd.Series(data['hourly']['wind_speed_100m'], index=idx, name=f'wind_{city}')
-            frames = s.to_frame() if frames is None else frames.join(s, how='outer')
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Open-Meteo wind FORECAST failed for %s: %s", city, exc)
+        # Yarının rüzgar hızı ön-tahmincinin TEK geleceğe dönük sinyali. Tek denemede
+        # bir ağ hıçkırığı yüzünden kaçırmak, o günün ön-tahminini sessizce 14 günlük
+        # gecikmeye düşürüyor (25-30 Ağu 2026 arızası). 3 kez, artan bekleme ile dene.
+        data = None
+        for attempt in range(3):
+            try:
+                resp = httpx.get(url, timeout=30.0)
+                payload = resp.json()
+                if 'hourly' in payload:
+                    data = payload
+                    break
+                logger.warning("Open-Meteo wind FORECAST attempt %d/3 for %s: no 'hourly' key",
+                               attempt + 1, city)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Open-Meteo wind FORECAST attempt %d/3 failed for %s: %s",
+                               attempt + 1, city, exc)
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+        if data is None:
+            logger.error("Open-Meteo wind FORECAST failed for %s after 3 attempts", city)
             failed.append(city)
+            continue
+        idx = pd.to_datetime(data['hourly']['time']).tz_localize(
+            'Europe/Istanbul', ambiguous='infer', nonexistent='shift_forward')
+        s = pd.Series(data['hourly']['wind_speed_100m'], index=idx, name=f'wind_{city}')
+        frames = s.to_frame() if frames is None else frames.join(s, how='outer')
 
     if failed:
         logger.warning("Wind forecast failed for %d/%d cities (%s)",
@@ -161,13 +176,21 @@ def load_wind_features(start_date_str, end_date_str, with_forecast: bool = True)
         return hist
     fc = fetch_openmeteo_wind_forecast()
     if fc is None or fc.empty:
-        logger.warning("Wind forecast unavailable; falling back to archive only.")
+        # Arşiv geleceği veremez, forecast de gelmedi → yarının hedef saatleri NaN
+        # kalacak. Bu path'te (T+1) assert_wind_available() bunu yakalayıp koşuyu
+        # durduruyor; yine de burada ERROR'la görünür yap.
+        logger.error("Wind FORECAST API returned nothing; archive-only result cannot cover "
+                     "tomorrow. Downstream assert_wind_available() will abort the T+1 run.")
         return hist
     if hist is None or hist.empty:
         return fc
     gap = fc[~fc.index.isin(hist.index)]
     if gap.empty:
         return hist
+    today_ts = pd.Timestamp.now(tz='Europe/Istanbul').normalize()
+    if gap.index.max() < today_ts + pd.Timedelta(days=1):
+        logger.error("Wind forecast merge reaches only %s — does not cover tomorrow. "
+                     "T+1 pre-forecast will fail the wind-availability check.", gap.index.max())
     logger.info("Wind: archive %s → %s, forecast adds %d hours (to %s)",
                 hist.index.min().date(), hist.index.max(), len(gap), gap.index.max())
     return pd.concat([hist, gap]).sort_index()
@@ -194,10 +217,17 @@ def assert_wind_available(df_features, target_index, context: str = ""):
             f"({target_index.min()} → {target_index.max()}). The archive API cannot "
             "return future dates — use load_wind_features(), which merges the "
             "forecast API. Refusing to write immutable pre-forecasts.")
+    # Herhangi bir hedef saatte üç şehir birden NaN ise, LightGBM o saat için
+    # sessizce 14 günlük otoregresif gecikmeye düşer — 25-30 Ağu 2026 arızası:
+    # predicted_wind_lag0 düz ~2300 MW takılırken gerçek rüzgar 8000+ MW'a çıktı.
+    # "Kısmen eksik" satır da kalıcı olarak yanlış → burada da hata fırlat.
     n_bad = int(sub.isna().all(axis=1).sum())
     if n_bad:
-        logger.warning("Wind speed missing for %d/%d target hours (%s)",
-                       n_bad, len(sub), context)
+        raise RuntimeError(
+            f"Wind speed missing for {n_bad}/{len(sub)} target hours ({context}). "
+            "Those hours would silently fall back to the 14-day autoregressive lag. "
+            "Refusing to write immutable pre-forecasts — check the Open-Meteo forecast API "
+            "(fetch_openmeteo_wind_forecast) and the archive→forecast merge in load_wind_features().")
 
 
 def build_pre_forecast_features(df_raw, df_wind):
